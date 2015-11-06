@@ -3,7 +3,7 @@
 ###########################################################
 # Script Name:  Config_Staff.sh
 # By:  Zack Thompson / Created:  5/14/2015
-# Version:  2.2 / Updated:  8/20/2015 / By:  ZT
+# Version:  2.3 / Updated:  9/4/2015 / By:  ZT
 #
 # Description:  This is an configuration script to configure existing Macs in the environment.
 #
@@ -47,29 +47,6 @@ sudo defaults write /System/Library/User\ Template/English.lproj/Library/Prefere
 # Disable default file sharing for guest
 Echo "Disabling file sharing for guest..."
 sudo defaults write /Library/Preferences/com.apple.AppleFileServer guestAccess -bool false
-
-# Copy over Desktop Shortcuts for Existing Users
-Echo "Copying over Desktop Shortcuts for current user..."
-Echo "Mounting Share"
-sudo -u $user osascript -e 'mount volume "smb://server/share"'
-Echo "Share Mounted, copying over shortcuts..."
-sudo -u $user cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Intranet.webloc $userHome/Desktop
-sudo -u $user cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Kronos\ Workforce\ Central.webloc $userHome/Desktop
-sudo -u $user cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Support.webloc $userHome/Desktop
-sudo -u $user cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Website 1.webloc $userHome/Desktop
-sudo -u $user cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Website 2.webloc $userHome/Desktop
-Echo "Unmounting sharing..."
-sudo -u $user umount /Volumes/share
-
-# Copy over Desktop Shortcuts for New Users
-Echo "Copying over Desktop Shortcuts for new users..."
-sudo osascript -e 'mount volume "smb://server/share"'
-sudo cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Intranet.webloc /System/Library/User\ Template/English.lproj/Desktop/
-sudo cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Kronos\ Workforce\ Central.webloc /System/Library/User\ Template/English.lproj/Desktop/
-sudo cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Support.webloc /System/Library/User\ Template/English.lproj/Desktop/
-sudo cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Website 1.webloc /System/Library/User\ Template/English.lproj/Desktop/
-sudo cp /Volumes/share/GPO\ Files/Shortcut\ Icons/Website 2.webloc /System/Library/User\ Template/English.lproj/Desktop/
-sudo umount /Volumes/share
 
 # Disable iCloud & Apple Assistant Popup for new user creation
 Echo "Disabling iCloud & Apple Assistant popup for new user creation..."
