@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ManagedPlugInPolicies</key>
+	<dict>
+		<key>com.macromedia.Flash Player.plugin</key>
+		<dict>
+			<key>PlugInFirstVisitPolicy</key>
+			<string>PlugInPolicyAsk</string>
+			<key>PlugInHostnamePolicies</key>
+			<array>
+				<dict>
+					<key>PlugInHostname</key>
+					<string>kronos.domain.org</string>
+					<key>PlugInPageURL</key>
+					<string>http://kronos.domain.org</string>
+					<key>PlugInPolicy</key>
+					<string>PlugInPolicyAllowNoSecurityRestrictions</string>
+					<key>PlugInRunUnsandboxed</key>
+					<false/>
+				</dict>
+			</array>
+		<key>com.oracle.java.JavaAppletPlugin</key>
+		<dict>
+			<key>PlugInFirstVisitPolicy</key>
+			<string>PlugInPolicyAsk</string>
+			<key>PlugInHostnamePolicies</key>
+			<array>
+				<dict>
+					<key>PlugInHostname</key>
+					<string>kronos.domain.org</string>
+					<key>PlugInPageURL</key>
+					<string>http://kronos.domain.org</string>
+					<key>PlugInPolicy</key>
+					<string>PlugInPolicyAllowNoSecurityRestrictions</string>
+					<key>PlugInRunUnsandboxed</key>
+					<false/>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+</dict>
+</plist>
+</dict>
