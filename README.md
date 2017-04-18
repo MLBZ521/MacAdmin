@@ -1,1 +1,1 @@
-macos-jamf
+This repo will contain scripts I have written for JAMF usage.
