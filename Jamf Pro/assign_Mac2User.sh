@@ -13,13 +13,13 @@
 
 # Use Apple Script to request information via dialog boxes and assign to variables.
 
-endUsername=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your asurite:" default answer " ")')
+endUsername=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your domain account:" default answer " ")')
 
 realname=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your full name:" default answer " ")')
 
 email=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your email address:" default answer " ")')
 
-phone=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your ASU assigned phone number:" default answer " ")')
+phone=$(osascript -e 'set userInput to the text returned of (display dialog "Please enter your phone number:" default answer " ")')
 
 
 # Run jamf recon and field it the values gathered above.
