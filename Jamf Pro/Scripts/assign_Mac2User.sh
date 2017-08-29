@@ -4,8 +4,6 @@
 # Script Name:  assign_Mac2User.sh
 # By:  Zack Thompson / Created:  4/18/2017
 # Version:  1.0 / Updated:  4/18/2017 / By:  ZT
-# ChangeLog:
-#	v1.0 = First Production Version
 #
 # Description:  This script assigns a Mac to a User in JAMF Inventory records for a specific device.
 #
