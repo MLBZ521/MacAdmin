@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.0 / Updated:  9/29/2017 / By:  ZT
+# Version:  1.1 / Updated:  11/2/2017 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -29,14 +29,14 @@
 # Setup Functions
 
 function modelCheck {
-	if [[ $modelMajorVersion -ge $1 && $osVersion -ge 10.8 ]]; then
-		echo "<result>High Sierra</result>"
-	if [[ $modelMajorVersion -ge $1 && $osVersion -ge 10.7.5 ]]; then
-		echo "<result>Sierra</result>"  # (Current OS Limitation, 10,13 Compatible)
-	elif [[ $modelMajorVersion -ge $2 && $osVersion -ge 10.6.8 ]]; then
-		echo "<result>El Capitan</result>"
+	if [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+		/bin/echo "<result>High Sierra</result>"
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 7.5") -eq 1 ]]; then
+		/bin/echo "<result>Sierra</result>"  # (Current OS Limitation, 10.13 Compatible)
+	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
+		/bin/echo "<result>El Capitan</result>"
 	else
-		echo "<result>Model or Current OS Not Supported</result>"
+		/bin/echo "<result>Model or Current OS Not Supported</result>"
 	fi
 }
 
@@ -44,14 +44,14 @@ function modelCheck {
 # Get machine info
 
 # Get the OS Version
-	osVersion=$(sw_vers -productVersion)
+	osVersion=$(sw_vers -productVersion | /usr/bin/awk -F '10.' '{print $2}')
 # Get the Model Type and Major Version
-	modelType=$(/usr/sbin/sysctl -n hw.model | sed 's/[^a-zA-Z]//g')
-	modelMajorVersion=$(/usr/sbin/sysctl -n hw.model | sed 's/[^0-9,]//g' | awk -F, '{print $1}')
+	modelType=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^a-zA-Z]//g')
+	modelMajorVersion=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^0-9,]//g' | /usr/bin/awk -F, '{print $1}')
 # Get RAM
 	systemRAM=$(/usr/sbin/sysctl -n hw.memsize)
 # Get free space on the boot disk
-	systemFreeSpace=$(diskutil info / | awk -F '[()]' '/Free Space|Available Space/ {print $2}' | cut -d " " -f1)
+	systemFreeSpace=$(diskutil info / | /usr/bin/awk -F '[()]' '/Free Space|Available Space/ {print $2}' | /usr/bin/cut -d " " -f1)
 
 ##################################################
 # Check for compatibility...
@@ -87,7 +87,7 @@ if [[ $systemRAM -ge $requiredRAM && $systemFreeSpace -ge $requiredFreeSpace ]];
 	esac
 
 else
-	echo "<result>Insufficient Resources</result>"
+	/bin/echo "<result>Insufficient Resources</result>"
 fi
 
 exit 0
