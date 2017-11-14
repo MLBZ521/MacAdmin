@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.1 / Updated:  11/2/2017 / By:  ZT
+# Version:  1.2 / Updated:  11/13/2017 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -19,7 +19,7 @@
 
 # Setting the minimum RAM and free disk space required for compatibility (opting for 4GB instead of 2GB)
 	minimumRAM=4
-	minimumFreeSpace=15
+	minimumFreeSpace=20
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
 	requiredRAM=$(($minimumRAM * $convertToGigabytes))
