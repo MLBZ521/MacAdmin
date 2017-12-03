@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_RetirePackages.sh
 # By:  Zack Thompson / Created:  9/15/2017
-# Version:  1.0 / Updated:  9/15/2017 / By:  ZT
+# Version:  1.1 / Updated:  9/29/2017 / By:  ZT
 #
 # Description:  This script is used for cleaning up packages in a Jamf Pro Server.
 #
@@ -14,8 +14,8 @@
 	scriptDirectory=$(dirname "${0}")
 	cwd=$(pwd)
 	switch="${1}"
-	input2="${cwd}/${2}"
-	input3="${cwd}/${3}"
+	input2="${2}"
+	input3="${3}"
 
 ##################################################
 # Setup Functions
@@ -39,9 +39,9 @@ function getPackages {
 	packages=$(jss_helper package)
 
 	printf '%s\n' "$packages" | while IFS= read -r line; do
-	   packageID=$(echo "$line" | awk -F 'ID: ' '{print $2}' | awk -F ' ' '{print $1}')
-	   packageName=$(echo "$line" | awk -F 'NAME: ' '{print $2}')
-	   echo "$packageID,$packageName" >> "${input2}"
+		packageID=$(echo "$line" | awk -F 'ID: ' '{print $2}' | awk -F ' ' '{print $1}')
+		packageName=$(echo "$line" | awk -F 'NAME: ' '{print $2}')
+		echo "$packageID,$packageName" >> "${input2}"
 	done
 }
 
@@ -62,7 +62,16 @@ function getPolicies {
 				fi
 			done
 		fi
-	done < $1
+	done < "${1}"
+}
+
+function fileExists {
+	if [[ ! -e "${1}" ]]; then
+		touch "${1}"
+	elif [[ ! -e "${2}" ]]; then
+		echo "Unable to find the input file!"
+		exit 101
+	fi
 }
 
 ##################################################
@@ -70,18 +79,25 @@ function getPolicies {
 
 case $switch in
 	-packages )
-		if [[ -n $input2 ]]; then
+		if [[ -n "${input2}" ]]; then
+			# Function fileExists 
+			fileExists "${input2}"
+			
 			# Function getPackages
-			getPackages $input2
+			getPackages "${input2}"
 		else
 			# Function getHelp
 			getHelp
 		fi
 	;;
 	-policies)
-		if [[ -n $input2 || -n $input3 ]]; then
+		if [[ -n "${input2}" || -n "${input3}" ]]; then
+
+			# Function fileExists 
+			fileExists "${input3}" "${input2}"
+
 			# Function getPolicies
-			getPolicies $input2 $input3
+			getPolicies "${input2}" "${input3}"
 		else
 			# Function getHelp
 			getHelp
