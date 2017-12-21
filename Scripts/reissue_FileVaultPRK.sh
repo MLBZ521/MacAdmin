@@ -25,7 +25,7 @@ cmdFileVault="/usr/bin/fdesetup"
 if [[ $fvStatus == "true" ]]; then
 	/usr/bin/logger -s "Machine is FileVault Encrypted."
 
-	$cmdFileVault changerecovery -personal -inputplist <<XML
+	$cmdFileVault changerecovery -personal -inputplist 1> /dev/null <<XML
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -34,7 +34,7 @@ if [[ $fvStatus == "true" ]]; then
 <string>$4</string>
 </dict>
 </plist>
-XML 1> /dev/null
+XML
 
 else
 	/usr/bin/logger -s "Machine is not FileVault Encrypted."
