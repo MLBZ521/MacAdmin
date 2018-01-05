@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.0 / Updated:  1/4/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/5/2018 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -106,9 +106,9 @@ if [[ -e "${appPath}/SPSSStatistics.app" ]]; then
 		# Function LicenseInfo
 		LicenseInfo
 
-		# Inject the License Manager Server Name and number of days allowed to check out a license. # LANG=C 
-		/usr/bin/sed -i '' 's/DaemonHost=/&'"${licenseManager}"'/' "${licenseFile}"
-		/usr/bin/sed -i '' 's/CommuterMaxLife=/&'"${cummuterDays}"'/' "${licenseFile}"
+		# Inject the License Manager Server Name and number of days allowed to check out a license.
+		/usr/bin/sed -i '' 's/DaemonHost=.*/'"DaemonHost=${licenseManager}"'/' "${licenseFile}"
+		/usr/bin/sed -i '' 's/CommuterMaxLife=.*/'"CommuterMaxLife=${cummuterDays}"'/' "${licenseFile}"
 
 	elif [[ $licenseMechanism == "Local" ]]; then
 
