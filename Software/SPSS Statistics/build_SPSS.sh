@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  build_SPSS.sh
 # By:  Zack Thompson / Created:  1/5/2018
-# Version:  1.0 / Updated:  1/5/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/8/2018 / By:  ZT
 #
-# Description:  This script uses munkpkg to build an SPSS Package.
+# Description:  This script uses munkpkg to build an SPSS package.
 #
 ###################################################################################################
 
@@ -16,12 +16,16 @@
 
 softwareTitle="SPSSStatistics"
 
-# Set working directory
-	scriptDirectory=$(/usr/bin/dirname "$(/usr/bin/stat -f "$0")")
 # Switches
 	switch1="${1}"  # Build Type
 	switch2="${2}"  # Version
 	switch3="${3}"  # Version Value
+
+# Set working directory
+	scriptDirectory=$(/usr/bin/dirname "$(/usr/bin/stat -f "$0")")
+
+# Get the Major Version
+	majorVersion=$(/bin/echo "${switch3}" | /usr/bin/awk -F "." '{print $1}')
 
 ##################################################
 # Setup Functions
@@ -71,12 +75,18 @@ case $switch1 in
 		/bin/cp "${scriptDirectory}"/install_SPSS.sh "${scriptDirectory}"/scripts/postinstall
 		/bin/cp "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
+		# Set the desired install directory
+		/usr/bin/sed -i '' 's,USER_INSTALL_DIR=,'"USER_INSTALL_DIR=/Applications/SPSS Statistics ${majorVersion}/"',' "${scriptDirectory}"/scripts/installer.properties
+
 		# Function munkiBuild
 		munkiBuild
 	;;
 	-update )
 		/bin/cp "${scriptDirectory}"/update_SPSS.sh "${scriptDirectory}"/scripts/postinstall
 		/bin/cp "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+
+		# Set the version in the update_SPSS.sh script
+		/usr/bin/sed -i '' 's/version=/'"version=${majorVersion}"'/' "${scriptDirectory}"/scripts/update_SPSS.sh
 
 		# Function munkiBuild
 		munkiBuild
