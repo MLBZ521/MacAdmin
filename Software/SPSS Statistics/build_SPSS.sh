@@ -50,7 +50,7 @@ Actions:
 
 function munkiBuild {
 	/usr/libexec/PlistBuddy -c "set identifier com.github.mlbz521.pkg.${softwareTitle}" "${scriptDirectory}"/build-info.plist
-	/usr/libexec/PlistBuddy -c "set name ${softwareTitle}-\${version}.pkg" "${scriptDirectory}"/build-info.plist
+	/usr/libexec/PlistBuddy -c "set name ${softwareTitle} Unlicensed-\${version}.pkg" "${scriptDirectory}"/build-info.plist
 	/usr/libexec/PlistBuddy -c "set version $switch3" "${scriptDirectory}"/build-info.plist
 
 	munkipkg "${scriptDirectory}" > /dev/null
