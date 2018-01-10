@@ -3,21 +3,34 @@
 ###################################################################################################
 # Script Name:  install_Maple.sh
 # By:  Zack Thompson / Created:  3/2/2017
-# Version:  1.1 / Updated:  6/23/2017 / By:  ZT
+# Version:  1.2 / Updated:  1/8/2018 / By:  ZT
 #
-# Description:  This script installs silent installs and activates Maple with a network license.
+# Description:  This script silently installs Maple.
 #
 ###################################################################################################
 
-# Define working directory
-cd /tmp/Maple2017.0
+/bin/echo "*****  Install Maple process:  START  *****"
 
-# Install Maple via built-in script and option file. 
-./Maple2017.0MacInstaller.app/Contents/MacOS/installbuilder.sh --optionfile ./installer.properties
-Echo 'Maple has been installed!'
+##################################################
+# Define Variables
+
+# Set working directory
+	pkgDir=$(/usr/bin/dirname $0)
+# Version that's being updated (this will be set by the build_Maple.sh script)
+	version=
+
+##################################################
+# Bits staged...
+
+# Install Maple
+/bin/echo "Installing Maple..."
+	"${pkgDir}/Maple${version}MacInstaller.app/Contents/MacOS/installbuilder.sh" --mode unattended
+/bin/echo "Install complete!"
 
 # Apple update 'Java for OS X 2015-001' is required for Maples as well, installing that here.
-/usr/sbin/installer -dumplog -verbose -pkg ./JavaForOSX.pkg -target /
-Echo 'Java installed!'
+	/usr/sbin/installer -dumplog -verbose -pkg "${pkgDir}/JavaForOSX.pkg" -target /
+/bin/echo 'Java installed!'
+
+/bin/echo "*****  Install Maple process:  COMPLETE  *****"
 
 exit 0
