@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.2 / Updated:  11/13/2017 / By:  ZT
+# Version:  1.2.1 / Updated:  1/10/2018 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -44,7 +44,7 @@ function modelCheck {
 # Get machine info
 
 # Get the OS Version
-	osVersion=$(sw_vers -productVersion | /usr/bin/awk -F '10.' '{print $2}')
+	osVersion=$(sw_vers -productVersion | /usr/bin/awk -F '.' '{print $2"."$3}')
 # Get the Model Type and Major Version
 	modelType=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^a-zA-Z]//g')
 	modelMajorVersion=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^0-9,]//g' | /usr/bin/awk -F, '{print $1}')
