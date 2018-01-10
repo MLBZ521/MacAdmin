@@ -86,7 +86,7 @@ case $switch1 in
 		/bin/cp "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Set the version in the update_SPSS.sh script
-		/usr/bin/sed -i '' 's/version=/'"version=${majorVersion}"'/' "${scriptDirectory}"/scripts/update_SPSS.sh
+		/usr/bin/sed -i '' 's/version=/'"version=${majorVersion}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
