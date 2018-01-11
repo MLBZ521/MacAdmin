@@ -1,7 +1,7 @@
-# Matlab 2017a
+# Matlab 2017b
 destinationFolder=/Applications
 fileInstallationKey=12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345-67890-12345
 agreeToLicense=yes
-# This entry did not work for me in Matlab 2017a, so added it as an argument to the script.
-#mode=silent
-licensePath=/tmp/license.nic
+mode=silent
+# The 'licensePath' is handled in another step
+#licensePath=
