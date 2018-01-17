@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  build_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.0 / Updated:  1/9/2018 / By:  ZT
+# Version:  1.0.1 / Updated:  1/13/2018 / By:  ZT
 #
-# Description:  This script uses munkpkg to build an Maple package.
+# Description:  This script uses munkipkg to build an Maple package.
 #
 ###################################################################################################
 
@@ -82,7 +82,7 @@ case $switch1 in
 		/bin/cp -Rf "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Set the version in the update_Maple.sh script
-		/usr/bin/sed -i '' 's/version=/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/update_Maple.sh
+		/usr/bin/sed -i '' 's/version=/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
