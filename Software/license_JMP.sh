@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_JMP.sh
 # By:  Zack Thompson / Created:  3/3/2017
-# Version:  2.0 / Updated:  1/2/2018 / By:  ZT
+# Version:  2.1 / Updated:  1/17/2018 / By:  ZT
 #
 # Description:  This script applies the license for JMP applications.
 #
@@ -17,9 +17,10 @@
 licenseFile="/Library/Application Support/JMP/13/JMP.per"
 # Get the current user
 	currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
+
 # Get the install JMP.app edition (standard vs Pro)
-	appJMP=$(/bin/ls /applications | /usr/bin/grep "JMP")
-	/usr/bin/logger -s "Apply license for:  ${appJMP}"
+	appPath=$(/usr/bin/find /Applications -iname "JMP*.app" -maxdepth 1 -type d)
+	/usr/bin/logger -s "Applying license for:  ${appPath}"
 
 ##################################################
 # Create the license file.
@@ -27,7 +28,7 @@ licenseFile="/Library/Application Support/JMP/13/JMP.per"
 # Assign the proper license per edition
 	/usr/bin/logger -s "Creating license file..."
 
-if [[ $appJMP == "JMP 13.app" ]]; then
+if [[ $appPath == *"JMP 13.app"* ]]; then
 	/bin/cat > "${licenseFile}" <<licenseContents
 Platform=Macintosh
 Product=JMP
@@ -44,7 +45,7 @@ Password1=
 Department=
 licenseContents
 
-elif [[ $appJMP == "JMP Pro 13.app" ]]; then
+elif [[ $appPath == *"JMP Pro 13.app"* ]]; then
 	/bin/cat > "${licenseFile}" <<licenseContents
 Platform=Macintosh
 Product=JMPPRO
