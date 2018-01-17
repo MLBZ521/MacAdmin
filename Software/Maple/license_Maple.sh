@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.0 / Updated:  1/9/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/17/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
@@ -31,27 +31,27 @@
 
 	/usr/bin/logger -s "Licensing Mechanism:  ${licenseMechanism}"
 
-# Get the install Maple.app edition (standard vs Pro)
-	appPath=$(/usr/bin/find /Applications -name "Maple *.app" | /usr/bin/grep -Ev ".app/")
-
-# Get the Maple version
-	majorVersion=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
-	/usr/bin/logger -s "Apply License for Major Version:  ${majorVersion}"
-
-# Location of the License File
-	licenseFile="/Library/Frameworks/Maple.framework/Versions/${majorVersion}/license/license.dat"
-
 ##################################################
 # Bits staged, license software...
 
-if [[ -d "${appPath}" ]]; then
+# If the machine has multiple Maple Applications, loop through them...
+/usr/bin/find /Applications -iname "Maple*.app" -maxdepth 1 -type d | while IFS="\n" read -r appPath; do
 
-	if [[ $licenseMechanism == "Network" ]]; then
+	# Get the Maple version
+		majorVersion=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
+		/usr/bin/logger -s "Applying License for Major Version:  ${majorVersion}"
 
-		/usr/bin/logger -s "Configuring the License Manager Server..."
-		/usr/bin/logger -s "Creating license file..."
+	# Location of the License File
+		licenseFile="/Library/Frameworks/Maple.framework/Versions/${majorVersion}/license/license.dat"
 
-		/bin/cat > "${licenseFile}" <<licenseContents
+	if [[ -d "${appPath}" ]]; then
+
+		if [[ $licenseMechanism == "Network" ]]; then
+
+			/usr/bin/logger -s "Creating license file..."
+			/usr/bin/logger -s "Setting the License Manager Server..."
+
+			/bin/cat > "${licenseFile}" <<licenseContents
 #
 # License File for network installations
 #
@@ -62,27 +62,27 @@ USE_SERVER
 # You should not have to edit this file directly.
 licenseContents
 
-		# Set permissions on the file for everyone to be able to read.
-			/usr/bin/logger -s "Applying permissions to license file..."
-			/bin/chmod 644 "${licenseFile}"
+			# Set permissions on the file for everyone to be able to read.
+				/usr/bin/logger -s "Applying permissions to license file..."
+				/bin/chmod 644 "${licenseFile}"
 
-	elif [[ $licenseMechanism == "Local" ]]; then
+		elif [[ $licenseMechanism == "Local" ]]; then
 
-		# Assign the proper license per edition
-		case "${majorVersion}" in
-			"2017" )
-				licenseCode="201712345678910"
-				;;
-			"2016" )
-				licenseCode="201612345678910"
-				;;
-			"2015" )
-				licenseCode="201512345678910"
-				;;
-		esac
+			# Assign the proper license per edition
+			case "${majorVersion}" in
+				"2017" )
+					licenseCode="201712345678910"
+					;;
+				"2016" )
+					licenseCode="201612345678910"
+					;;
+				"2015" )
+					licenseCode="201512345678910"
+					;;
+			esac
 
-# Apply License Code
-exitStatus=$(
+	# Apply License Code
+	exitStatus=$(
 expect - <<activateLicense
 set timeout 1
 spawn /Library/Frameworks/Maple.framework/Versions/2016/bin/activation -console
@@ -107,21 +107,21 @@ interact
 activateLicense
 )
 
-		if [[ $exitStatus == *"Activation successful!"* ]]; then
-			/usr/bin/logger -s "License Code applied successfully!"
-		else
-			/usr/bin/logger -s "ERROR:  Failed to apply License Code"
-			/usr/bin/logger -s "ERROR Contents:  ${exitStatus}"
-			/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
-			exit 3
+			if [[ $exitStatus == *"Activation successful!"* ]]; then
+				/usr/bin/logger -s "License Code applied successfully!"
+			else
+				/usr/bin/logger -s "ERROR:  Failed to apply License Code"
+				/usr/bin/logger -s "ERROR Contents:  ${exitStatus}"
+				/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
+				exit 3
+			fi
 		fi
-	fi
 
-else
-	/usr/bin/logger -s "A version of Maple was not located in the expected location!"
-	/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
-	exit 2
-fi
+	else
+		/usr/bin/logger -s "A version of Maple was not located in the expected location!"
+		/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
+		exit 2
+	fi
 
 /usr/bin/logger -s "Maple has been activated!"
 /usr/bin/logger -s "*****  License Maple process:  COMPLETE  *****"
