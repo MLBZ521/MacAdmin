@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Parallels.sh
 # By:  Zack Thompson / Created:  8/17/2017
-# Version:  1.1 / Updated:  12/14/2017 / By:  ZT
+# Version:  1.1.1 / Updated:  1/18/2018 / By:  ZT
 #
 # Description:  This script will apply a Parallels License provided as a JSS Script Parameter.
 #
@@ -30,6 +30,7 @@ else
 		/bin/echo "Error:  License was likely invalid."
 		/bin/echo "*****  license_Parallels Process:  FAILED  *****"
 		exit 2
+	fi
 fi
 
 exit 0
