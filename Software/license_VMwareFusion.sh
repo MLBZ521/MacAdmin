@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_VMwareFusion.sh
 # By:  Zack Thompson / Created:  12/14/2017
-# Version:  1.0 / Updated:  12/14/2017 / By:  ZT
+# Version:  1.0.1 / Updated:  1/18/2018 / By:  ZT
 #
 # Description:  This script will apply a VMware Fusion License provided as a JSS Script Parameter.
 #		- Supports VMware Fusion 4.x and later.
@@ -32,6 +32,7 @@ else
 		/bin/echo "Error:  License was likely invalid."
 		/bin/echo "*****  license_VMwareFusion Process:  FAILED  *****"
 		exit 2
+	fi
 fi
 
 exit 0
