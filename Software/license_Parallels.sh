@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Parallels.sh
 # By:  Zack Thompson / Created:  8/17/2017
-# Version:  1.2 / Updated:  1/18/2018 / By:  ZT
+# Version:  1.2.1 / Updated:  1/19/2018 / By:  ZT
 #
 # Description:  This script will apply a Parallels License provided as a JSS Script Parameter.
 #
@@ -14,13 +14,13 @@
 # Define Variables
 Parallels="/Applications/Parallels Desktop.app/Contents/MacOS/prlsrvctl"
 
-if [[ ! -x $Parallels ]]; then
+if [[ ! -x "${Parallels}" ]]; then
 	/bin/echo "Error:  Parallels is not properly installed."
 	/bin/echo "*****  license_Parallels Process:  FAILED  *****"
 	exit 1
 else
 	/bin/echo "Applying the Parallels license..."
-	$Parallels install-license --key $4
+	"${Parallels}" install-license --key $4
 	exitCode=$?
 
 	if [[ $exitCode = 0 ]]; then
