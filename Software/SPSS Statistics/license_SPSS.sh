@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.2 / Updated:  1/9/2018 / By:  ZT
+# Version:  1.3 / Updated:  1/18/2018 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -12,12 +12,6 @@
 /usr/bin/logger -s "*****  License SPSS process:  START  *****"
 
 ##################################################
-# Define Variables
-
-# Get the location of SPSSStatistics.app
-appPath="/Applications/$(/bin/ls /Applications | /usr/bin/grep "SPSS")"
-licensePath="${appPath}/SPSSStatistics.app/Contents/bin"
-
 # Determine License Type
 case "${4}" in
 	"T&R" | "Teaching and Research" | "Academic" )
@@ -94,15 +88,18 @@ function LicenseInfo {
 ##################################################
 # Bits staged, license software...
 
-# Ensure the App Bundle exists
-if [[ -d "${appPath}/SPSSStatistics.app" ]]; then
+# If the machine has multiple SPSS Applications, loop through them...
+/usr/bin/find -E /Applications -iregex ".*[/](SPSS) ?(Statistics) ?(\d\d)?[.]app" -type d -prune | while IFS="\n" read -r appPath; do
+
+	# Get the location of SPSSStatistics.app
+	licensePath="${appPath}/Contents/bin"
 
 	if [[ $licenseMechanism == "Network" ]]; then
 
 		/usr/bin/logger -s "Configuring the License Manager Server..."
 
 		# Set the license file path
-		networkLicense="${appPath}/${licensePath}/spssprod.inf"
+		networkLicense="${licensePath}/spssprod.inf"
 
 		# Function LicenseInfo
 		LicenseInfo
@@ -111,28 +108,28 @@ if [[ -d "${appPath}/SPSSStatistics.app" ]]; then
 		/usr/bin/sed -i '' 's/DaemonHost=.*/'"DaemonHost=${licenseManager}"'/' "${networkLicense}"
 		/usr/bin/sed -i '' 's/CommuterMaxLife=.*/'"CommuterMaxLife=${cummuterDays}"'/' "${networkLicense}"
 
-		if [[ -e "${appPath}/${licensePath}/lservrc" ]]; then
+		if [[ -e "${licensePath}/lservrc" ]]; then
 			/usr/bin/logger -s "Local License file exists; deleting..."
-			/bin/rm -rf "${appPath}/${licensePath}/lservrc"
+			/bin/rm -rf "${licensePath}/lservrc"
 		fi
 
 	elif [[ $licenseMechanism == "Local" ]]; then
 
 		# Get the SPSS version
-		versionSPSS=$(/usr/bin/defaults read "${appPath}/SPSSStatistics.app/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
+		versionSPSS=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
 		/usr/bin/logger -s "Apply License Code for version:  ${versionSPSS}"
 
 		# Function LicenseInfo
 		LicenseInfo
 
 		# Apply License Code
-		/usr/bin/cd "${appPath}/${licensePath}"
+		/usr/bin/cd "${licensePath}"
 		exitStatus=$(./licenseactivator "${licenseCode}")
 
 		if [[ $exitStatus == *"Authorization succeeded"* ]]; then
 			/usr/bin/logger -s "License Code applied successfully!"
 
-			if [[ -e "${appPath}/${licensePath}/spssprod.inf" ]]; then
+			if [[ -e "${licensePath}/spssprod.inf" ]]; then
 				/usr/bin/logger -s "Removing Network License Manager info..."
 				# Remove the License Manager Server Name.
 				/usr/bin/sed -i '' 's/DaemonHost=.*/'"DaemonHost="'/' "${networkLicense}"
@@ -142,14 +139,10 @@ if [[ -d "${appPath}/SPSSStatistics.app" ]]; then
 			/usr/bin/logger -s "ERROR:  Failed to apply License Code"
 			/usr/bin/logger -s "ERROR Contents:  ${exitStatus}"
 			/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
-			exit 4
+			exit 3
 		fi
 	fi
-else
-	/usr/bin/logger -s "ERROR:  Unable to locate the SPSSStatistics.app bundle"
-	/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
-	exit 3
-fi
+done
 
 /usr/bin/logger -s "SPSS has been activated!"
 /usr/bin/logger -s "*****  License SPSS process:  COMPLETE  *****"
