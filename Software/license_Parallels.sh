@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Parallels.sh
 # By:  Zack Thompson / Created:  8/17/2017
-# Version:  1.2.1 / Updated:  1/19/2018 / By:  ZT
+# Version:  1.3 / Updated:  1/19/2018 / By:  ZT
 #
 # Description:  This script will apply a Parallels License provided as a JSS Script Parameter.
 #
@@ -20,7 +20,7 @@ if [[ ! -x "${Parallels}" ]]; then
 	exit 1
 else
 	/bin/echo "Applying the Parallels license..."
-	"${Parallels}" install-license --key $4
+	"${Parallels}" install-license --key $4 --deferred
 	exitCode=$?
 
 	if [[ $exitCode = 0 ]]; then
