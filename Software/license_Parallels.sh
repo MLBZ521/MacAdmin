@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Parallels.sh
 # By:  Zack Thompson / Created:  8/17/2017
-# Version:  1.5 / Updated:  1/22/2018 / By:  ZT
+# Version:  1.5.1 / Updated:  1/23/2018 / By:  ZT
 #
 # Description:  This script will apply a Parallels License provided as a JSS Script Parameter.
 #
@@ -37,6 +37,9 @@ else
 			/bin/sleep 1
 		done
 	fi
+
+	# On clean installs, I was still getting the prl_disp_service not started errors on both prlsrvctl commands...adding in a sleep seems to help.
+	/bin/sleep 5
 
 	# Third, check the current license status.
 	status=$("${Parallels}" info --license | /usr/bin/awk -F "status=" '{print $2}' | /usr/bin/xargs)
