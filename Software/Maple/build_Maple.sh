@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  build_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.0.1 / Updated:  1/13/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/24/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Maple package.
 #
@@ -57,7 +57,9 @@ function munkiBuild {
 }
 
 function cleanUp {
-	/bin/rm -Rf "${scriptDirectory}"/scripts/*
+	/bin/rm "${scriptDirectory}"/scripts/postinstall
+	/bin/mv "${scriptDirectory}"/scripts/JavaForOSX.pkg "${scriptDirectory}"/build/
+	/bin/mv "${scriptDirectory}"/scripts/* "${scriptDirectory}"/build/$switch3/
 }
 
 ##################################################
@@ -69,7 +71,8 @@ function cleanUp {
 case $switch1 in
 	-install )
 		/bin/cp "${scriptDirectory}"/install_Maple.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp -Rf "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/JavaForOSX.pkg "${scriptDirectory}"/scripts/
 
 		# Set the version in the update_Maple.sh script
 		/usr/bin/sed -i '' 's/version=/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
@@ -79,10 +82,10 @@ case $switch1 in
 	;;
 	-update )
 		/bin/cp "${scriptDirectory}"/update_Maple.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp -Rf "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Set the version in the update_Maple.sh script
-		/usr/bin/sed -i '' 's/version=/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
+		/usr/bin/sed -i '' 's/version=.*/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
