@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  build_Mathematica.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.0 / Updated:  1/10/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/24/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Mathematica package.
 #
@@ -54,7 +54,8 @@ function munkiBuild {
 }
 
 function cleanUp {
-	/bin/rm -Rf "${scriptDirectory}"/scripts/*
+	/bin/rm "${scriptDirectory}"/scripts/postinstall
+	/bin/mv "${scriptDirectory}"/scripts/* "${scriptDirectory}"/build/$switch3/
 }
 
 ##################################################
@@ -66,7 +67,7 @@ function cleanUp {
 case $switch1 in
 	-install )
 		/bin/cp "${scriptDirectory}"/install_Mathematica.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp -Rf "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Function munkiBuild
 		munkiBuild
