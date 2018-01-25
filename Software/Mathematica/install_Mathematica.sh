@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_Mathematica.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.0 / Updated:  1/10/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/24/2018 / By:  ZT
 #
 # Description:  This script silently installs Mathematica.
 #
@@ -22,7 +22,7 @@
 
 # Install Mathematica
 /bin/echo "Installing Mathematica..."
-	/bin/cp -Rf "${pkgDir}/Mathematica.app" /Applications
+	/bin/mv "${pkgDir}/Mathematica.app" /Applications
 /bin/echo "Install complete!"
 
 /bin/echo "*****  Install Mathematica process:  COMPLETE  *****"
