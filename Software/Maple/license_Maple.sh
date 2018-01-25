@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.1 / Updated:  1/17/2018 / By:  ZT
+# Version:  1.2 / Updated:  1/24/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
@@ -35,7 +35,7 @@
 # Bits staged, license software...
 
 # If the machine has multiple Maple Applications, loop through them...
-/usr/bin/find /Applications -iname "Maple*.app" -maxdepth 1 -type d | while IFS="\n" read -r appPath; do
+/usr/bin/find -E /Applications -iregex ".*Maple [0-9]{4}[.]app" -maxdepth 3 -type d -prune | while IFS="\n" read -r appPath; do
 
 	# Get the Maple version
 		majorVersion=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
@@ -122,6 +122,7 @@ activateLicense
 		/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
 		exit 2
 	fi
+done
 
 /usr/bin/logger -s "Maple has been activated!"
 /usr/bin/logger -s "*****  License Maple process:  COMPLETE  *****"
