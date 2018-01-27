@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_MatLab.sh
 # By:  Zack Thompson / Created:  3/6/2017
-# Version:  1.3 / Updated:  1/11/2018 / By:  ZT
+# Version:  1.4 / Updated:  1/25/2018 / By:  ZT
 #
 # Description:  This script installs MatLab.
 #
@@ -22,17 +22,30 @@
 ##################################################
 # Bits staged...
 
-# Install MatLab with an option file.
+# Install MatLab with option file.
 /bin/echo "Installing Matlab..."
-	"${pkgDir}/Matlab_${version}_Mac/InstallForMacOSX.app/Contents/MacOS/InstallForMacOSX" -inputFile "${pkgDir}/installer_input.txt"
-exitStatus=$?
 
-if [[ $exitStatus != 0 ]]; then
+if [[ $version == "2017a" ]]; then
+	# -mode silent did not work in the option file for me.
+	exitStatus=$("${pkgDir}/install" -mode silent -inputFile "${pkgDir}/installer_input.txt")
+else
+	# I'm assuming all future version will be packaged in this manner...(/hoping)..?
+	exitStatus=$("${pkgDir}/InstallForMacOSX.app/Contents/MacOS/InstallForMacOSX" -inputFile "${pkgDir}/installer_input.txt")
+fi
+exitCode=$?
+
+if [[ $exitCode != 0 ]]; then
+	/bin/echo "Exit Code:  ${exitCode}"
+fi
+
+if [[ $exitStatus == *"End - Unsuccessful"* ]]; then
 	/bin/echo "ERROR:  Install failed!"
+	/bin/echo "ERROR Content:  ${exitStatus}"
 	/bin/echo "*****  Install Matlab process:  FAILED  *****"
 	exit 1
 fi
 
+/bin/echo "Install complete!"
 /bin/echo "*****  Install Matlab process:  COMPLETE  *****"
 
 exit 0
