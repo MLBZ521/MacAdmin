@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  build_Matlab.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.0 / Updated:  1/10/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/23/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Matlab package.
 #
@@ -54,7 +54,8 @@ function munkiBuild {
 }
 
 function cleanUp {
-	/bin/rm -Rf "${scriptDirectory}"/scripts/*
+	/bin/rm -Rf "${scriptDirectory}"/scripts/postinstall
+	/bin/mv "${scriptDirectory}"/scripts/* "${scriptDirectory}"/build/$switch3/
 }
 
 ##################################################
@@ -66,8 +67,10 @@ function cleanUp {
 case $switch1 in
 	-install )
 		/bin/cp "${scriptDirectory}"/install_Matlab.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp "${scriptDirectory}"/installer_input.txt "${scriptDirectory}"/scripts/
-		/bin/cp -Rf "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+
+		# Set the version in the install_Matlab.sh script
+		/usr/bin/sed -i '' 's/version=.*/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
