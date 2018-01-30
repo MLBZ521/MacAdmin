@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Mathematica.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.0 / Updated:  1/10/2018 / By:  ZT
+# Version:  1.1 / Updated:  1/29/2018 / By:  ZT
 #
 # Description:  This script applies the license for Mathematica applications.
 #
@@ -14,10 +14,16 @@
 ##################################################
 # Define Variables
 
-licenseFile="/Library/Mathematica/Licensing/mathpass"
+licenseDirectory="/Library/Mathematica/Licensing"
+licenseFile="${licenseDirectory}/mathpass"
 
 ##################################################
 # Create the license file.
+
+if [[ ! -d "${licenseDirectory}" ]]; then
+	/usr/bin/logger -s "Creating License Directory..."
+	/bin/mkdir -p "${licenseDirectory}"
+fi
 
 /usr/bin/logger -s "Creating license file..."
 
