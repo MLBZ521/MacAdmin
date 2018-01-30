@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  build_SPSS.sh
 # By:  Zack Thompson / Created:  1/5/2018
-# Version:  1.1 / Updated:  1/8/2018 / By:  ZT
+# Version:  1.2 / Updated:  1/26/2018 / By:  ZT
 #
-# Description:  This script uses munkpkg to build an SPSS package.
+# Description:  This script uses munkipkg to build an SPSS package.
 #
 ###################################################################################################
 
@@ -49,7 +49,7 @@ Actions:
 }
 
 function munkiBuild {
-	/usr/libexec/PlistBuddy -c "set identifier com.github.mlbz521.pkg.${softwareTitle}" "${scriptDirectory}"/build-info.plist
+	/usr/libexec/PlistBuddy -c "set identifier edu.asu.pkg.${softwareTitle}" "${scriptDirectory}"/build-info.plist
 	/usr/libexec/PlistBuddy -c "set name ${softwareTitle} Unlicensed-\${version}.pkg" "${scriptDirectory}"/build-info.plist
 	/usr/libexec/PlistBuddy -c "set version $switch3" "${scriptDirectory}"/build-info.plist
 
@@ -60,7 +60,9 @@ function munkiBuild {
 }
 
 function cleanUp {
-	/bin/rm -Rf "${scriptDirectory}"/scripts/*
+	/bin/rm -Rf "${scriptDirectory}"/scripts/postinstall
+	/bin/rm -Rf "${scriptDirectory}"/scripts/preinstall
+	/bin/mv "${scriptDirectory}"/scripts/* "${scriptDirectory}"/build/$switch3/
 }
 
 ##################################################
@@ -73,20 +75,23 @@ case $switch1 in
 	-install )
 		/bin/cp "${scriptDirectory}"/uninstall_SPSS.sh "${scriptDirectory}"/scripts/preinstall
 		/bin/cp "${scriptDirectory}"/install_SPSS.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Set the desired install directory
-		/usr/bin/sed -i '' 's,USER_INSTALL_DIR=,'"USER_INSTALL_DIR=/Applications/SPSS Statistics ${majorVersion}/"',' "${scriptDirectory}"/scripts/installer.properties
+		LANG=C /usr/bin/sed -Ei '' 's,(#)?USER_INSTALL_DIR=.*,'"USER_INSTALL_DIR=/Applications/SPSS Statistics ${majorVersion}/"',' "${scriptDirectory}"/scripts/installer.properties
+
+		# Set the version in the install_SPSS.sh script
+		LANG=C /usr/bin/sed -i '' 's/version=.*/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
 	;;
 	-update )
 		/bin/cp "${scriptDirectory}"/update_SPSS.sh "${scriptDirectory}"/scripts/postinstall
-		/bin/cp "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
+		/bin/mv "${scriptDirectory}"/build/$switch3/* "${scriptDirectory}"/scripts/
 
 		# Set the version in the update_SPSS.sh script
-		/usr/bin/sed -i '' 's/version=/'"version=${majorVersion}"'/' "${scriptDirectory}"/scripts/postinstall
+		LANG=C /usr/bin/sed -i '' 's/version=.*/'"version=${switch3}"'/' "${scriptDirectory}"/scripts/postinstall
 
 		# Function munkiBuild
 		munkiBuild
