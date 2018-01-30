@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.3 / Updated:  1/25/2018 / By:  ZT
+# Version:  1.4 / Updated:  1/30/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
@@ -12,7 +12,8 @@
 /usr/bin/logger -s "*****  License Maple process:  START  *****"
 
 ##################################################
-# Define Variables
+# Turn on case-insensitive pattern matching
+shopt -s nocasematch
 
 # Determine License Mechanism
 	case "${4}" in
@@ -29,6 +30,9 @@
 			;;
 	esac
 
+# Turn off case-insensitive pattern matching
+shopt -u nocasematch
+
 	/usr/bin/logger -s "Licensing Mechanism:  ${licenseMechanism}"
 
 ##################################################
@@ -39,7 +43,7 @@ appPaths=$(/usr/bin/find -E /Applications -iregex ".*Maple [0-9]{4}[.]app" -maxd
 
 # Verify that a Maple version was found.
 if [[ -z "${appPaths}" ]]; then
-	/usr/bin/logger -s "A version of Maple was not located in the expected location!"
+	/usr/bin/logger -s "A version of Maple was not found in the expected location!"
 	/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
 	exit 2
 else
