@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_MatLab.sh
 # By:  Zack Thompson / Created:  3/6/2017
-# Version:  1.4 / Updated:  1/25/2018 / By:  ZT
+# Version:  1.4.1 / Updated:  1/29/2018 / By:  ZT
 #
 # Description:  This script installs MatLab.
 #
@@ -26,6 +26,8 @@
 /bin/echo "Installing Matlab..."
 
 if [[ $version == "2017a" ]]; then
+	# Inject dummy location to the installer.input file -- hacky, but works
+	LANG=C /usr/bin/sed -Ei '' 's,(#)?licensePath=.*,'"licensePath=${pkgDir}/installer_input.txt"',' "${pkgDir}/installer_input.txt"
 	# -mode silent did not work in the option file for me.
 	exitStatus=$("${pkgDir}/install" -mode silent -inputFile "${pkgDir}/installer_input.txt")
 else
