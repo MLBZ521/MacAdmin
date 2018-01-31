@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.4 / Updated:  1/29/2018 / By:  ZT
+# Version:  1.5 / Updated:  1/30/2018 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -12,6 +12,9 @@
 /usr/bin/logger -s "*****  License SPSS process:  START  *****"
 
 ##################################################
+# Turn on case-insensitive pattern matching
+shopt -s nocasematch
+
 # Determine License Type
 case "${4}" in
 	"T&R" | "Teaching and Research" | "Academic" )
@@ -43,6 +46,9 @@ case "${5}" in
 		exit 2
 		;;
 esac
+
+# Turn off case-insensitive pattern matching
+shopt -u nocasematch
 
 /usr/bin/logger -s "Licensing Mechanism:  ${licenseMechanism}"
 
