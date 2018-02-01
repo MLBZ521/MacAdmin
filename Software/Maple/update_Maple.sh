@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 ###################################################################################################
 # Script Name:  update_Maple.sh
 # By:  Zack Thompson / Created:  3/2/2017
-# Version:  1.4 / Updated:  1/24/2018 / By:  ZT
+# Version:  1.5 / Updated:  1/31/2018 / By:  ZT
 #
 # Description:  This script silently installs a Maple update.
 #
