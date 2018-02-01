@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 ###################################################################################################
 # Script Name:  install_Mathematica.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.1 / Updated:  1/24/2018 / By:  ZT
+# Version:  1.2 / Updated:  1/31/2018 / By:  ZT
 #
 # Description:  This script silently installs Mathematica.
 #
