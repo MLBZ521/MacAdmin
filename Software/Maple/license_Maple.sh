@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.4 / Updated:  1/30/2018 / By:  ZT
+# Version:  1.5 / Updated:  1/31/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
@@ -109,7 +109,7 @@ expect "The Maple Reporter (Professional Edition)" { send "\r" }
 expect "The Maple Reporter (Academic Edition)" { send "\r" }
 expect "Upcoming Events and Seminars" { send "\r" }
 expect "Special Product Announcements" { send "\r" }
-interact
+expect "Press ENTER to finish" { send "\r"; exp_continue }
 activateLicense
 )
 
