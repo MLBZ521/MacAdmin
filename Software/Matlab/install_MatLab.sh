@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 ###################################################################################################
 # Script Name:  install_MatLab.sh
 # By:  Zack Thompson / Created:  3/6/2017
-# Version:  1.4.1 / Updated:  1/29/2018 / By:  ZT
+# Version:  1.5 / Updated:  1/31/2018 / By:  ZT
 #
 # Description:  This script installs MatLab.
 #
