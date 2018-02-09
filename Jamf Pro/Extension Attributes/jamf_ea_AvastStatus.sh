@@ -1,19 +1,19 @@
 #!/bin/bash
 
 ###################################################################################################
-# Script Name:  jamf_ea_AvastConfig.sh
+# Script Name:  jamf_ea_AvastStatus.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  0.4 / Updated:  2/8/2018 / By:  ZT
+# Version:  1.0 / Updated:  2/9/2018 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
-#		- This is currently in development!
 #
 ###################################################################################################
 
 /bin/echo "Checking the Avast configuration..."
 
 ##################################################
-# Define Variables
+# Define Array Variables for each item that we want to check for
+# The last item in each array is the "desired" state (0 = Disabled and 1 = Enabled)
 
 mailShield=("MailShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "mail" "ENABLED=" "1")
 webShield=("WebShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "web" "ENABLED=" "1")
@@ -22,16 +22,17 @@ virusDefUpdates=("DefinitionUpdates" "/Library/Application Support/Avast/config/
 programUpdates=("ProgramUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "PROGRAM_UPDATE_ENABLED=" "1")
 betaUpdates=("BetaUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "BETA_CHANNEL=" "0")
 licensedName=("Customer" "/Library/Application Support/Avast/config/license.avastlic" "CustomerName=" "Company Name")
-licenseType=("License Type" "/Library/Application Support/Avast/config/license.avastlic" "LicenseType=" "99")
+licenseType=("License Type" "/Library/Application Support/Avast/config/license.avastlic" "LicenseType=" "0")
 definitionStatus=("Virus Definitions" "/Library/Application Support/Avast/vps9/defs/aswdefs.ini" "Latest=")
 
+# "Error" collection variables
 disabled=""
 license=""
 virusDef=""
 returnResult=""
 
 ##################################################
-# Functions
+# Functions that perform searching routines
 
 searchType1() {
 	if [[ -e "${2}" ]]; then
@@ -95,6 +96,7 @@ searchType2() {
 }
 
 ##################################################
+# Bits staged, collect the information...
 
 searchType1 "${mailShield[@]}"
 searchType1 "${webShield[@]}"
@@ -105,6 +107,9 @@ searchType2 "${betaUpdates[@]}"
 searchType2 "${licensedName[@]}"
 searchType2 "${licenseType[@]}"
 searchType2 "${definitionStatus[@]}"
+
+##################################################
+# Check if each "error" collection variable is collected anything
 
 if [[ -n "${disabled}" ]]; then
 	returnResult+="Disabled:  ${disabled%?};"
@@ -118,4 +123,13 @@ if [[ -n "${virusDef}" ]]; then
 	returnResult+="${virusDef};"
 fi
 
-echo "${returnResult%?}"
+##################################################
+# Return any errors or the all good.
+
+if [[ -n "${returnResult}" ]]; then
+	/bin/echo "<result>${returnResult%?}</result>"
+else
+	/bin/echo "<result>Desired State</result>"
+fi
+
+exit 0
