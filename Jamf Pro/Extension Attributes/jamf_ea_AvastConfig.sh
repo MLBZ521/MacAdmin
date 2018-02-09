@@ -3,9 +3,10 @@
 ###################################################################################################
 # Script Name:  jamf_ea_AvastConfig.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  0.1 / Updated:  2/6/2018 / By:  ZT
+# Version:  0.2 / Updated:  2/7/2018 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
+#		- This is currently in development!
 #
 ###################################################################################################
 
@@ -14,106 +15,68 @@
 ##################################################
 # Define Variables
 
-mailWebSheilds="/Library/Appli/bin/cation Support/Avast/config/com.avast.proxy.conf"
-fileShield="/Library/Appli/bin/cation Support/Avast/config/com.avast.fileshield.conf"
-updateState="/Library/Appli/bin/cation Support/Avast/config/com.avast.update.conf"
-definitionState="/Library/Appli/bin/cation Support/Avast/vps9/defs/aswdefs.ini"
-licenseState="/Library/Appli/bin/cation Support/Avast/config/license.avastlic"
+mailSheild=("/Library/Application Support/Avast/config/com.avast.proxy.conf" "mail" "ENABLED=" "1")
+webSheild=("/Library/Application Support/Avast/config/com.avast.proxy.conf" "web" "ENABLED=" "1")
+
+fileshield=("/Library/Application Support/Avast/config/com.avast.fileshield.conf" "ENABLED=" "1")
+virusDefUpdates=("/Library/Application Support/Avast/config/com.avast.update.conf" "VPS_UPDATE_ENABLED=" "1")
+programUpdates=("/Library/Application Support/Avast/config/com.avast.update.conf" "PROGRAM_UPDATE_ENABLED=" "1")
+betaUpdates=("/Library/Application Support/Avast/config/com.avast.update.conf" "BETA_CHANNEL=" "0")
+
+definitionStatus=("/Library/Application Support/Avast/vps9/defs/aswdefs.ini" "Latest=")
+
+licensedName=("/Library/Application Support/Avast/config/license.avastlic" "CustomerName=" "Company Name")
+licenseType=("/Library/Application Support/Avast/config/license.avastlic" "LicenseType=" "0")
+
+
+##################################################
+# Functions
+
+confirmExists() {
+	if [[ -e "${1}" ]]; then
+		# continue
+	fi
+}
+
+
+searchType1() {
+
+if [[ -e "${1}" ]]; then
+
+	result=$(/bin/cat "${1}" | /usr/bin/awk '/'"${2}"'/ {getline; print}' | /usr/bin/awk -F "${3}" '{print $2}')
+
+	if [[ $result == "${4}" ]]; then
+		/bin/echo "Desired State"
+	else
+		/bin/echo "Misconfigured"
+	fi
+fi
+
+}
+
+searchType2() {
+
+if [[ -e "${1}" ]]; then
+	result=$(/bin/cat "${1}" | /usr/bin/awk -F "${2}" '{print $2}' | /usr/bin/xargs)
+
+	if [[ $result == "${3}" ]]; then
+		/bin/echo "Desired State"
+	else
+		/bin/echo "Misconfigured"
+	fi
+fi
+}
+
 
 
 ##################################################
 
-
-# Check if file exists.
-if [[ -e "${mailWebSheilds}" ]]; then
-	mailStatus=$(/bin/cat "${mailWebSheilds}" | /usr/bin/awk '/mail/ {getline; print}' | /usr/bin/awk -F "ENABLED=" '{print $2}')
-	if [[ $mailStatus == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-
-	webStatus=$(/bin/cat "${mailWebSheilds}" | /usr/bin/awk '/web/ {getline; print}' | /usr/bin/awk -F "ENABLED=" '{print $2}')
-	if [[ $webStatus == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-fi
-
-
-if [[ -e "${fileShield}" ]]; then
-	fileStatus=$(/bin/cat "${fileShield}" | /usr/bin/awk -F "ENABLED=" '{print $2}' | /usr/bin/xargs)
-	if [[ $fileStatus == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-fi
-
-
-if [[ -e "${updateState}" ]]; then
-	virusDefUpdates=$(/bin/cat "${updateState}" | /usr/bin/awk -F "VPS_UPDATE_ENABLED=" '{print $2}' | /usr/bin/xargs)
-	if [[ $virusDefUpdates == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-
-	programUpdates=$(/bin/cat "${updateState}" | /usr/bin/awk -F "ROGRAM_UPDATE_ENABLED=" '{print $2}' | /usr/bin/xargs)
-	if [[ $programUpdates == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-
-	betaUpdates=$(/bin/cat "${updateState}" | /usr/bin/awk -F "BETA_CHANNEL=" '{print $2}' | /usr/bin/xargs)
-	if [[ $betaUpdates == "1" ]]; then
-		/bin/echo "Enabled"
-	else
-		/bin/echo "Disabled"
-	fi
-fi
-
-
-
-if [[ -e "${definitionState}" ]]; then
-	definitionStatus=$(/bin/cat "${definitionState}" | /usr/bin/awk -F "Latest=" '{print $2}' | /usr/bin/xargs)
-	/bin/echo "$definitionStatus"
-
-fi
-
-
-if [[ -e "${licenseState}" ]]; then
-	licensedStatus=$(/bin/cat "${licenseState}" | /usr/bin/awk -F "CustomerName=" '{print $2}' | /usr/bin/xargs)
-	if [[ $licensedStatus != "Company Name" ]]; then
-		/bin/echo "Not Licensed"
-	else
-		/bin/echo "Licensed"
-	fi
-
-	licenseType=$(/bin/cat "${licenseState}" | /usr/bin/awk -F "LicenseType=" '{print $2}' | /usr/bin/xargs)
-	
-	case $licenseType in
-		0 )
-			/bin/echo "Standard (Premium)"
-			;;
-		4 )
-			/bin/echo "Premium trial"
-			;;
-		13 )
-			/bin/echo "Free, unapproved"
-			;;
-		14 )
-			/bin/echo "Free, approved"
-			;;
-		16 )
-			/bin/echo "Temporary"
-			;;
-		* )
-			/bin/echo "Unknown Type"
-			;;
-	esac
-fi
-
-exit 0
+searchType1 "${mailSheild[@]}"
+searchType1 "${webSheild[@]}"
+searchType1 "${fileSheild[@]}"
+searchType1 "${virusDefUpdates[@]}"
+searchType1 "${programUpdates[@]}"
+searchType1 "${betaUpdates[@]}"
+searchType1 "${definitionStatus[@]}"
+searchType1 "${licensedName[@]}"
+searchType1 "${licenseType[@]}"
