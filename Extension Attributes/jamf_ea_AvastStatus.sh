@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_AvastStatus.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  1.0 / Updated:  2/9/2018 / By:  ZT
+# Version:  1.1 / Updated:  2/9/2018 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
 #
@@ -24,6 +24,9 @@ betaUpdates=("BetaUpdates" "/Library/Application Support/Avast/config/com.avast.
 licensedName=("Customer" "/Library/Application Support/Avast/config/license.avastlic" "CustomerName=" "Company Name")
 licenseType=("License Type" "/Library/Application Support/Avast/config/license.avastlic" "LicenseType=" "0")
 definitionStatus=("Virus Definitions" "/Library/Application Support/Avast/vps9/defs/aswdefs.ini" "Latest=")
+
+# The number of days before trigger virus definitions are out of date.
+virusDefVariance=7
 
 # "Error" collection variables
 disabled=""
@@ -83,7 +86,7 @@ searchType2() {
 			# Compare Virus Definition Dates
 			dateCheck=$(( $(date "+%y%m%d") - ${result%??} ))
 
-			if [[ $dateCheck -ge 1 ]]; then
+			if [[ $dateCheck -gt $virusDefVariance ]]; then
 				/bin/echo "Misconfigured:  ${1}"
 				virusDef+="Virus Definitions are out of date"
 			fi
