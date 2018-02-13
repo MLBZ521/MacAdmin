@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.5 / Updated:  1/31/2018 / By:  ZT
+# Version:  1.5.1 / Updated:  2/7/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
@@ -89,7 +89,7 @@ licenseContents
 
 				# Apply License Code
 				exitStatus=$(
-expect - <<activateLicense
+/usr/bin/expect - <<activateLicense
 set timeout 1
 spawn /Library/Frameworks/Maple.framework/Versions/$majorVersion/bin/activation -console
 expect "Do you access the internet through a proxy server?" { send "no\r" }
