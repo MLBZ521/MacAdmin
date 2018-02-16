@@ -12,7 +12,6 @@ This repo will contain scripts I have written for a JAMF environment.
 This script assigns a Mac to a User in JAMF Inventory records for a specific device.  I had a request for a way to tie users to machines where users were not using directory accounts to sign in.  This was as quick script that I threw together to accomplish this.  I later converted this to an application using Swift and Cocoa.
 
 
-
 #### config_SMBProtocol.sh ####
 
 This script uses Script Parameters to configure the SMB Protocol on a Mac.  There is also an Extension Attribute that can be used for scoping.
@@ -66,11 +65,20 @@ From the nsmb.conf man page:
 * smb2_only = Negotiate with only SMB 2.x. This also will set no_netbios.
 
 
+#### jamf_policyCaller.sh ####
 
-#### install_ParallelsLicense.sh ####
+Description:  This script uses Script Parameters to call other policies via Custom Triggers or Policy IDs.  Essentially add the script to a policy and then in the Script Parameters, list the trigger(s) and ID(s) you want to use, separated by commas.  Example format:
+* Custom Triggers
+  * Trigger1, Trigger2, A_Trigger3, Another_Trigger4
+* Policy IDs
+  * 1, 56, 237, 503, 290
 
-This script will allow the installation of the Parallels License.  Simply enter the license in the format of "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" (without the quotes) into the parameter field and have it configured to run after the software installation of Parallels.
 
+#### reissue_FileVaultPRK.sh ####
+
+Description:  This script is intended for scenarios where the JSS does not have a valid FileVault Personal Recovery Key and one of the two are known:
+* a FV_Enabled User accounts’ password; or
+* a FileVault Recovery Key that was created/saved outside of the JSS
 
 
 #### set_DefaultApplications.sh ####
@@ -110,11 +118,46 @@ This parameters script is a little more complicated so if you have any questions
 ## Extension Attributes ##
 
 
+##### jamf_ea_AvastStatus.sh #####
+
+Checks the current configuration of Avast.  The following are what is checked and what files these settings are found in:
+* Values
+  * 0 = Disabled
+  * 1 = Enabled
+* Mail and Web Shields:  /Library/Application Support/Avast/config/com.avast.proxy.conf
+* File Shield:  /Library/Application Support/Avast/config/com.avast.fileshield.conf
+* Updates:  /Library/Application Support/Avast/config/com.avast.update.conf
+  * Virus Definitions
+  * Program
+  * Beta Channel
+* Definition Updates:  /Library/Application Support/Avast/vps9/defs/aswdefs.ini
+* License Info:  /Library/Application Support/Avast/config/license.avastlic
+  * CustomerName
+  * LicenseType
+    * 0=Standard (Premium)
+    * 4=Premium trial
+    * 13=Free, unapproved
+    * 14=Free, approved
+    * 16=Temporary
+
+
+##### jamf_ea_GetSSID.sh ####
+
+Checks and returns one of the following:
+* the SSID of the currently connected WiFi Network
+* Not Connected
+* Off (If WiFi is off)
+
+
+##### jamf_ea_LatestOSSupported.sh ####
+
+Checks the latest compatible version of macOS that a device's current state supports.  i.e. current HW and OS Version can be upgraded to.  Supports:
+* High Sierra
+* Sierra
+* El Capitan
+
+
 ##### jamf_ea_SMBProtocol.sh ####
 
 Check if the SMB Protocol is configured.  This is available for use with the config_SMBProtocol.sh script above.
-
-
-
-
 
