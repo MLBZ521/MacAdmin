@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_Avast.sh
 # By:  Zack Thompson / Created:  2/9/2018
-# Version:  1.1 / Updated:  2/12/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  2/16/2018 / By:  ZT
 #
 # Description:  This script installs Avast.
 #
@@ -30,7 +30,7 @@
 # Get the name of the mount.
 	AvastMount=$(/bin/ls /Volumes/ | /usr/bin/grep Avast)
 # Get the name of the pkg
-	AvastPKG=$(/bin/ls Volumes/${AvastMount}/ | /usr/bin/grep Avast)
+	AvastPKG=$(/bin/ls "/Volumes/${AvastMount}/" | /usr/bin/grep Avast)
 
 # Install Avast
 	/bin/echo "Installing ${AvastMount}..."
