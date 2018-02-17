@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.4 / Updated:  2/17/2018 / By:  ZT
+# Version:  0.5 / Updated:  2/16/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -53,7 +53,7 @@ getApps() {
 	appIDs=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
 	
 	for appID in $appIDs; do
-		/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications/id/${appID}/subset/General" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/,/g' >> $outFile
+		/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications/id/${appID}/subset/General" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\",/g'  | LANG=C sed -e 's/,[^,]*$//' >> $outFile
 	done
 
 }
