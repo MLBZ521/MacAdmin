@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.1 / Updated:  2/16/2018 / By:  ZT
+# Version:  0.2 / Updated:  2/16/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -53,6 +53,25 @@ getApps() {
 		# # Function exitCode
 		# exitCode $?
 
+	appIDs=()
+	appNames=()
+	while IFS= read -r line; do
+		if [[ $line == *"<id>"* ]]; then
+			appIDs+=($(echo $line | xargs -0 | LANG=C sed -e 's/<[^>]*>//g'))
+		elif [[ $line == *"<name>"* ]]; then
+			appNames+=("$(echo $line | xargs -0 | LANG=C sed -e 's/<[^>]*>//g' | LANG=C  sed "s/ /\\ /g")")
+		fi
+	done < <(cat /tmp/appList.xml | xmllint --format - | xpath /mobile_device_applications/mobile_device_application 2>/dev/null | awk '!/display_name/' | awk '!/bundle_id/' | awk '!/version/' | awk '!/internal_app/' | awk '!/mobile_device_application/')
+
+	# echo ${#appIDs[*]}
+	# echo ${#appNames[*]}
+
+	if [[ ${#appIDs[*]} == ${#appNames[*]} ]]; then
+		count=${#appIDs[*]}
+		for ((i = 0; i < $count; i++)); do
+			echo "${appIDs[$i]},\"${appNames[$i]}\"" >> $outFile
+		done
+	fi
 }
 
 
