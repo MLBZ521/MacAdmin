@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.3 / Updated:  2/16/2018 / By:  ZT
+# Version:  0.4 / Updated:  2/17/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -49,24 +49,11 @@ getApps() {
 	outFile="${1}"
 	# Get Mobile Device Apps from the JSS (add -k, --insecure to disabled SSL verification)
 	/bin/echo "Getting a list of all Mobile Device Apps..."
-	/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}" --header "Content-Type: text/xml" --request GET > /tmp/allAppIDs.xml
-		# # Function exitCode
-		# exitCode $?
 
-	appIDs=()
-	appNames=()
-	while IFS= read -r line; do
-		if [[ $line == *"<id>"* ]]; then
-			appIDs+=($(echo $line | xargs -0 | LANG=C sed -e 's/<[^>]*>//g'))
-		fi
-	done < <(cat /tmp/allAppIDs.xml | xmllint --format - | xpath /mobile_device_applications/mobile_device_application 2>/dev/null | awk '!/name/' | awk '!/display_name/' | awk '!/bundle_id/' | awk '!/version/' | awk '!/internal_app/' | awk '!/mobile_device_application/')
-
-	# echo ${#appIDs[*]}
-	# echo ${#appNames[*]}
-
-	count=${#appIDs[*]}
-	for ((id = 0; id < $count; id++)); do
-		appGeneral=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}/${appIDs[$id]}/subset/General" --header "Content-Type: text/xml" --request GET)
+	appIDs=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	
+	for appID in $appIDs; do
+		/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications/id/${appID}/subset/General" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/,/g' >> $outFile
 	done
 
 }
