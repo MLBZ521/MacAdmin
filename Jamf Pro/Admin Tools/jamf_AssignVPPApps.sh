@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.2 / Updated:  2/16/2018 / By:  ZT
+# Version:  0.3 / Updated:  2/16/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -49,7 +49,7 @@ getApps() {
 	outFile="${1}"
 	# Get Mobile Device Apps from the JSS (add -k, --insecure to disabled SSL verification)
 	/bin/echo "Getting a list of all Mobile Device Apps..."
-	/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}" --header "Content-Type: text/xml" --request GET > /tmp/appList.xml
+	/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}" --header "Content-Type: text/xml" --request GET > /tmp/allAppIDs.xml
 		# # Function exitCode
 		# exitCode $?
 
@@ -58,20 +58,17 @@ getApps() {
 	while IFS= read -r line; do
 		if [[ $line == *"<id>"* ]]; then
 			appIDs+=($(echo $line | xargs -0 | LANG=C sed -e 's/<[^>]*>//g'))
-		elif [[ $line == *"<name>"* ]]; then
-			appNames+=("$(echo $line | xargs -0 | LANG=C sed -e 's/<[^>]*>//g' | LANG=C  sed "s/ /\\ /g")")
 		fi
-	done < <(cat /tmp/appList.xml | xmllint --format - | xpath /mobile_device_applications/mobile_device_application 2>/dev/null | awk '!/display_name/' | awk '!/bundle_id/' | awk '!/version/' | awk '!/internal_app/' | awk '!/mobile_device_application/')
+	done < <(cat /tmp/allAppIDs.xml | xmllint --format - | xpath /mobile_device_applications/mobile_device_application 2>/dev/null | awk '!/name/' | awk '!/display_name/' | awk '!/bundle_id/' | awk '!/version/' | awk '!/internal_app/' | awk '!/mobile_device_application/')
 
 	# echo ${#appIDs[*]}
 	# echo ${#appNames[*]}
 
-	if [[ ${#appIDs[*]} == ${#appNames[*]} ]]; then
-		count=${#appIDs[*]}
-		for ((i = 0; i < $count; i++)); do
-			echo "${appIDs[$i]},\"${appNames[$i]}\"" >> $outFile
-		done
-	fi
+	count=${#appIDs[*]}
+	for ((id = 0; id < $count; id++)); do
+		appGeneral=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}/${appIDs[$id]}/subset/General" --header "Content-Type: text/xml" --request GET)
+	done
+
 }
 
 
