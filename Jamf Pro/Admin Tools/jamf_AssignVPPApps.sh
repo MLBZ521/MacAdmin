@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.5 / Updated:  2/16/2018 / By:  ZT
+# Version:  0.6 / Updated:  2/17/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -13,15 +13,15 @@
 
 ##################################################
 # Define Variables
+	jamfAPIUser="APIUsername"
+	jamfAPIPassword="APIPassword"
 	jamfPS="https://newjss.company.com:8443"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${jamfPS}/${mobileApps}/id"
-	jamfAPIUser="APIUsername"
-	jamfAPIPassword="APIPassword"
-
+	# Add -k (--insecure) to disable SSL verification
+	curlAPI=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: text/xml" --request)
 	action="${1}"
 	switch1="${2}"
-	#switch2="${3}"
 
 ##################################################
 # Setup Functions
@@ -44,32 +44,33 @@ Actions:
 "
 }
 
+# Build a list of Mobile Device Apps from the JSS.
 getApps() {
-
 	outFile="${1}"
-	# Get Mobile Device Apps from the JSS (add -k, --insecure to disabled SSL verification)
-	/bin/echo "Getting a list of all Mobile Device Apps..."
-
-	appIDs=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	/bin/echo "Building list of all Mobile Device App IDs..."
+	# GET list of Mobile Device App IDs from the JSS.
+	appIDs=$($curlAPI GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
 	
+	# For Each ID, get the Name and Site it is assigned too.
 	for appID in $appIDs; do
-		/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "https://orchard.asu.edu:8443/JSSResource/mobiledeviceapplications/id/${appID}/subset/General" --header "Content-Type: text/xml" --request GET | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\",/g'  | LANG=C sed -e 's/,[^,]*$//' >> $outFile
+		$curlAPI GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\",/g'  | LANG=C sed -e 's/,[^,]*$//' >> $outFile
 	done
 
+	/bin/echo "List has been saved to:  ${outFile}"
 }
 
-
+# Read in the App IDs and the Group Name to assign to them.
 assignApps() {
-
 	inputFile="${1}"
-	while IFS= read -r line; do
-		if [[ -n $line ]]; then
-			appID=$(echo "$line" | awk -F ',' '{print $1}')
-			groupName=$(echo "$line" | awk -F ',' '{print $2}')
+	# Read in the file and assign to variables
+	while IFS=$'\t' read appID appName appSite groupName; do
+		# echo "$appID"
+		# echo "$groupName"
 
-			# Assigns Mobile Device Apps to Groups (add -k, --insecure to disabled SSL verification)
-				/bin/echo "Getting a list of all Mobile Device Apps..."
-				/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" "${mobileApps}/" --header "Content-Type: text/xml" --request PUT --upload-file &> /dev/null <<XML
+		# PUT changes to the JSS.
+		/bin/echo "Getting a list of all Mobile Device Apps..."
+
+			$curlAPI PUT ${mobileAppsByID} --upload-file &> /dev/null <<XML
 <?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>
 <mobile_device_application>
 <general>
@@ -87,20 +88,13 @@ assignApps() {
 </mobile_device_application>
 XML
 
-			# Function exitCode
-			exitCode $?
-		fi
+		# Function exitCode
+		exitCode $?
 	done < "${inputFile}"
 }
 
-
-
 ##################################################
 # Bits Staged
-
-
-
-
 
 case $action in
 	--get | -g )
