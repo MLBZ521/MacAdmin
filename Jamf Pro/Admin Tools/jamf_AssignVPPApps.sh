@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.6 / Updated:  2/17/2018 / By:  ZT
+# Version:  0.7 / Updated:  2/17/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -47,13 +47,22 @@ Actions:
 # Build a list of Mobile Device Apps from the JSS.
 getApps() {
 	outFile="${1}"
+
 	/bin/echo "Building list of all Mobile Device App IDs..."
 	# GET list of Mobile Device App IDs from the JSS.
 	appIDs=$($curlAPI GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
-	
+	# Check if the API call was successful or not.
+	exitCode $?
+
+	/bin/echo "Adding headers to output file..."
+	/bin/echo -e "\"App ID\"\t\"App Name\"\t\"App Site\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"Scope to Group\""
+
+	/bin/echo "Getting Mobile Device App info..."
 	# For Each ID, get the Name and Site it is assigned too.
 	for appID in $appIDs; do
 		$curlAPI GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\",/g'  | LANG=C sed -e 's/,[^,]*$//' >> $outFile
+		# Check if the API call was successful or not.
+		exitCode $?
 	done
 
 	/bin/echo "List has been saved to:  ${outFile}"
@@ -62,26 +71,36 @@ getApps() {
 # Read in the App IDs and the Group Name to assign to them.
 assignApps() {
 	inputFile="${1}"
+	/bin/echo "Scoping Mobile Device Apps..."
+
 	# Read in the file and assign to variables
-	while IFS=$'\t' read appID appName appSite groupName; do
+	while IFS=$'\t' read appID appName appSite autoInstall autoDeploy manageApp removeApp scopeGroup; do
 		# echo "$appID"
 		# echo "$groupName"
 
-		# PUT changes to the JSS.
-		/bin/echo "Getting a list of all Mobile Device Apps..."
+		if [[ $autoInstall == "true" ]]; then
+			autoInstall="Install Automatically/Prompt Users to Install"
+		else
+			autoInstall="Self Service"
+		fi
 
-			$curlAPI PUT ${mobileAppsByID} --upload-file &> /dev/null <<XML
+		# PUT changes to the JSS.
+		$curlAPI PUT ${mobileAppsByID} --upload-file &> /dev/null <<XML
 <?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>
 <mobile_device_application>
 <general>
 <id>$appID</id>
+<deployment_type>$autoInstall</deployment_type>
+<deploy_automatically>$autoDeploy</deploy_automatically>
+<deploy_as_managed_app>$manageApp</deploy_as_managed_app>
+<remove_app_when_mdm_profile_is_removed>$removeApp</remove_app_when_mdm_profile_is_removed>
 </general>
 <scope>
 <mobile_devices/>
 <mobile_device_groups>
 <mobile_device_group>
 <id>0</id>
-<name>$groupName</name>
+<name>$scopeGroup</name>
 </mobile_device_group>
 </mobile_device_groups>
 </scope>
@@ -91,6 +110,15 @@ XML
 		# Function exitCode
 		exitCode $?
 	done < "${inputFile}"
+}
+
+exitCode() {
+	if [[ $1 != "0" ]]; then
+		/bin/echo " -> Failed"
+		# exit 1
+	else
+		/bin/echo " -> Success!"
+	fi
 }
 
 ##################################################
@@ -126,5 +154,7 @@ case $action in
 		getHelp
 	;;
 esac
+
+/bin/echo "*****  AssignVPPApps process:  COMPLETE  *****"
 
 exit 0
