@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.7 / Updated:  2/17/2018 / By:  ZT
+# Version:  0.8 / Updated:  2/17/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -78,6 +78,7 @@ assignApps() {
 		# echo "$appID"
 		# echo "$groupName"
 
+		# For sake of editing the csv, we're expecting a true or false value to "Auto Install" the App, but we need to reassign this value to what the JSS expects.
 		if [[ $autoInstall == "true" ]]; then
 			autoInstall="Install Automatically/Prompt Users to Install"
 		else
@@ -109,7 +110,7 @@ XML
 
 		# Function exitCode
 		exitCode $?
-	done < "${inputFile}"
+	done < <(/usr/bin/tail -n +2 "${inputFile}") # Essentially, skip the header line.
 }
 
 exitCode() {
@@ -121,15 +122,20 @@ exitCode() {
 	fi
 }
 
+fileExists() {
+	if [[ ! -e "${1}" ]]; then
+		/bin/echo "ERROR:  Unable to find the input file!"
+		/bin/echo "*****  AssignVPPApps process:  FAILED  *****"
+		exit 1
+	fi
+}
+
 ##################################################
 # Bits Staged
 
 case $action in
 	--get | -g )
-		if [[ -n "${switch1}" ]]; then
-			# # Function fileExists 
-			# fileExists "${input2}"
-			
+		if [[ -n "${switch1}" ]]; then			
 			# Function getApps
 			getApps "${switch1}"
 		else
@@ -139,8 +145,8 @@ case $action in
 	;;
 	--assign | -a )
 		if [[ -n "${switch1}" ]]; then
-			# # Function fileExists 
-			# fileExists "${input3}" "${input2}"
+			# Function fileExists 
+			fileExists "${switch1}"
 
 			# Function assignApps
 			assignApps "${switch1}"
