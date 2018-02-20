@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.8 / Updated:  2/17/2018 / By:  ZT
+# Version:  0.9 / Updated:  2/19/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -17,9 +17,9 @@
 	jamfAPIPassword="APIPassword"
 	jamfPS="https://newjss.company.com:8443"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
-	mobileAppsByID="${jamfPS}/${mobileApps}/id"
+	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
-	curlAPI=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: text/xml" --request)
+	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: text/xml" --request)
 	action="${1}"
 	switch1="${2}"
 
@@ -50,17 +50,19 @@ getApps() {
 
 	/bin/echo "Building list of all Mobile Device App IDs..."
 	# GET list of Mobile Device App IDs from the JSS.
-	appIDs=$($curlAPI GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	appIDs=$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	
 	# Check if the API call was successful or not.
 	exitCode $?
 
 	/bin/echo "Adding headers to output file..."
-	/bin/echo -e "\"App ID\"\t\"App Name\"\t\"App Site\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"Scope to Group\""
+	header="\"App ID\"\t\"App Name\"\t\"App Site\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"Scope to Group\""
+	echo -e $header >> $outFile
 
 	/bin/echo "Getting Mobile Device App info..."
 	# For Each ID, get the Name and Site it is assigned too.
 	for appID in $appIDs; do
-		$curlAPI GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\",/g'  | LANG=C sed -e 's/,[^,]*$//' >> $outFile
+		/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> $outFile
 		# Check if the API call was successful or not.
 		exitCode $?
 	done
