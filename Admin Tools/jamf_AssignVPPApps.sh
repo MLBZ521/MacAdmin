@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.9 / Updated:  2/19/2018 / By:  ZT
+# Version:  0.10 / Updated:  2/19/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -53,7 +53,7 @@ getApps() {
 	appIDs=$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
 	
 	# Check if the API call was successful or not.
-	exitCode $?
+	exitCode $? notify
 
 	/bin/echo "Adding headers to output file..."
 	header="\"App ID\"\t\"App Name\"\t\"App Site\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"Scope to Group\""
@@ -83,8 +83,11 @@ assignApps() {
 		# For sake of editing the csv, we're expecting a true or false value to "Auto Install" the App, but we need to reassign this value to what the JSS expects.
 		if [[ $autoInstall == "true" ]]; then
 			autoInstall="Install Automatically/Prompt Users to Install"
+		elif [[ $autoInstall == "false" ]]; then
+			autoInstall="Make Available in Self Service"
 		else
-			autoInstall="Self Service"
+			/bin/echo "Unable to determine the install method for App ID:  ${appID}"
+			continue
 		fi
 
 		# PUT changes to the JSS.
@@ -117,10 +120,17 @@ XML
 
 exitCode() {
 	if [[ $1 != "0" ]]; then
-		/bin/echo " -> Failed"
-		# exit 1
+		if [[ $2 == "notify" ]]; then
+			# Notify only if told too. 
+			/bin/echo " -> An action failed"
+			# exit 1
+		fi
 	else
-		/bin/echo " -> Success!"
+		if [[ $2 == "notify" ]]; then
+			# Notify only if told too. 
+			/bin/echo " -> Success!"
+			# exit 1
+		fi
 	fi
 }
 
@@ -141,6 +151,7 @@ case $action in
 			# Function getApps
 			getApps "${switch1}"
 		else
+			/bin/echo "Output file was not properly defined."
 			# Function getHelp
 			getHelp
 		fi
@@ -153,6 +164,7 @@ case $action in
 			# Function assignApps
 			assignApps "${switch1}"
 		else
+			/bin/echo "Input file was not properly defined."
 			# Function getHelp
 			getHelp
 		fi
