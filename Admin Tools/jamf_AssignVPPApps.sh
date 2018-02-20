@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.10 / Updated:  2/19/2018 / By:  ZT
+# Version:  0.11 / Updated:  2/19/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -19,9 +19,9 @@
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
-	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: text/xml" --request)
 	action="${1}"
 	switch1="${2}"
+	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: application/xml" --request)
 
 ##################################################
 # Setup Functions
@@ -56,8 +56,8 @@ getApps() {
 	exitCode $? notify
 
 	/bin/echo "Adding headers to output file..."
-	header="\"App ID\"\t\"App Name\"\t\"App Site\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"Scope to Group\""
 	echo -e $header >> $outFile
+	header="\"App ID\"\t\"App Name\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"App Site\"\t\"Scope to Group\""
 
 	/bin/echo "Getting Mobile Device App info..."
 	# For Each ID, get the Name and Site it is assigned too.
@@ -91,27 +91,21 @@ assignApps() {
 		fi
 
 		# PUT changes to the JSS.
-		$curlAPI PUT ${mobileAppsByID} --upload-file &> /dev/null <<XML
-<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>
-<mobile_device_application>
+		/usr/bin/curl "${curlAPI[@]}" PUT ${mobileAppsByID}/${appID} --data "<mobile_device_application>
 <general>
-<id>$appID</id>
 <deployment_type>$autoInstall</deployment_type>
 <deploy_automatically>$autoDeploy</deploy_automatically>
 <deploy_as_managed_app>$manageApp</deploy_as_managed_app>
 <remove_app_when_mdm_profile_is_removed>$removeApp</remove_app_when_mdm_profile_is_removed>
 </general>
 <scope>
-<mobile_devices/>
 <mobile_device_groups>
 <mobile_device_group>
-<id>0</id>
 <name>$scopeGroup</name>
 </mobile_device_group>
 </mobile_device_groups>
 </scope>
-</mobile_device_application>
-XML
+</mobile_device_application>" 2>&1>/dev/null 
 
 		# Function exitCode
 		exitCode $?
