@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.12 / Updated:  2/20/2018 / By:  ZT
+# Version:  0.13 / Updated:  2/20/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -13,15 +13,26 @@ echo "*****  AssignVPPApps process:  START  *****"
 
 ##################################################
 # Define Variables
-	jamfAPIUser="APIUsername"
-	jamfAPIPassword="APIPassword"
-	jamfPS="https://newjss.company.com:8443"
+	# Either hard code or prompt for credentials
+	# jamfAPIUser="APIUsername"
+	# jamfAPIPassword="APIPassword"
+	# jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
+	jamfAPIUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
+	jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
+
+	#jamfPS="https://newjss.company.com:8443"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
-	action="${1}"
-	switch1="${2}"
 	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: application/xml" --request)
+
+	# Either use CLI arguments or prompt for choice
+	if [[ "${4}" == "Jamf" ]]; then
+		action=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"Get VPP Apps", "Assign VPP Apps"}' -e 'set Action to choose from list availableActions with prompt "Select action:" default items {"Get VPP Apps"}' -e 'end tell' 2>/dev/null)
+	else
+		action="${1}"
+		switch1="${2}"
+	fi
 
 ##################################################
 # Setup Functions
@@ -46,8 +57,6 @@ Actions:
 
 # Build a list of Mobile Device Apps from the JSS.
 getApps() {
-	outFile="${1}"
-
 	echo "Building list of all Mobile Device App IDs..."
 	# GET list of Mobile Device App IDs from the JSS.
 	appIDs=$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
@@ -62,7 +71,7 @@ getApps() {
 	echo "Getting Mobile Device App info..."
 	# For Each ID, get the Name and Site it is assigned too.
 	for appID in $appIDs; do
-		/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> $outFile
+		/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 		# Check if the API call was successful or not.
 		exitCode $?
 	done
@@ -72,7 +81,6 @@ getApps() {
 
 # Read in the App IDs and the Group Name to assign to them.
 assignApps() {
-	inputFile="${1}"
 	echo "Scoping Mobile Device Apps..."
 
 	# Read in the file and assign to variables
@@ -125,38 +133,51 @@ exitCode() {
 }
 
 fileExists() {
-	if [[ ! -e "${1}" ]]; then
-		/bin/echo "ERROR:  Unable to find the input file!"
-		/bin/echo "*****  AssignVPPApps process:  FAILED  *****"
-		exit 1
+	if [[ ! -e "${1}" && $2 == "create" ]]; then
+		echo "Creating output file at location:  ${1}"
+		/usr/bin/touch "${1}"
+	elif  [[ ! -e "${1}" && $2 == "trip" ]]; then
+		echo "ERROR:  Unable to find the input file!"
+		echo "*****  AssignVPPApps process:  FAILED  *****"
+		exit 2
 	fi
 }
 
 ##################################################
 # Bits Staged
 
+if [[ -z "${jamfAPIUser}" && -z "${jamfAPIPassword}" ]]; then
+	echo "Jamf credentials are required!"
+	exit 1
+fi
+
 case $action in
-	--get | -g )
-		if [[ -n "${switch1}" ]]; then			
+	--get | -g | "Get VPP Apps" )
+		if [[ -n "${switch1}" ]]; then
+			outFile="${switch1}"
 			# Function getApps
-			getApps "${switch1}"
+				getApps
 		else
-			/bin/echo "Output file was not properly defined."
-			# Function getHelp
-			getHelp
+			outFile=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of (choose file name with prompt "Provide a file name and location to save the configuration file:")' -e 'end tell' 2>/dev/null)
+			# Function fileExists
+				fileExists "${outFile}" create
+			# Function getApps
+				getApps
 		fi
 	;;
-	--assign | -a )
+	--assign | -a | "Assign VPP Apps" )
 		if [[ -n "${switch1}" ]]; then
-			# Function fileExists 
-			fileExists "${switch1}"
-
+			inputFile="${switch1}"
+			# Function fileExists
+				fileExists "${inputFile}" trip
 			# Function assignApps
-			assignApps "${switch1}"
+				assignApps
 		else
-			/bin/echo "Input file was not properly defined."
-			# Function getHelp
-			getHelp
+			inputFile=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of(choose file with prompt "Select configuration file to process:" of type {"txt"})' -e 'end tell' 2>/dev/null)
+			# Function fileExists
+				fileExists "${inputFile}" trip
+			# Function assignApps
+				assignApps
 		fi
 	;;
 	-help | -h | * )
