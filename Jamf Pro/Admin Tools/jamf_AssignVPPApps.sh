@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.16 / Updated:  2/20/2018 / By:  ZT
+# Version:  0.17 / Updated:  2/21/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -67,7 +67,7 @@ getApps() {
 	if [[ $curlCode != "200" ]]; then
 		informBy "ERROR:  API call failed with error:  ${curlCode}!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
-		exit 3
+		exit 4
 	fi
 	
 	# Regex down to just the ID numbers
@@ -161,7 +161,7 @@ fileExists() {
 	elif  [[ ! -e "${1}" && $2 == "trip" ]]; then
 		informBy "ERROR:  Unable to find the input file!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
-		exit 2
+		exit 3
 	fi
 }
 
@@ -179,9 +179,24 @@ informBy() {
 ##################################################
 # Bits Staged
 
+# Verify credentials were provided.
 if [[ -z "${jamfAPIUser}" && -z "${jamfAPIPassword}" ]]; then
 	informBy "Jamf credentials are required!"
 	exit 1
+else
+	# Verify credentials that were provided by doing an API call and checking the result to verify permissions.
+	echo "Verifying API credentials..."
+	curlReturn="$(/usr/bin/curl $jamfPS/JSSResource/jssuser -i --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}")"
+
+	# Check if the API call was successful or not.
+	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+	if [[ $curlCode != *"200"* ]]; then
+		informBy "ERROR:  Invalid API credentials provided!"
+		echo "*****  AssignVPPApps process:  FAILED  *****"
+		exit 2
+	fi
+
+	echo "API Credentials Valid -- continuing..."
 fi
 
 case $action in
