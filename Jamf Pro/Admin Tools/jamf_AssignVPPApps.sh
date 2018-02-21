@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.14 / Updated:  2/20/2018 / By:  ZT
+# Version:  0.15 / Updated:  2/20/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -16,11 +16,10 @@ echo "*****  AssignVPPApps process:  START  *****"
 	# Either hard code or prompt for credentials
 	# jamfAPIUser="APIUsername"
 	# jamfAPIPassword="APIPassword"
-	# jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
 	jamfAPIUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
 	jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
 
-	#jamfPS="https://newjss.company.com:8443"
+	jamfPS="https://newjss.company.com:8443"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
@@ -29,9 +28,11 @@ echo "*****  AssignVPPApps process:  START  *****"
 	# Either use CLI arguments or prompt for choice
 	if [[ "${4}" == "Jamf" ]]; then
 		action=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"Get VPP Apps", "Assign VPP Apps"}' -e 'set Action to choose from list availableActions with prompt "Select action:" default items {"Get VPP Apps"}' -e 'end tell' 2>/dev/null)
+		ranBy="Jamf"
 	else
 		action="${1}"
 		switch1="${2}"
+		ranBy="CLI"
 	fi
 
 ##################################################
@@ -59,12 +60,12 @@ Actions:
 getApps() {
 	echo "Requesting list of all App IDs..."
 	# GET list of App IDs from the JSS.
-	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps)" #" | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null)" #" | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')"
+	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps)"
 	
 	# Check if the API call was successful or not.
 	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
 	if [[ $curlCode != "200" ]]; then
-		echo "ERROR:  API call failed with error:  ${curlCode}!"
+		informBy "ERROR:  API call failed with error:  ${curlCode}!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
 		exit 3
 	fi
@@ -76,7 +77,7 @@ getApps() {
 	header="\"App ID\"\t\"App Name\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"App Site\"\t\"Scope to Group\""
 	echo -e $header >> "${outFile}"
 
-	echo "Requesting info for each App..."
+	informBy "Requesting info for each App..."
 	# For Each ID, get additional information.
 	for appID in $appIDs; do
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General)"
@@ -89,7 +90,7 @@ getApps() {
 		echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 	done
 
-	echo "List has been saved to:  ${outFile}"
+	informBy "List has been saved to:  ${outFile}"
 }
 
 # Read in the App IDs and configuration parameters and the Group Name to assign to each.
@@ -137,29 +138,29 @@ checkStatusCode() {
 	case $1 in
 		200 )
 			# Turn off success notifications
-			# echo " -> Request successful"
+			# informBy " -> Request successful"
 		;;
 		201)
 			# Turn off success notifications
-			# echo "App ID:  ${appID} -> Request to create or update object successful"
+			# informBy "App ID:  ${appID} -> Request to create or update object successful"
 		;;
 		400)
-			echo "App ID:  ${appID} -> Bad request. Verify the syntax of the request specifically the XML body."
+			informBy "App ID:  ${appID} -> Bad request. Verify the syntax of the request specifically the XML body."
 		;;
 		401)
-			echo "App ID:  ${appID} -> Authentication failed. Verify the credentials being used for the request."
+			informBy "App ID:  ${appID} -> Authentication failed. Verify the credentials being used for the request."
 		;;
 		403)
-			echo "App ID:  ${appID} -> Invalid permissions. Verify the account being used has the proper permissions for the object/resource you are trying to access."
+			informBy "App ID:  ${appID} -> Invalid permissions. Verify the account being used has the proper permissions for the object/resource you are trying to access."
 		;;
 		404)
-			echo "App ID:  ${appID} -> Object/resource not found. Verify the URL path is correct."
+			informBy "App ID:  ${appID} -> Object/resource not found. Verify the URL path is correct."
 		;;
 		409)
-			echo "App ID:  ${appID} -> Conflict"
+			informBy "App ID:  ${appID} -> Conflict"
 		;;
 		500)
-			echo "App ID:  ${appID} -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
+			informBy "App ID:  ${appID} -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
 		;;
 	esac
 }
@@ -169,17 +170,28 @@ fileExists() {
 		echo "Creating output file at location:  ${1}"
 		/usr/bin/touch "${1}"
 	elif  [[ ! -e "${1}" && $2 == "trip" ]]; then
-		echo "ERROR:  Unable to find the input file!"
+		informBy "ERROR:  Unable to find the input file!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
 		exit 2
 	fi
+}
+
+informBy() {
+	case $ranBy in
+		Jamf )
+			/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "'"${1}"'" buttons {"OK"}' > /dev/null
+		;;
+		CLI )
+			echo "${1}"
+		;;
+	esac
 }
 
 ##################################################
 # Bits Staged
 
 if [[ -z "${jamfAPIUser}" && -z "${jamfAPIPassword}" ]]; then
-	echo "Jamf credentials are required!"
+	informBy "Jamf credentials are required!"
 	exit 1
 fi
 
@@ -218,5 +230,6 @@ case $action in
 	;;
 esac
 
+informBy "Script successfully completed!"
 echo "*****  AssignVPPApps process:  COMPLETE  *****"
 exit 0
