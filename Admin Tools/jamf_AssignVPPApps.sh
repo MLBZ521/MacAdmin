@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.13 / Updated:  2/20/2018 / By:  ZT
+# Version:  0.14 / Updated:  2/20/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -24,7 +24,7 @@ echo "*****  AssignVPPApps process:  START  *****"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
-	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --header "Content-Type: application/xml" --request)
+	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 
 	# Either use CLI arguments or prompt for choice
 	if [[ "${4}" == "Jamf" ]]; then
@@ -57,31 +57,44 @@ Actions:
 
 # Build a list of Mobile Device Apps from the JSS.
 getApps() {
-	echo "Building list of all Mobile Device App IDs..."
-	# GET list of Mobile Device App IDs from the JSS.
-	appIDs=$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	echo "Requesting list of all App IDs..."
+	# GET list of App IDs from the JSS.
+	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps)" #" | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null)" #" | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')"
 	
 	# Check if the API call was successful or not.
-	exitCode $? notify
-
+	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+	if [[ $curlCode != "200" ]]; then
+		echo "ERROR:  API call failed with error:  ${curlCode}!"
+		echo "*****  AssignVPPApps process:  FAILED  *****"
+		exit 3
+	fi
+	
+	# Regex down to just the ID numbers
+	appIDs=$(echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	
 	echo "Adding headers to output file..."
 	header="\"App ID\"\t\"App Name\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"App Site\"\t\"Scope to Group\""
 	echo -e $header >> "${outFile}"
 
-	echo "Getting Mobile Device App info..."
-	# For Each ID, get the Name and Site it is assigned too.
+	echo "Requesting info for each App..."
+	# For Each ID, get additional information.
 	for appID in $appIDs; do
-		/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General)"
+
 		# Check if the API call was successful or not.
-		exitCode $?
+		curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+		checkStatusCode $curlCode $appID
+
+		# Regex down to the info we want and output to a tab delimited file
+		echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 	done
 
 	echo "List has been saved to:  ${outFile}"
 }
 
-# Read in the App IDs and the Group Name to assign to them.
+# Read in the App IDs and configuration parameters and the Group Name to assign to each.
 assignApps() {
-	echo "Scoping Mobile Device Apps..."
+	echo "Scoping Apps to Groups..."
 
 	# Read in the file and assign to variables
 	while IFS=$'\t' read appID appName appSite autoInstall autoDeploy manageApp removeApp scopeGroup; do
@@ -97,7 +110,7 @@ assignApps() {
 		fi
 
 		# PUT changes to the JSS.
-		/usr/bin/curl "${curlAPI[@]}" PUT ${mobileAppsByID}/${appID} --data "<mobile_device_application>
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${mobileAppsByID}/${appID} --data "<mobile_device_application>
 <general>
 <deployment_type>$autoInstall</deployment_type>
 <deploy_automatically>$autoDeploy</deploy_automatically>
@@ -111,25 +124,44 @@ assignApps() {
 </mobile_device_group>
 </mobile_device_groups>
 </scope>
-</mobile_device_application>" 2>&1>/dev/null 
+</mobile_device_application>")"
 
-		# Function exitCode
-		exitCode $?
+		# Check if the API call was successful or not.
+		curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+		checkStatusCode $curlCode $appID
+
 	done < <(/usr/bin/tail -n +2 "${inputFile}") # Essentially, skip the header line.
 }
 
-exitCode() {
-	if [[ $1 != "0" ]]; then
-		if [[ $2 == "notify" ]]; then
-			# Notify only if told too. 
-			echo " -> An action failed"
-		fi
-	else
-		if [[ $2 == "notify" ]]; then
-			# Notify only if told too. 
-			echo " -> Success!"
-		fi
-	fi
+checkStatusCode() {
+	case $1 in
+		200 )
+			# Turn off success notifications
+			# echo " -> Request successful"
+		;;
+		201)
+			# Turn off success notifications
+			# echo "App ID:  ${appID} -> Request to create or update object successful"
+		;;
+		400)
+			echo "App ID:  ${appID} -> Bad request. Verify the syntax of the request specifically the XML body."
+		;;
+		401)
+			echo "App ID:  ${appID} -> Authentication failed. Verify the credentials being used for the request."
+		;;
+		403)
+			echo "App ID:  ${appID} -> Invalid permissions. Verify the account being used has the proper permissions for the object/resource you are trying to access."
+		;;
+		404)
+			echo "App ID:  ${appID} -> Object/resource not found. Verify the URL path is correct."
+		;;
+		409)
+			echo "App ID:  ${appID} -> Conflict"
+		;;
+		500)
+			echo "App ID:  ${appID} -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
+		;;
+	esac
 }
 
 fileExists() {
