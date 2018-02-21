@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.15 / Updated:  2/20/2018 / By:  ZT
+# Version:  0.16 / Updated:  2/20/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -73,8 +73,8 @@ getApps() {
 	# Regex down to just the ID numbers
 	appIDs=$(echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
 	
-	echo "Adding headers to output file..."
-	header="\"App ID\"\t\"App Name\"\t\"Auto Install?\"\t\"Auto Deploy\"\t\"Manage App?\"\t\"Remove App?\"\t\"App Site\"\t\"Scope to Group\""
+	echo "Adding header to output file..."
+	header="App ID\tApp Name\tAuto Deploy\tRemove App\tTake Over\tApp Site\tScope to Group"
 	echo -e $header >> "${outFile}"
 
 	informBy "Requesting info for each App..."
@@ -87,7 +87,7 @@ getApps() {
 		checkStatusCode $curlCode $appID
 
 		# Regex down to the info we want and output to a tab delimited file
-		echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deployment_type | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/deploy_as_managed_app | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed' 2>/dev/null | LANG=C sed -e 's/Install Automatically\/Prompt Users to Install/true/g' | LANG=C sed -e 's/Make Available in Self Service/false/g' | LANG=C sed -e 's/<[^/>]*>/\'$'\"/g' | LANG=C sed -e 's/<[^>]*>/\'$'\"\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
+		echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed | /mobile_device_application/general/take_over_management' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 	done
 
 	informBy "List has been saved to:  ${outFile}"
@@ -98,25 +98,14 @@ assignApps() {
 	echo "Scoping Apps to Groups..."
 
 	# Read in the file and assign to variables
-	while IFS=$'\t' read appID appName appSite autoInstall autoDeploy manageApp removeApp scopeGroup; do
-
-		# For sake of editing the txt, we're expecting a true or false value to "Auto Install" the App, but we need to reassign this value to what the JSS expects.
-		if [[ $autoInstall == "true" ]]; then
-			autoInstall="Install Automatically/Prompt Users to Install"
-		elif [[ $autoInstall == "false" ]]; then
-			autoInstall="Make Available in Self Service"
-		else
-			echo "Unable to determine the install method for App ID:  ${appID}"
-			continue
-		fi
+	while IFS=$'\t' read appID appName autoDeploy removeApp takeOver appSite scopeGroup; do
 
 		# PUT changes to the JSS.
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${mobileAppsByID}/${appID} --data "<mobile_device_application>
 <general>
-<deployment_type>$autoInstall</deployment_type>
 <deploy_automatically>$autoDeploy</deploy_automatically>
-<deploy_as_managed_app>$manageApp</deploy_as_managed_app>
 <remove_app_when_mdm_profile_is_removed>$removeApp</remove_app_when_mdm_profile_is_removed>
+<take_over_management>$takeOver</take_over_management>
 </general>
 <scope>
 <mobile_device_groups>
