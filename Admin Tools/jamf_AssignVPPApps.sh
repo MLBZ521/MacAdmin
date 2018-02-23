@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  0.17 / Updated:  2/21/2018 / By:  ZT
+# Version:  1.0 / Updated:  2/21/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
