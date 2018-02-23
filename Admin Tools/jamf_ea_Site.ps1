@@ -32,11 +32,17 @@ $computersEA="${jamPS}/JSSResource/computers/id/subset/extension_attribute"
 
 function updateSiteList {
 
-$objectOf_Sites = Invoke-RestMethod -Uri $getSites -Method Get -Credential $APIcredentials
-$objectOf_ComputerEA = Invoke-RestMethod -Uri $getComputerEA -Method Get -Credential $APIcredentials
-[xml]$xml_ComputerEA = $objectOfComputerEA.InnerXml
+# Get a list of all Sites
+    $objectOf_Sites = Invoke-RestMethod -Uri $getSites -Method Get -Credential $APIcredentials
+# Get the ComputerEA for Site
+    $objectOf_ComputerEA = Invoke-RestMethod -Uri $getComputerEA -Method Get -Credential $APIcredentials
+# Dump the current configuration into a XML variable 
+    [xml]$xml_ComputerEA = $objectOf_ComputerEA.InnerXml
 
+    $objectOf_Sites.sites.site.Count
+    $($objectOf_ComputerEA.computer_extension_attribute.input_type.popup_choices.choice.Count - 1)
 
+# Computer the Sites count to the list of Choices from the ComputerEA
 if ( $objectOf_Sites.sites.site.Count -eq $($objectOf_ComputerEA.computer_extension_attribute.input_type.popup_choices.choice.Count - 1) ) {
     Write-Host "Site count equal Computer EA Choice Count"
     Write-Host "Presuming these are up to date"
@@ -46,17 +52,18 @@ else {
 
     $SiteList = $objectOf_Sites.sites.site | ForEach-Object {$_.Name}
     $missingChoices = $(Compare-Object -ReferenceObject $($objectOf_Sites.sites.site | ForEach-Object {$_.Name}) -DifferenceObject $objectOf_ComputerEA.computer_extension_attribute.input_type.popup_choices.choice) | ForEach-Object {$_.InputObject}
-    $missingChoices
+    $missingChoices.count # Just here for dev purposes, so I know how many are missing.
 
     ForEach ( $choice in $missingChoices ) {
-        Write-Host $choice
-        $newElement = $xml_ComputerEA.CreateElement("choice")
-        $newElement.InnerXml = $choice
-        $xml_ComputerEA.SelectSingleNode("//popup_choices").AppendChild($newElement)
-   
+        # Write-Host $choice
+        $newChoice = $xml_ComputerEA.CreateElement("choice")
+        $newChoice.InnerXml = $choice
+        $xml_ComputerEA.SelectSingleNode("//popup_choices").AppendChild($newChoice)
     }
 
-    #Invoke-RestMethod -Uri $getComputerEA -Method Put -Credential $APIcredentials -Body $template_ComputerEA
+    $xml_ComputerEA.computer_extension_attribute.input_type.popup_choices.choice.Count
+
+    #Invoke-RestMethod -Uri $getComputerEA -Method Put -Credential $APIcredentials -Body $new_xml_ComputerEA
 }
 
 }
