@@ -2,7 +2,7 @@
 
 Script Name:  jamf_ea_Site.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  0.3 / Updated:  2/23/2018 / By:  ZT
+Version:  0.4 / Updated:  2/23/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -70,29 +70,30 @@ function updateSiteList {
     }
 }
 
-function updateComputers {
-    # Get a list of all Computers
-        $objectOf_Computers = Invoke-RestMethod -Uri $getComputers -Method Get -Credential $APIcredentials
-    # Get the ID of each computer
-        $computerList = $objectOf_Computers.computers.computer | ForEach-Object {$_.ID}
+# ============================================================
+# Bits Staged...
+# ============================================================
 
-    ForEach ( $ID in $computerList ) {
+Write-Host "Pulling all computer records..."
+# Get a list of all Computers
+$objectOf_Computers = Invoke-RestMethod -Uri $getComputers -Method Get -Credential $APIcredentials
 
-        # Get Computer's General Section
-            $objectOf_computerGeneral = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/General" -Method Get -Credential $APIcredentials
-      
-        # Get Computer's Extention Attribute Section
-            $objectOf_computerEA = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
+Write-Host "Pulling data for each computer record..."
+# Get the ID of each computer
+$computerList = $objectOf_Computers.computers.computer | ForEach-Object {$_.ID}
 
-            If ( $objectOf_computerGeneral.computer.general.site.name -eq $($objectOf_computerEA.computer.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $id_EAComputer } | Select-Object Value)) {
-                Write-Host "Site is set!"
-            }
-            else{
-                Write-host "Site is incorrect -- updating..."
-                [xml]$upload_ComputerEA = "<?xml version='1.0' encoding='UTF-8'?><computer><extension_attributes><extension_attribute><id>${id_EAComputer}</id><value>$(${objectOf_computerGeneral}.computer.general.site.name)</value></extension_attribute></extension_attributes></computer>"
-                Invoke-RestMethod -Uri "${getComputer}/${ID}" -Method Put -Credential $APIcredentials -Body $test_ComputerEA
-            }
+ForEach ( $ID in $computerList ) {
+
+    # Get Computer's General Section
+    $objectOf_computerGeneral = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/General" -Method Get -Credential $APIcredentials
+
+    # Get Computer's Extention Attribute Section
+    $objectOf_computerEA = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
+
+    If ( $objectOf_computerGeneral.computer.general.site.name -ne $($objectOf_computerEA.computer.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $id_EAComputer } | Select-Object Value)) {
+        Write-host "Site is incorrect for computer ID:  ${ID} -- updating..."
+        [xml]$upload_ComputerEA = "<?xml version='1.0' encoding='UTF-8'?><computer><extension_attributes><extension_attribute><id>${id_EAComputer}</id><value>$(${objectOf_computerGeneral}.computer.general.site.name)</value></extension_attribute></extension_attributes></computer>"
+        Invoke-RestMethod -Uri "${getComputer}/${ID}" -Method Put -Credential $APIcredentials -Body $test_ComputerEA
     }
-
 }
 
