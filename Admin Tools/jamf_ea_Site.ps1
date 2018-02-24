@@ -2,7 +2,7 @@
 
 Script Name:  jamf_ea_Site.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  0.4 / Updated:  2/23/2018 / By:  ZT
+Version:  0.5 / Updated:  2/23/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -14,7 +14,7 @@ Description:  This script will basically update an EA to the value of the comput
 
 # Jamf EA IDs
 $id_EAComputer="43"
-$id_MobileComputer="43"
+$id_EAMobileDevice="1"
 
 # Setup Credentials
 $jamfAPIUser = ""
@@ -24,10 +24,12 @@ $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredenti
 # Setup API URLs
 $jamfPS="https://newjss.company.com:8443"
 $getSites="${jamfPS}/JSSResource/sites"
-$getComputerEA="${jamfPS}/JSSResource/computerextensionattributes/id/${id_EAComputer}"
-$getMobileEA="${jamfPS}/JSSResource/mobiledeviceextensionattributes/id/"
 $getComputers="${jamfPS}/JSSResource/computers"
 $getComputer="${jamfPS}/JSSResource/computers/id"
+$getMobileDevices="${jamfPS}/JSSResource/mobiledevices"
+$getMobileDevice="${jamfPS}/JSSResource/mobiledevices/id"
+$getComputerEA="${jamfPS}/JSSResource/computerextensionattributes/id/${id_EAComputer}"
+$getMobileEA="${jamfPS}/JSSResource/mobiledeviceextensionattributes/id/${id_MobileComputer}"
 
 # ============================================================
 # Functions
@@ -70,30 +72,38 @@ function updateSiteList {
     }
 }
 
+function updateRecord($deviceType, $urlALL, $urlID, $idEA) {
+
+    Write-Host "Pulling all ${deviceType} records..."
+    # Get a list of all records
+    $objectOf_Devices = Invoke-RestMethod -Uri $urlALL -Method Get -Credential $APIcredentials
+
+    Write-Host "Pulling data for each individual ${deviceType} record..."
+    # Get the ID of each device
+    $deviceList = $objectOf_Devices."${deviceType}s"."${deviceType}" | ForEach-Object {$_.ID}
+
+    ForEach ( $ID in $deviceList ) {
+        $ID = "822"
+        # Get Computer's General Section
+        $objectOf_deviceGeneral = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/General" -Method Get -Credential $APIcredentials
+
+        # Get Computer's Extention Attribute Section
+        $objectOf_deviceEA = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
+        
+        If ( $objectOf_deviceGeneral.$deviceType.general.site.name -ne $($objectOf_deviceEA.$deviceType.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $idEA }).value) {
+            Write-host "Site is incorrect for computer ID:  ${ID} -- updating..."
+            [xml]$upload_deviceEA = "<?xml version='1.0' encoding='UTF-8'?><${deviceType}><extension_attributes><extension_attribute><id>${idEA}</id><value>$(${objectOf_deviceGeneral}.$deviceType.general.site.name)</value></extension_attribute></extension_attributes></${deviceType}>"
+            Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Credential $APIcredentials -Body $upload_deviceEA
+        }
+    }
+
+
+}
+
 # ============================================================
 # Bits Staged...
 # ============================================================
 
-Write-Host "Pulling all computer records..."
-# Get a list of all Computers
-$objectOf_Computers = Invoke-RestMethod -Uri $getComputers -Method Get -Credential $APIcredentials
-
-Write-Host "Pulling data for each computer record..."
-# Get the ID of each computer
-$computerList = $objectOf_Computers.computers.computer | ForEach-Object {$_.ID}
-
-ForEach ( $ID in $computerList ) {
-
-    # Get Computer's General Section
-    $objectOf_computerGeneral = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/General" -Method Get -Credential $APIcredentials
-
-    # Get Computer's Extention Attribute Section
-    $objectOf_computerEA = Invoke-RestMethod -Uri "${getComputer}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
-
-    If ( $objectOf_computerGeneral.computer.general.site.name -ne $($objectOf_computerEA.computer.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $id_EAComputer } | Select-Object Value)) {
-        Write-host "Site is incorrect for computer ID:  ${ID} -- updating..."
-        [xml]$upload_ComputerEA = "<?xml version='1.0' encoding='UTF-8'?><computer><extension_attributes><extension_attribute><id>${id_EAComputer}</id><value>$(${objectOf_computerGeneral}.computer.general.site.name)</value></extension_attribute></extension_attributes></computer>"
-        Invoke-RestMethod -Uri "${getComputer}/${ID}" -Method Put -Credential $APIcredentials -Body $test_ComputerEA
-    }
-}
-
+# Call Update function for each device type
+updateRecord computer $getComputers $getComputer $id_EAComputer
+updateRecord mobile_device $getMobileDevices $getMobileDevice $id_EAMobileDevice
