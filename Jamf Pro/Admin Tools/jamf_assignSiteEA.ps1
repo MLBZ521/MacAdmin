@@ -2,7 +2,7 @@
 
 Script Name:  jamf_assignSiteEA.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  1.0 / Updated:  2/26/2018 / By:  ZT
+Version:  1.1 / Updated:  2/26/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -18,7 +18,7 @@ $id_EAMobileDevice="1"
 
 # Setup Credentials
 $jamfAPIUser = ""
-$jamfAPIPassword = ConvertTo-SecureString -String "" -AsPlainText -Force
+$jamfAPIPassword = ConvertTo-SecureString -String 'SecurePassPhrase' -AsPlainText -Force
 $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $jamfAPIUser, $jamfAPIPassword
 
 # Setup API URLs
@@ -100,6 +100,21 @@ function updateRecord($deviceType, $urlALL, $urlID, $idEA) {
 # ============================================================
 # Bits Staged...
 # ============================================================
+
+# Verify credentials that were provided by doing an API call and checking the result to verify permissions.
+try {
+    $Response = Invoke-RestMethod -Uri "${jamfPS}/JSSResource/jssuser" -Method Get -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
+}
+catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    $statusDescription = $_.Exception.Response.StatusDescription
+
+    if ($statusCode -notcontains "200") {
+        Write-Host "ERROR:  Invalid Credentials or permissions."
+        Write-Host "Response:  ${statusCode}/${statusDescription}"
+    exit
+    }
+}
 
 # Call Update function for each device type
 updateRecord computer $getComputers $getComputer $id_EAComputer
