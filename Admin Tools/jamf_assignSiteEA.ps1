@@ -2,7 +2,7 @@
 
 Script Name:  jamf_assignSiteEA.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  1.1 / Updated:  2/26/2018 / By:  ZT
+Version:  1.2 / Updated:  2/26/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -18,7 +18,13 @@ $id_EAMobileDevice="1"
 
 # Setup Credentials
 $jamfAPIUser = ""
-$jamfAPIPassword = ConvertTo-SecureString -String 'SecurePassPhrase' -AsPlainText -Force
+# Define Password from within the script.
+    # $jamfAPIPassword = ConvertTo-SecureString -String 'SecurePassPhrase' -AsPlainText -Force
+# Create an encrypted password file.
+    # $exportPassPhrase = 'SecurePassPhrase' | ConvertTo-Securestring -AsPlainText -Force
+    # $exportPassPhrase | ConvertFrom-SecureString | Out-File $PSScriptRoot\Cred.txt
+# Read in encrypted password.
+    $jamfAPIPassword = Get-Content $PSScriptRoot\jamf_assignSiteEA_Creds.txt | ConvertTo-SecureString
 $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $jamfAPIUser, $jamfAPIPassword
 
 # Setup API URLs
@@ -60,7 +66,6 @@ function updateSiteList {
         Write-Host "Adding missing objects to into an XML list..."
         # For each missing value, add it to the original retrived XML list.
         ForEach ( $choice in $missingChoices ) {
-            # Write-Host $choice
             $newChoice = $objectOf_EAComputer.CreateElement("choice")
             $newChoice.InnerXml = $choice
             $objectOf_EAComputer.SelectSingleNode("//popup_choices").AppendChild($newChoice)
