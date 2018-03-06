@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  0.2 / Updated:  3/6/2018 / By:  ZT
+# Version:  0.3 / Updated:  3/6/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -13,10 +13,6 @@ echo "*****  CreatePrinters process:  START  *****"
 
 ##################################################
 # Define Variables
-	# Either hard code or prompt for credentials
-	# jamfAPIUser="APIUsername"
-	# jamfAPIPassword="APIPassword"
-
 	jamfPS="https://jss.company.com:8443"
 	apiPrinters="${jamfPS}/JSSResource/printers/id"
 
@@ -37,6 +33,11 @@ Actions:
 			Example:  jamf_CreatePrinters.sh -help
 "
 	exit 0
+}
+
+DecryptString() {
+    # Usage: ~$ DecryptString "Encrypted String" "Salt" "Passphrase"
+    echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
 }
 
 createPrinter() {
@@ -138,6 +139,8 @@ informBy() {
 	if [[ "${4}" == "Jamf" ]]; then
 		ranBy="Jamf"
 		createdByUser="${3}"
+		jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
+		jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
 	else
 		action="${1}"
 		ranBy="CLI"
