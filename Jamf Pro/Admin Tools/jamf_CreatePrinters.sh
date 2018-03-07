@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  0.3 / Updated:  3/6/2018 / By:  ZT
+# Version:  0.4 / Updated:  3/7/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -15,9 +15,6 @@ echo "*****  CreatePrinters process:  START  *****"
 # Define Variables
 	jamfPS="https://jss.company.com:8443"
 	apiPrinters="${jamfPS}/JSSResource/printers/id"
-
-	# Add -k (--insecure) to disable SSL verification
-	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 
 ##################################################
 # Setup Functions
@@ -62,7 +59,8 @@ createPrinter() {
 	# Read the printer info into variables.
 	while IFS="," read -r printerName printerCUPsName printerLocation printerIP printerModel; do
 		if [[ -e "/private/etc/cups/ppd/${printerCUPsName}.ppd" ]]; then
-			printerPPDContents=$(printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
+			printerPPDFile=$(printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
+			printerPPDContents=$(cat "${printerPPDFile}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
 		else
 			informBy "Unable to locate the PPD file -- unable to create the printer."
 			return
@@ -71,13 +69,14 @@ createPrinter() {
 		# POST changes to the JSS.
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data "<printer>
 <name>$printerName</name>
+<category>Printers</category>
 <uri>${printerIP}</uri>
 <CUPS_name>${printerCUPsName}</CUPS_name>
 <location>${printerLocation}</location>
 <model>${printerModel}</model>
 <notes>Created by ${createdByUser} running the jamf_CreatePrinters.sh script.</notes>
 <ppd>${printerCUPsName}.ppd</ppd>
-<ppd_contents>$(cat ${printerPPDContents})</ppd_contents>
+<ppd_contents>${printerPPDContents}</ppd_contents>
 <ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerCUPsName}.ppd</ppd_path>
 </printer>")"
 
@@ -141,6 +140,9 @@ informBy() {
 		createdByUser="${3}"
 		jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
 		jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
+
+		# Add -k (--insecure) to disable SSL verification
+		curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 	else
 		action="${1}"
 		ranBy="CLI"
