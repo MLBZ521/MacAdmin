@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.2.1 / Updated:  1/10/2018 / By:  ZT
+# Version:  1.2.2 / Updated:  3/15/2018 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -76,7 +76,7 @@ if [[ $systemRAM -ge $requiredRAM && $systemFreeSpace -ge $requiredFreeSpace ]];
 			# Function modelCheck
 				modelCheck 3 2
 			;;
-		"MacMini" )
+		"Macmini" )
 			# Function modelCheck
 				modelCheck 4 3
 			;;
