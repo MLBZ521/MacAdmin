@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.0 / Updated:  3/7/2018 / By:  ZT
+# Version:  1.0.1 / Updated:  3/15/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -51,16 +51,16 @@ createPrinter() {
 	fi
 
 	# Get the Printer ID of the selected printer.
-	printerID=$(printf $selectedPrinterName | cut -c 1)
+	printerID=$(/usr/bin/printf $selectedPrinterName | cut -c 1)
 
 	# Get only the selected printers info.
-	selectedPrinterInfo=$(printf '%s\n' "$printerInfo" | xmllint --format - | xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/,/g')
+	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/,/g')
 
 	# Read the printer info into variables.
 	while IFS="," read -r printerName printerCUPsName printerLocation printerIP printerModel; do
 		if [[ -e "/private/etc/cups/ppd/${printerCUPsName}.ppd" ]]; then
-			printerPPDFile=$(printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
-			printerPPDContents=$(cat "${printerPPDFile}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
+			printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
+			printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
 		else
 			informBy "Unable to locate the PPD file -- unable to create the printer."
 			return
@@ -81,13 +81,13 @@ createPrinter() {
 </printer>")"
 
 		# Check if the API call was successful or not.
-		curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode
 
 		# Prompt if we want to create another printer.
 		createAnother=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Do you want to create another printer?" buttons {"Yes", "No"}')
 
-	done < <(printf '%s\n' "${selectedPrinterInfo}")
+	done < <(/usr/bin/printf '%s\n' "${selectedPrinterInfo}")
 }
 
 checkStatusCode() {
@@ -169,7 +169,7 @@ else
 	curlReturn="$(/usr/bin/curl $jamfPS/JSSResource/jssuser -i --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}")"
 
 	# Check if the API call was successful or not.
-	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+	curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 	if [[ $curlCode != *"200"* ]]; then
 		informBy "ERROR:  Invalid API credentials provided!"
 		echo "*****  CreatePrinters process:  FAILED  *****"
@@ -180,20 +180,20 @@ else
 fi
 
 # Get a list of all printer configurations.
-	printerInfo=$(sudo jamf listprinters | xmllint --format - | xpath /printers 2>/dev/null)
+	printerInfo=$(/usr/local/bin/jamf listprinters | /usr/bin/xmllint --format - | /usr/bin/xpath /printers 2>/dev/null)
 # Get the number of printers.
-	numberOfPrinters=$(echo $(printf '%s\n' "$printerInfo") | xmllint --format - | xpath 'count(//printers/printer)' 2>/dev/null)
+	numberOfPrinters=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath 'count(//printers/printer)' 2>/dev/null)
 # Clear the variable, in case we're rerunning the process.
 	unset printerNames
 
 # Loop through each printer to only get the printer name and add in it's printer "ID" -- node number in the xml.
 for ((i=1; i<=$numberOfPrinters; ++i)); do
-	printerName=$(echo $(printf '%s\n' "$printerInfo") | xmllint --format - | xpath /printers/printer[$i]/display_name 2>/dev/null| LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	printerName=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath /printers/printer[$i]/display_name 2>/dev/null| LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 	printerNames+=$"${i}) ${printerName}\n"
 done
 
 # Drop the final \n (newline).
-	printerNames=$(echo -e ${printerNames} | perl -pe 'chomp if eof')
+	printerNames=$(echo -e ${printerNames} | /usr/bin/perl -pe 'chomp if eof')
 
 # We prompt to create another printer in the function; either continue create printers or complete script.
 until [[ $createAnother == "button returned:No" ]]; do
