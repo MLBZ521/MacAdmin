@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_QGIS.sh
 # By:  Zack Thompson / Created:  7/26/2017
-# Version:  1.2 / Updated:  3/19/2018 / By:  ZT
+# Version:  1.3 / Updated:  3/19/2018 / By:  ZT
 #
 # Description:  This script installs all the packages that are contained in this package.
 #
@@ -16,6 +16,8 @@ echo "*****  Install QGIS Process:  START  *****"
 
 # Set working directory
 	pkgDir=$(/usr/bin/dirname $0)
+# Get the current user
+	currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
 # Get the filename of the .dmg file
 	QGISdmg=$(/bin/ls "${pkgDir}" | /usr/bin/grep .dmg)
 
@@ -44,6 +46,22 @@ exitCheck() {
 if [[ $3 != "/" ]]; then
 	/bin/echo "ERROR:  Target disk is not the startup disk."
 	/bin/echo "*****  Install QGIS process:  FAILED  *****"
+	exit 1
+fi
+
+# Check if Python3 is installed
+if [[ -x /usr/local/bin/python3 ]]; then
+	getVersion=$(/usr/local/bin/python3 --version | /usr/bin/awk -F "." '{print $2}')
+	if [[ $(/usr/bin/bc <<< "${getVersion} >= 6") -eq 1 ]]; then
+		echo "Python 3.6+ is installed!"
+	else
+		echo "ERROR:  Python 3.6+ is not installed!"
+		echo "*****  Install QGIS Process:  FAILED  *****"
+		exit 1
+	fi
+else
+	echo "ERROR:  Python 3.6+ is not installed!"
+	echo "*****  Install QGIS Process:  FAILED  *****"
 	exit 1
 fi
 
@@ -83,7 +101,7 @@ echo "All packages have been installed!"
 
 # Disable version check (this is done because the version compared is not always the latest available for macOS).
 echo "Disabling version check on launch..."
-/usr/bin/defaults write org.qgis.QGIS2.plist qgis.checkVersion -boolean false
+/usr/bin/sed -Ei '' 's/checkVersion=true/checkVersion=false/g' "/${currentUser}/Library/Application Support/QGIS/QGIS3/profiles/default/qgis.org/QGIS3.ini"
 
 echo "${QGISMount} has been installed!"
 echo "*****  Install QGIS Process:  COMPLETE  *****"
