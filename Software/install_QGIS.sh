@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  install_QGIS.sh
 # By:  Zack Thompson / Created:  7/26/2017
-# Version:  1.3 / Updated:  3/19/2018 / By:  ZT
+# Version:  1.4 / Updated:  3/19/2018 / By:  ZT
 #
-# Description:  This script installs all the packages that are contained in this package.
+# Description:  This script installs all the packages that are contained in the QGIS dmg.
 #
 ###################################################################################################
 
@@ -66,9 +66,17 @@ else
 fi
 
 # Check if QGIS is currently installed...
-if [[ -e /Applications/QGIS.app ]]; then
+appPaths=$(/usr/bin/find -E /Applications -iregex ".*[/]QGIS ?([0-9]{1})?[.]app" -type d -maxdepth 1 -prune)
+
+if [[ ! -z "${appPaths}" ]]; then
 	echo "QGIS is currently installed; removing this instance before continuing..."
-	rm -rf /Applications/QGIS.app
+
+	# If the machine has multiple QGIS Applications, loop through them...
+	while IFS="\n" read -r appPath; do
+		echo "Deleting:  ${appPath}"
+		/bin/rm -rf "${appPath}"
+	done < <(echo "${appPaths}")
+
 	echo "QGIS has been removed."
 fi
 
@@ -100,8 +108,8 @@ echo "All packages have been installed!"
 	/usr/bin/hdiutil eject /Volumes/"${QGISMount}"
 
 # Disable version check (this is done because the version compared is not always the latest available for macOS).
-echo "Disabling version check on launch..."
-/usr/bin/sed -Ei '' 's/checkVersion=true/checkVersion=false/g' "/${currentUser}/Library/Application Support/QGIS/QGIS3/profiles/default/qgis.org/QGIS3.ini"
+# echo "Disabling version check on launch..."
+# /usr/bin/sed -Ei '' 's/checkVersion=true/checkVersion=false/g' "/${currentUser}/Library/Application Support/QGIS/QGIS3/profiles/default/qgis.org/QGIS3.ini"
 
 echo "${QGISMount} has been installed!"
 echo "*****  Install QGIS Process:  COMPLETE  *****"
