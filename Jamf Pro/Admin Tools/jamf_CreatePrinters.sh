@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.2 / Updated:  3/23/2018 / By:  ZT
+# Version:  1.3 / Updated:  3/23/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -51,7 +51,7 @@ createPrinter() {
 	fi
 
 	# Get the Printer ID of the selected printer.
-	printerID=$(/usr/bin/printf $selectedPrinterName | cut -c 1)
+	printerID=$(/usr/bin/printf "${selectedPrinterName}" | cut -c 1)
 
 	# Get only the selected printers info.
 	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/,/g')
@@ -161,9 +161,6 @@ informBy() {
 		createdByUser="${3}"
 		jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
 		jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
-
-		# Add -k (--insecure) to disable SSL verification
-		curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 	else
 		action="${1}"
 		ranBy="CLI"
@@ -179,6 +176,9 @@ informBy() {
 		jamfAPIUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
 		jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
 	fi
+
+	# Define the curl switches.  Add -k (--insecure) to disable SSL verification.
+	curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 
 # Verify credentials were provided.
 if [[ -z "${jamfAPIUser}" && -z "${jamfAPIPassword}" ]]; then
