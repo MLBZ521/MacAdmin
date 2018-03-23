@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.3 / Updated:  3/23/2018 / By:  ZT
+# Version:  1.4 / Updated:  3/23/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -78,7 +78,8 @@ createPrinter() {
 		echo " "
 
 		# POST changes to the JSS.
-		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data "<printer>
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data @- <<printerConfig
+<printer>
 <name>$printerName</name>
 <category>Printers</category>
 <uri>${printerIP}</uri>
@@ -89,7 +90,8 @@ createPrinter() {
 <ppd>${printerCUPsName}.ppd</ppd>
 <ppd_contents>${printerPPDContents}</ppd_contents>
 <ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerCUPsName}.ppd</ppd_path>
-</printer>")"
+</printer>
+printerConfig)"
 
 		# Get the Exit Code
 		exitCode=$?
