@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.1 / Updated:  3/22/2018 / By:  ZT
+# Version:  1.2 / Updated:  3/23/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -90,6 +90,15 @@ createPrinter() {
 <ppd_contents>${printerPPDContents}</ppd_contents>
 <ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerCUPsName}.ppd</ppd_path>
 </printer>")"
+
+		# Get the Exit Code
+		exitCode=$?
+
+		if [[ $exitCode != 0 ]]; then
+			informBy "API Request Failed!"
+			echo "ERROR:  curl failed!"
+			echo "Exit Code:  ${exitCode}"
+		fi
 
 		# Check if the API call was successful or not.
 		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
