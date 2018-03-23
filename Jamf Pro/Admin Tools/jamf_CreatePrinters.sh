@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.0.1 / Updated:  3/15/2018 / By:  ZT
+# Version:  1.1 / Updated:  3/22/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -66,6 +66,17 @@ createPrinter() {
 			return
 		fi
 
+		echo " "
+		echo "*****  Selected Printer Configuration  *****"
+		echo " "
+		echo "Display Name:  ${printerName}"
+		echo "CUPS Name:  ${printerCUPsName}"
+		echo "Location:  ${printerLocation}"
+		echo "IP Address:  ${printerIP}"
+		echo "Driver Model:  ${printerModel}"
+		echo "PPD File:  ${printerPPDFile}"
+		echo " "
+
 		# POST changes to the JSS.
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data "<printer>
 <name>$printerName</name>
@@ -82,6 +93,7 @@ createPrinter() {
 
 		# Check if the API call was successful or not.
 		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+		echo "Curl Status Code is:  ${curlCode}"
 		checkStatusCode $curlCode
 
 		# Prompt if we want to create another printer.
