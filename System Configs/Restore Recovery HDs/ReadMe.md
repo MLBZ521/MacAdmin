@@ -44,10 +44,20 @@ For 10.12 and 10.11 though, you have to be in an unbooted state; examples are:
   	      * Set the location of the stored files
   	      * The PlistBuddy Utility needs to be available
         * Notes:
-      	  * If I booted to a NetBoot Set of a different version than what I was restoring, then I had strange issues:
-            * i.e. If I installed the 10.12 package while booted in a 10.11 NetBoot Set, it would restore the Recovery HD, however the package/workflow would never complete (also the Recovery HD name was set to EFI Boot, which was seen when Option Booting)
+      	  * It may have just been our NBI, but I wasn't able to restore while in a 10.11 NetBoot Set -- `dmtest` would get to about ~70% and stall out.  It would restore the Recovery HD, but the Recovery HD name was set to EFI Boot, which was seen when Option Booting.
+          * If the Target Volume was 10.12 and the NetBoot Set was 10.10, `dmtest` would fail.
+          * I didn't test every combinations, but made recommendations to my Site Admins:
+            * Use either the latest NetBoot Set; or
+            * Used the same NetBoot Set OS Version as the Target Volume OS Version
       * Task 3:  Message Prompt
         * This seemed to help some weirdness observed where the process would recreate the Recovery HD, but not complete the workflow process.
+
+
+#### For our DeployStudio Environment ####
+
+For our environment, I actually changed the installation method to call the individual files directly.  This way, we can see the output of the `dmtest` tool directly in the DeployStudio Logs. It's also a little quicker since we don't have to wait for the .pkg to unpack.
+
+I left the original code in the `install_RecoveryHDpkg.sh` script just in case anyone wants to use that method instead. 
 
 
 Sources:  
