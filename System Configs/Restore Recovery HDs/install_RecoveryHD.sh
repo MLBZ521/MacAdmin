@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_RecoveryHD.sh
 # By:  Zack Thompson / Created:  3/21/2018
-# Version:  1.0 / Updated:  3/21/2018 / By:  ZT
+# Version:  1.1 / Updated:  3/23/2018 / By:  ZT
 #
 # Description:  This script will install the proper Recovery HD based on the OS Version.
 #
@@ -20,6 +20,9 @@ restoreFiles="${DS_REPOSITORY_PATH}/Files/Deskside/RecoveryHD"
 targetVolume="/Volumes/${DS_LAST_SELECTED_TARGET}"
 osVersion=$("${DS_REPOSITORY_PATH}/Tools/PlistBuddy" -c "Print :ProductVersion" "${targetVolume}/System/Library/CoreServices/SystemVersion.plist")
 dsRuntimeOSVersion=$("${DS_REPOSITORY_PATH}/Tools/PlistBuddy" -c "Print :ProductVersion" "/Volumes/DeployStudioRuntime//System/Library/CoreServices/SystemVersion.plist")
+dmtestBinary="${DS_REPOSITORY_PATH}/Tools/dmtest"
+BaseSystemDMG="${restoreFiles}/${version}/BaseSystem.dmg"
+BaseSystemChunkList="${restoreFiles}/${version}/BaseSystem.chunklist"
 
 ##################################################
 # Bits staged...
@@ -27,7 +30,7 @@ dsRuntimeOSVersion=$("${DS_REPOSITORY_PATH}/Tools/PlistBuddy" -c "Print :Product
 echo "Selected Volume:  ${DS_LAST_SELECTED_TARGET}"
 echo "Selected Volume OS Version:  ${osVersion}"
 echo "NetBoot Set OS Version:  ${dsRuntimeOSVersion}"
-echo "Installing:  macOS Restore Recovery HD-${osVersion}.pkg"
+# echo "Installing:  macOS Restore Recovery HD-${osVersion}.pkg"
 echo " "
 
 if [[ $(echo "${dsRuntimeOSVersion}" | /usr/bin/awk -F '.' '{print $1"."$2}') == "10.11" ]]; then
@@ -40,8 +43,11 @@ if [[ $(echo "${dsRuntimeOSVersion}" | /usr/bin/awk -F '.' '{print $1"."$2}') ==
 fi
 
 # Install the package.
+# /usr/sbin/installer -pkg "${restoreFiles}/macOS Restore Recovery HD-${osVersion}.pkg" -target "${targetVolume}" -allowUntrusted -verbose
+
 echo "Creating the missing Recovery HD...."
-/usr/sbin/installer -pkg "${restoreFiles}/macOS Restore Recovery HD-${osVersion}.pkg" -target "${targetVolume}" -allowUntrusted -verbose
+# Create the Recovery HD Partition
+"${dmtestBinary}" ensureRecoveryPartition "${targetVolume}" "${BaseSystemDMG}" 0 0 "${BaseSystemChunkList}"
 
 # Get the Exit Code
 exitCode=$?
