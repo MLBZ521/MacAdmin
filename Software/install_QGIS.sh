@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_QGIS.sh
 # By:  Zack Thompson / Created:  7/26/2017
-# Version:  1.4 / Updated:  3/19/2018 / By:  ZT
+# Version:  1.4.1 / Updated:  3/30/2018 / By:  ZT
 #
 # Description:  This script installs all the packages that are contained in the QGIS dmg.
 #
@@ -15,7 +15,7 @@ echo "*****  Install QGIS Process:  START  *****"
 # Define Variables
 
 # Set working directory
-	pkgDir=$(/usr/bin/dirname $0)
+	pkgDir=$(/usr/bin/dirname "${0}")
 # Get the current user
 	currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
 # Get the filename of the .dmg file
@@ -44,8 +44,8 @@ exitCheck() {
 
 # Check the installation target.
 if [[ $3 != "/" ]]; then
-	/bin/echo "ERROR:  Target disk is not the startup disk."
-	/bin/echo "*****  Install QGIS process:  FAILED  *****"
+	echo "ERROR:  Target disk is not the startup disk."
+	echo "*****  Install QGIS process:  FAILED  *****"
 	exit 1
 fi
 

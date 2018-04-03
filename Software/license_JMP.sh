@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_JMP.sh
 # By:  Zack Thompson / Created:  3/3/2017
-# Version:  2.1 / Updated:  1/17/2018 / By:  ZT
+# Version:  2.1.1 / Updated:  3/30/2018 / By:  ZT
 #
 # Description:  This script applies the license for JMP applications.
 #
 ###################################################################################################
 
-/usr/bin/logger -s "*****  License JMP process:  START  *****"
+echo "*****  License JMP process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -20,13 +20,13 @@ licenseFile="/Library/Application Support/JMP/13/JMP.per"
 
 # Get the install JMP.app edition (standard vs Pro)
 	appPath=$(/usr/bin/find /Applications -iname "JMP*.app" -maxdepth 1 -type d)
-	/usr/bin/logger -s "Applying license for:  ${appPath}"
+	echo "Applying license for:  ${appPath}"
 
 ##################################################
 # Create the license file.
 
 # Assign the proper license per edition
-	/usr/bin/logger -s "Creating license file..."
+	echo "Creating license file..."
 
 if [[ $appPath == *"JMP 13.app"* ]]; then
 	/bin/cat > "${licenseFile}" <<licenseContents
@@ -63,23 +63,23 @@ Department=
 licenseContents
 
 else
-	/usr/bin/logger -s "A version of JMP was not located in the expected location!"
-	/usr/bin/logger -s "*****  License JMP process:  FAILED  *****"
+	echo "A version of JMP was not located in the expected location!"
+	echo "*****  License JMP process:  FAILED  *****"
 	exit 1
 fi
 
 # Set permissions on the file for everyone to be able to read.
-	/usr/bin/logger -s "Applying permissions to license file..."
+	echo "Applying permissions to license file..."
 	/bin/chmod 644 "${licenseFile}"
 
 ##################################################
 # Additional configuration
 
 # Set the location of the license file in the System Library folder plist.
-	/usr/bin/logger -s "Setting location of the license file..."
+	echo "Setting location of the license file..."
 	/usr/bin/defaults write /Library/Preferences/com.sas.jmp.plist Setinit_13_Path "${licenseFile}"
 
-/usr/bin/logger -s "Configuring user space..."
+echo "Configuring user space..."
 	# Remove the location from the users preference file (if it's configured there).
 		/usr/bin/defaults delete /Users/$currentUser/Library/Preferences/com.sas.jmp.plist Setinit_13_Path &> /dev/null
 	# Mark as 'registration requested' so it doesn't ask the user.
@@ -87,7 +87,7 @@ fi
 	# Set permissions on the plist file.
 		/bin/chmod 644 "/Users/${currentUser}/Library/Application Support/JMP/13/License.plist"
 
-/usr/bin/logger -s "JMP has been activated!"
-/usr/bin/logger -s "*****  License JMP process:  COMPLETE  *****"
+echo "JMP has been activated!"
+echo "*****  License JMP process:  COMPLETE  *****"
 
 exit 0

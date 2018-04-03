@@ -35,6 +35,9 @@ Items that I ran into when attempting to license Parallels in a more 'Enterprise
     * `prl_disp_service` = `/Applications/Parallels Desktop.app/Contents/MacOS/Parallels Service.app/Contents/MacOS/prl_disp_service`
     * LaunchDaemon = `/Applications/Parallels Desktop.app/Contents/Resources/com.parallels.desktop.launchdaemon.plist`
 
+To Use:  Simply enter the license in the format of "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" (without the quotes) into the parameter field and have it configured to run after the software installation of Parallels.
+
+
 #### Managing the Java JRE ####
 
 Description:  These configuration files are for managing the Java Runtime Environment on client systems.  I used these files and scripts to whitelist websites and Java applets.

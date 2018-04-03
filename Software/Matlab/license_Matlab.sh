@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_Matlab.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.1 / Updated:  1/30/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script applies the license for Matlab applications.
 #
 ###################################################################################################
 
-/usr/bin/logger -s "*****  License Matlab process:  START  *****"
+echo "*****  License Matlab process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -19,8 +19,8 @@ appPaths=$(/usr/bin/find /Applications -iname "Matlab*.app" -maxdepth 1 -type d)
 
 # Verify that a Matlab version was found.
 if [[ -z "${appPaths}" ]]; then
-	/usr/bin/logger -s "A version of Matlab was not found in the expected location!"
-	/usr/bin/logger -s "*****  License Matlab process:  FAILED  *****"
+	echo "A version of Matlab was not found in the expected location!"
+	echo "*****  License Matlab process:  FAILED  *****"
 	exit 1
 else
 	# If the machine has multiple Matlab Applications, loop through them...
@@ -28,7 +28,7 @@ else
 
 		# Get the Matlab version
 			appVersion=$(/bin/cat "${appPath}/VersionInfo.xml" | /usr/bin/grep release | /usr/bin/awk -F "<(/)?release>" '{print $2}')
-			/usr/bin/logger -s "Applying License for Version:  ${appVersion}"
+			echo "Applying License for Version:  ${appVersion}"
 
 		# Build the license file location
 		licenseFile="${appPath}/licenses/network.lic"
@@ -36,7 +36,7 @@ else
 		##################################################
 		# Create the license file.
 
-		/usr/bin/logger -s "Creating license file..."
+		echo "Creating license file..."
 
 		/bin/cat > "${licenseFile}" <<licenseContents
 SERVER license.server.com 11000 
@@ -45,16 +45,16 @@ licenseContents
 
 		if [[ -e "${licenseFile}" ]]; then
 			# Set permissions on the file for everyone to be able to read.
-			/usr/bin/logger -s "Applying permissions to license file..."
+			echo "Applying permissions to license file..."
 			/bin/chmod 644 "${licenseFile}"
 		else
-			/usr/bin/logger -s "ERROR:  Failed to create the license file!"
-			/usr/bin/logger -s "*****  License Matlab process:  FAILED  *****"
+			echo "ERROR:  Failed to create the license file!"
+			echo "*****  License Matlab process:  FAILED  *****"
 			exit 2
 		fi
-	done < <(/bin/echo "${appPaths}")
+	done < <(echo "${appPaths}")
 fi
 
-/usr/bin/logger -s "Matlab has been activated!"
-/usr/bin/logger -s "*****  License Matlab process:  COMPLETE  *****"
+echo "Matlab has been activated!"
+echo "*****  License Matlab process:  COMPLETE  *****"
 exit 0

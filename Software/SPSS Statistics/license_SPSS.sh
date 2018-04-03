@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.5 / Updated:  1/30/2018 / By:  ZT
+# Version:  1.5.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
 ###################################################################################################
 
-/usr/bin/logger -s "*****  License SPSS process:  START  *****"
+echo "*****  License SPSS process:  START  *****"
 
 ##################################################
 # Turn on case-insensitive pattern matching
@@ -24,13 +24,13 @@ case "${4}" in
 		licenseType="Administrative"
 		;;
 	* )
-		/usr/bin/logger -s "ERROR:  Invalid License Type provided"
-		/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
+		echo "ERROR:  Invalid License Type provided"
+		echo "*****  License SPSS process:  FAILED  *****"
 		exit 1
 		;;
 esac
 
-/usr/bin/logger -s "Licensing Type:  ${licenseType}"
+echo "Licensing Type:  ${licenseType}"
 
 # Determine License Mechanism
 case "${5}" in
@@ -41,8 +41,8 @@ case "${5}" in
 		licenseMechanism="Local"
 		;;
 	* )
-		/usr/bin/logger -s "ERROR:  Invalid License Mechanism provided"
-		/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
+		echo "ERROR:  Invalid License Mechanism provided"
+		echo "*****  License SPSS process:  FAILED  *****"
 		exit 2
 		;;
 esac
@@ -50,7 +50,7 @@ esac
 # Turn off case-insensitive pattern matching
 shopt -u nocasematch
 
-/usr/bin/logger -s "Licensing Mechanism:  ${licenseMechanism}"
+echo "Licensing Mechanism:  ${licenseMechanism}"
 
 ##################################################
 # Define Functions
@@ -99,8 +99,8 @@ appPaths=$(/usr/bin/find -E /Applications -iregex ".*[/](SPSS) ?(Statistics) ?([
 
 # Verify that a Maple version was found.
 if [[ -z "${appPaths}" ]]; then
-	/usr/bin/logger -s "A version of SPSS was not found in the expected location!"
-	/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
+	echo "A version of SPSS was not found in the expected location!"
+	echo "*****  License SPSS process:  FAILED  *****"
 	exit 3
 else
 	# If the machine has multiple SPSS Applications, loop through them...
@@ -115,7 +115,7 @@ else
 
 		if [[ $licenseMechanism == "Network" ]]; then
 
-			/usr/bin/logger -s "Configuring the License Manager Server..."
+			echo "Configuring the License Manager Server..."
 
 			# Function LicenseInfo
 			LicenseInfo
@@ -125,7 +125,7 @@ else
 			/usr/bin/sed -i '' 's/CommuterMaxLife=.*/'"CommuterMaxLife=${commuterDays}"'/' "${networkLicense}"
 
 			if [[ -e "${localLicense}" ]]; then
-				/usr/bin/logger -s "Local License file exists; deleting..."
+				echo "Local License file exists; deleting..."
 				/bin/rm -rf "${localLicense}"
 			fi
 
@@ -133,7 +133,7 @@ else
 
 			# Get the SPSS version
 			versionSPSS=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
-			/usr/bin/logger -s "Apply License Code for version:  ${versionSPSS}"
+			echo "Apply License Code for version:  ${versionSPSS}"
 
 			# Function LicenseInfo
 			LicenseInfo
@@ -142,24 +142,24 @@ else
 			exitStatus=$(cd "${licensePath}" && "${licensePath}"/licenseactivator "${licenseCode}")
 
 			if [[ $exitStatus == *"Authorization succeeded"* ]]; then
-				/usr/bin/logger -s "License Code applied successfully!"
+				echo "License Code applied successfully!"
 
 				if [[ -e "${networkLicense}" ]]; then
-					/usr/bin/logger -s "Removing Network License Manager info..."
+					echo "Removing Network License Manager info..."
 					# Remove the License Manager Server Name.
 					/usr/bin/sed -i '' 's/DaemonHost=.*/DaemonHost=/' "${networkLicense}"
 				fi
 
 			else
-				/usr/bin/logger -s "ERROR:  Failed to apply License Code"
-				/usr/bin/logger -s "ERROR Contents:  ${exitStatus}"
-				/usr/bin/logger -s "*****  License SPSS process:  FAILED  *****"
+				echo "ERROR:  Failed to apply License Code"
+				echo "ERROR Contents:  ${exitStatus}"
+				echo "*****  License SPSS process:  FAILED  *****"
 				exit 4
 			fi
 		fi
-	done < <(/bin/echo "${appPaths}")
+	done < <(echo "${appPaths}")
 fi
 
-/usr/bin/logger -s "SPSS has been activated!"
-/usr/bin/logger -s "*****  License SPSS process:  COMPLETE  *****"
+echo "SPSS has been activated!"
+echo "*****  License SPSS process:  COMPLETE  *****"
 exit 0

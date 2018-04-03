@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  build_Matlab.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.1 / Updated:  1/23/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Matlab package.
 #
 ###################################################################################################
 
-/bin/echo "*****  Build Matlab process:  START  *****"
+echo "*****  Build Matlab process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -28,7 +28,7 @@ softwareTitle="Matlab"
 # Setup Functions
 
 function getHelp {
-/bin/echo "
+echo "
 usage:  build_Matlab.sh [-install] [-version] <value> -help
 
 Info:	Uses munkipkg to build a package for use in Jamf.
@@ -61,8 +61,8 @@ function cleanUp {
 ##################################################
 # Find out what we want to do...
 
-/bin/echo "Build Type:  $switch1"
-/bin/echo "Version:  $switch3"
+echo "Build Type:  $switch1"
+echo "Version:  $switch3"
 
 case $switch1 in
 	-install )
@@ -81,5 +81,5 @@ case $switch1 in
 	;;
 esac
 
-/bin/echo "*****  Build Matlab process:  COMPLETE  *****"
+echo "*****  Build Matlab process:  COMPLETE  *****"
 exit 0
