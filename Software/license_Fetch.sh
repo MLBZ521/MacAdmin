@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_Fetch.sh
 # By:  Zack Thompson / Created:  6/28/2017
-# Version:  1.1 / Updated:  2/16/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  3/30/2018 / By:  ZT
 #
-# Description:  This script will license Fetch with ASU's License.
+# Description:  This script will license Fetch.
 #
 ###################################################################################################
 
-/bin/echo "*****  license Fetch Process:  START  *****"
+echo "*****  license Fetch Process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -22,20 +22,20 @@ serialNumber="FETCH12345-6789-0123-4567-8910-1112"
 # Bits staged...
 
 if [[ ! -x $FetchApp ]]; then
-	/bin/echo "Error:  Fetch is not properly installed."
-	/bin/echo "*****  license Fetch Process:  FAILED  *****"
+	echo "Error:  Fetch is not properly installed."
+	echo "*****  license Fetch Process:  FAILED  *****"
 	exit 1
 else
-	/bin/echo "Applying the Fetch license..."
+	echo "Applying the Fetch license..."
 	/usr/bin/defaults write $plist SerialNumber "$serialNumber"
 	/usr/bin/defaults write $plist RegistrantName "$registrantName"
 
 	if [[ -e $plist ]]; then
-		/bin/echo "Fetch has been licensed!"
-		/bin/echo "*****  license Fetch Process:  COMPLETE  *****"
+		echo "Fetch has been licensed!"
+		echo "*****  license Fetch Process:  COMPLETE  *****"
 	else
-		/bin/echo "Error:  License does not exist."
-		/bin/echo "*****  license Fetch Process:  FAILED  *****"
+		echo "Error:  License does not exist."
+		echo "*****  license Fetch Process:  FAILED  *****"
 		exit 2
 	fi
 fi

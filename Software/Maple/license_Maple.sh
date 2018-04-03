@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.5.1 / Updated:  2/7/2018 / By:  ZT
+# Version:  1.5.2 / Updated:  3/30/2018 / By:  ZT
 #
 # Description:  This script applies the license for Maple applications.
 #
 ###################################################################################################
 
-/usr/bin/logger -s "*****  License Maple process:  START  *****"
+echo "*****  License Maple process:  START  *****"
 
 ##################################################
 # Turn on case-insensitive pattern matching
@@ -24,8 +24,8 @@ shopt -s nocasematch
 			licenseMechanism="Local"
 			;;
 		* )
-			/usr/bin/logger -s "ERROR:  Invalid License Mechanism provided"
-			/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
+			echo "ERROR:  Invalid License Mechanism provided"
+			echo "*****  License Maple process:  FAILED  *****"
 			exit 1
 			;;
 	esac
@@ -33,7 +33,7 @@ shopt -s nocasematch
 # Turn off case-insensitive pattern matching
 shopt -u nocasematch
 
-	/usr/bin/logger -s "Licensing Mechanism:  ${licenseMechanism}"
+	echo "Licensing Mechanism:  ${licenseMechanism}"
 
 ##################################################
 # Bits staged, license software...
@@ -43,8 +43,8 @@ appPaths=$(/usr/bin/find -E /Applications -iregex ".*Maple [0-9]{4}[.]app" -maxd
 
 # Verify that a Maple version was found.
 if [[ -z "${appPaths}" ]]; then
-	/usr/bin/logger -s "A version of Maple was not found in the expected location!"
-	/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
+	echo "A version of Maple was not found in the expected location!"
+	echo "*****  License Maple process:  FAILED  *****"
 	exit 2
 else
 	# If the machine has multiple Maple Applications, loop through them...
@@ -52,7 +52,7 @@ else
 
 		# Get the Maple version
 			majorVersion=$(/usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}')
-			/usr/bin/logger -s "Applying License for Major Version:  ${majorVersion}"
+			echo "Applying License for Major Version:  ${majorVersion}"
 
 		# Location of the License File
 			licenseFile="/Library/Frameworks/Maple.framework/Versions/${majorVersion}/license/license.dat"
@@ -60,7 +60,7 @@ else
 		if [[ -d "${appPath}" ]]; then
 
 			if [[ $licenseMechanism == "Network" ]]; then
-				/usr/bin/logger -s "Configuring the License Manager Server..."
+				echo "Configuring the License Manager Server..."
 
 				/bin/cat > "${licenseFile}" <<licenseContents
 #
@@ -114,23 +114,23 @@ activateLicense
 )
 
 				if [[ $exitStatus == *"Activation successful!"* ]]; then
-					/usr/bin/logger -s "License Code applied successfully!"
-					/usr/bin/logger -s "Maple ${majorVersion} has been activated!"
+					echo "License Code applied successfully!"
+					echo "Maple ${majorVersion} has been activated!"
 				else
-					/usr/bin/logger -s "ERROR:  Failed to apply License Code for:  Maple ${majorVersion}"
-					/usr/bin/logger -s "ERROR Contents:  $(/bin/echo ${exitStatus} | /usr/bin/xargs)"
-					/usr/bin/logger -s "*****  License Maple process:  FAILED  *****"
+					echo "ERROR:  Failed to apply License Code for:  Maple ${majorVersion}"
+					echo "ERROR Contents:  $(echo ${exitStatus} | /usr/bin/xargs)"
+					echo "*****  License Maple process:  FAILED  *****"
 				fi
 			fi
 		fi
 
 		if [[ $(/usr/bin/stat -f "%OLp" "${licenseFile}") != "666" ]]; then
 			# Set permissions on default permissions on the file.
-				/usr/bin/logger -s "Applying permissions to license file..."
+				echo "Applying permissions to license file..."
 				/bin/chmod 666 "${licenseFile}"
 		fi
-	done < <(/bin/echo "${appPaths}")
+	done < <(echo "${appPaths}")
 fi
 
-/usr/bin/logger -s "*****  License Maple process:  COMPLETE  *****"
+echo "*****  License Maple process:  COMPLETE  *****"
 exit 0

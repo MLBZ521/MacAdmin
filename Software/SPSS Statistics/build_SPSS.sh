@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  build_SPSS.sh
 # By:  Zack Thompson / Created:  1/5/2018
-# Version:  1.2 / Updated:  1/26/2018 / By:  ZT
+# Version:  1.2.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an SPSS package.
 #
 ###################################################################################################
 
-/bin/echo "*****  Build SPSS process:  START  *****"
+echo "*****  Build SPSS process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -25,13 +25,13 @@ softwareTitle="SPSSStatistics"
 	scriptDirectory=$(/usr/bin/dirname "$(/usr/bin/stat -f "$0")")
 
 # Get the Major Version
-	majorVersion=$(/bin/echo "${switch3}" | /usr/bin/awk -F "." '{print $1}')
+	majorVersion=$(echo "${switch3}" | /usr/bin/awk -F "." '{print $1}')
 
 ##################################################
 # Setup Functions
 
 function getHelp {
-/bin/echo "
+echo "
 usage:  build_SPSS.sh [-install] [-update] [-version] <value> -help
 
 Info:	Uses munkipkg to build a package for use in Jamf.
@@ -68,8 +68,8 @@ function cleanUp {
 ##################################################
 # Find out what we want to do...
 
-/bin/echo "Build Type:  $switch1"
-/bin/echo "Version:  $switch3"
+echo "Build Type:  $switch1"
+echo "Version:  $switch3"
 
 case $switch1 in
 	-install )
@@ -102,5 +102,5 @@ case $switch1 in
 	;;
 esac
 
-/bin/echo "*****  Build SPSS process:  COMPLETE  *****"
+echo "*****  Build SPSS process:  COMPLETE  *****"
 exit 0

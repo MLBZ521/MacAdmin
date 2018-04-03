@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  build_Mathematica.sh
 # By:  Zack Thompson / Created:  1/10/2018
-# Version:  1.1 / Updated:  1/24/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Mathematica package.
 #
 ###################################################################################################
 
-/bin/echo "*****  Build Mathematica process:  START  *****"
+echo "*****  Build Mathematica process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -28,7 +28,7 @@ softwareTitle="Mathematica"
 # Setup Functions
 
 function getHelp {
-/bin/echo "
+echo "
 usage:  build_Mathematica.sh [-install] [-version] <value> -help
 
 Info:	Uses munkipkg to build a package for use in Jamf.
@@ -61,8 +61,8 @@ function cleanUp {
 ##################################################
 # Find out what we want to do...
 
-/bin/echo "Build Type:  $switch1"
-/bin/echo "Version:  $switch3"
+echo "Build Type:  $switch1"
+echo "Version:  $switch3"
 
 case $switch1 in
 	-install )
@@ -78,5 +78,5 @@ case $switch1 in
 	;;
 esac
 
-/bin/echo "*****  Build Mathematica process:  COMPLETE  *****"
+echo "*****  Build Mathematica process:  COMPLETE  *****"
 exit 0

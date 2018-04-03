@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  build_Maple.sh
 # By:  Zack Thompson / Created:  1/8/2018
-# Version:  1.1.1 / Updated:  1/25/2018 / By:  ZT
+# Version:  1.1.2 / Updated:  3/30/2018 / By:  ZT
 #
 # Description:  This script uses munkipkg to build an Maple package.
 #
 ###################################################################################################
 
-/bin/echo "*****  Build Maple process:  START  *****"
+echo "*****  Build Maple process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -65,8 +65,8 @@ function cleanUp {
 ##################################################
 # Find out what we want to do...
 
-/bin/echo "Build Type:  $switch1"
-/bin/echo "Version:  $switch3"
+echo "Build Type:  $switch1"
+echo "Version:  $switch3"
 
 case $switch1 in
 	-install )
@@ -96,5 +96,5 @@ case $switch1 in
 	;;
 esac
 
-/bin/echo "*****  Build Maple process:  COMPLETE  *****"
+echo "*****  Build Maple process:  COMPLETE  *****"
 exit 0

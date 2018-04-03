@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  license_Parallels.sh
 # By:  Zack Thompson / Created:  8/17/2017
-# Version:  1.5.1 / Updated:  1/23/2018 / By:  ZT
+# Version:  1.5.2 / Updated:  3/30/2018 / By:  ZT
 #
-# Description:  This script will apply a Parallels License provided as a JSS Script Parameter.
+# Description:  This script will apply a Parallels License provided as a Script Parameter.
 #
 ###################################################################################################
 
-/bin/echo "*****  license_Parallels Process:  START  *****"
+echo "*****  license_Parallels Process:  START  *****"
 
 ##################################################
 # Define Variables
@@ -22,18 +22,18 @@ serviceParallels="/Applications/Parallels Desktop.app/Contents/MacOS/Parallels S
 
 # First, check to make sure that the prlsrvctl binary exists and is executable.
 if [[ ! -x "${Parallels}" ]]; then
-	/bin/echo "Error:  Parallels is not properly installed."
-	/bin/echo "*****  license_Parallels Process:  FAILED  *****"
+	echo "Error:  Parallels is not properly installed."
+	echo "*****  license_Parallels Process:  FAILED  *****"
 	exit 1
 else
 	# Second, check if the Parallels Service is running, if not, start it.
 	if $(! $(/usr/bin/pgrep -xq prl_disp_service)); then
-		/bin/echo "The Parallels Service is not running -- Starting it now..."
+		echo "The Parallels Service is not running -- Starting it now..."
 		"${serviceParallels}" &
 
 		# If needed, waiting for the service to start...
 		until [[ $(/usr/bin/pkill -0 -ix prl_disp_service -q 2>/dev/null) -eq 0 ]]; do
-			/bin/echo "Waiting for the Parallels Service to start..."
+			echo "Waiting for the Parallels Service to start..."
 			/bin/sleep 1
 		done
 	fi
@@ -46,23 +46,23 @@ else
 
 	# Fourth, if the current status is active, we'll need to deactivate it, before activating a new license.
 	if [[ $status == "ACTIVE" ]]; then
-		/bin/echo "Machine currently has an active license."
-		/bin/echo "Deactivating old license..."
+		echo "Machine currently has an active license."
+		echo "Deactivating old license..."
 		"${Parallels}" deactivate-license
 	fi
 
 	# Fifth, install new license.
-	/bin/echo "Applying the provided license..."
+	echo "Applying the provided license..."
 	"${Parallels}" install-license --key "${licenseKey}"
 	exitCode=$?
 
 	# Sixth, check the result of installing the license.
 	if [[ $exitCode = 0 ]]; then
-		/bin/echo "Parallels has been licensed!"
-		/bin/echo "*****  license_Parallels Process:  COMPLETE  *****"
+		echo "Parallels has been licensed!"
+		echo "*****  license_Parallels Process:  COMPLETE  *****"
 	else
-		/bin/echo "Error:  License was likely invalid."
-		/bin/echo "*****  license_Parallels Process:  FAILED  *****"
+		echo "Error:  License was likely invalid."
+		echo "*****  license_Parallels Process:  FAILED  *****"
 		exit 2
 	fi
 fi
