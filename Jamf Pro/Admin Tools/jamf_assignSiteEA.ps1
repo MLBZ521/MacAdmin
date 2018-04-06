@@ -2,11 +2,13 @@
 
 Script Name:  jamf_assignSiteEA.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  1.2 / Updated:  2/26/2018 / By:  ZT
+Version:  1.3 / Updated:  4/5/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
 #>
+
+Write-Host "jamf_assignSiteEA Process:  START"
 
 # ============================================================
 # Define Variables
@@ -57,11 +59,11 @@ function updateSiteList {
     else {
         Write-Host "Site count does not equal Computer EA Choice Count"
 
-        $SiteList = $objectOf_Sites.sites.site | ForEach-Object {$_.Name}
+        $SiteList = $objectOf_Sites.sites.site | ForEach-Object { $_.Name }
         $EASiteList = $objectOf_EAComputer.computer_extension_attribute.input_type.popup_choices.choice
         # Compare the two lists to find the objects that are missing from the EA List.
         Write-Host "Finding the missing objects..."
-        $missingChoices = $(Compare-Object -ReferenceObject $SiteList -DifferenceObject $EASiteList) | ForEach-Object {$_.InputObject}
+        $missingChoices = $(Compare-Object -ReferenceObject $SiteList -DifferenceObject $EASiteList) | ForEach-Object { $_.InputObject }
 
         Write-Host "Adding missing objects to into an XML list..."
         # For each missing value, add it to the original retrived XML list.
@@ -95,11 +97,24 @@ function updateRecord($deviceType, $urlALL, $urlID, $idEA) {
         $objectOf_deviceEA = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
         
         If ( $objectOf_deviceGeneral.$deviceType.general.site.name -ne $($objectOf_deviceEA.$deviceType.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $idEA }).value) {
-            Write-host "Site is incorrect for computer ID:  ${ID} -- updating..."
+            Write-host "Site is incorrect for ${deviceType} ID:  ${ID} -- updating..."
             [xml]$upload_deviceEA = "<?xml version='1.0' encoding='UTF-8'?><${deviceType}><extension_attributes><extension_attribute><id>${idEA}</id><value>$(${objectOf_deviceGeneral}.$deviceType.general.site.name)</value></extension_attribute></extension_attributes></${deviceType}>"
-            Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Credential $APIcredentials -Body $upload_deviceEA
+            
+            Try {
+                $Response = Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Credential $APIcredentials -Body $upload_deviceEA -ErrorVariable RestError -ErrorAction SilentlyContinue
+            }
+            Catch {
+                $statusCode = $_.Exception.Response.StatusCode.value__
+                $statusDescription = $_.Exception.Response.StatusDescription
+
+                If ($statusCode -notcontains "200") {
+                    Write-host "Failed to assign site for ${deviceType} ID:  ${ID}..."
+                    Write-Host "Response:  ${statusCode}/${statusDescription}"
+                }
+            }
         }
     }
+    Write-Host "All ${deviceType} records have been processed."
 }
 
 # ============================================================
@@ -107,20 +122,26 @@ function updateRecord($deviceType, $urlALL, $urlID, $idEA) {
 # ============================================================
 
 # Verify credentials that were provided by doing an API call and checking the result to verify permissions.
-try {
+Write-Host "Verifying API credentials..."
+Try {
     $Response = Invoke-RestMethod -Uri "${jamfPS}/JSSResource/jssuser" -Method Get -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
 }
-catch {
+Catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
     $statusDescription = $_.Exception.Response.StatusDescription
 
-    if ($statusCode -notcontains "200") {
+    If ($statusCode -notcontains "200") {
         Write-Host "ERROR:  Invalid Credentials or permissions."
         Write-Host "Response:  ${statusCode}/${statusDescription}"
-    exit
+        Write-Host "jamf_assignSiteEA Process:  FAILED"
+        Exit
     }
 }
+
+Write-Host "API Credentials Valid -- continuing..."
 
 # Call Update function for each device type
 updateRecord computer $getComputers $getComputer $id_EAComputer
 updateRecord mobile_device $getMobileDevices $getMobileDevice $id_EAMobileDevice
+
+Write-Host "jamf_assignSiteEA Process:  COMPLETE"
