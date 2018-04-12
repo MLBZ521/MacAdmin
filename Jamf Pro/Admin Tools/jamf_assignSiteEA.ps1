@@ -2,7 +2,7 @@
 
 Script Name:  jamf_assignSiteEA.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  1.3 / Updated:  4/5/2018 / By:  ZT
+Version:  1.4 / Updated:  4/12/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -108,8 +108,8 @@ function updateRecord($deviceType, $urlALL, $urlID, $idEA) {
                 $statusDescription = $_.Exception.Response.StatusDescription
 
                 If ($statusCode -notcontains "200") {
-                    Write-host "Failed to assign site for ${deviceType} ID:  ${ID}..."
-                    Write-Host "Response:  ${statusCode}/${statusDescription}"
+                    Write-host " -> Failed to assign site for ${deviceType} ID:  ${ID}"
+                    Write-Host "  --> Response:  ${statusCode}/${statusDescription}: $($RestError.Message | ForEach { $_.Split(":")[1];} | ForEach { $_.Split([Environment]::NewLine)[0];})"
                 }
             }
         }
