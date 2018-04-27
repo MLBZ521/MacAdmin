@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.1 / Updated:  4/19/2018 / By:  ZT
+# Version:  0.2 / Updated:  4/25/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -18,7 +18,9 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 	# jamfAPIPassword="APIPassword"
 	
 	jamfPS="https://newjss.company.com:8443"
-	usersByName="${jamfPS}/JSSResource/users/name"
+	#usersByName="${jamfPS}/JSSResource/users/name"
+	apiGetToken="${jamfPS}/uapi/auth/tokens"
+	apiGetSites="${jamfPS}/uapi/auth/current"
 	computersbyID="${jamfPS}/JSSResource/computers/id"
 	mobileDevicesByID="${jamfPS}/JSSResource/mobiledevices/id"
 
@@ -26,7 +28,7 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 	if [[ "${4}" == "Jamf" ]]; then
 		action=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"Computers", "Mobile Devices"}' -e 'set Action to choose from list availableActions with prompt "Which device type do you want to move?" default items {"Computers"}' -e 'end tell' 2>/dev/null)
 		ranBy="Jamf"
-		siteAdmin="${3}"
+		#siteAdmin="${3}"
 		jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
 		jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
 	else
@@ -62,25 +64,29 @@ Actions:
 }
 
 getSites() {
+	# Create a token based on user provided credentials
+	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | python -c "import sys,json; print json.load(sys.stdin)['token']")
 
 	echo "Getting a list of Sites..."
 	# GET list of Sites that user has permissions to.
-	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${usersByName}/${siteAdmin})"
+	# curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${usersByName}/${siteAdmin})"
+	getSites="$(/usr/bin/curl --silent --show-error --fail --output - --header "Content-Type: application/json" --header "Authorization: jamf-token ${authToken}" --request POST ${apiGetSites} | python -c 'import sys,json; print "\n".join( [i["name"] for i in json.loads( sys.stdin.read() )["sites"]] )')"
+
 
 	# Check if the API call was successful or not.
-	curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
-	if [[ $curlCode != "200" ]]; then
-		informBy "ERROR:  API call failed with error:  ${curlCode}!"
-		echo "*****  MoveDevicesToSite process:  FAILED  *****"
-		exit 4
-	fi
+	# curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+	# if [[ $curlCode != "200" ]]; then
+	# 	informBy "ERROR:  API call failed with error:  ${curlCode}!"
+	# 	echo "*****  MoveDevicesToSite process:  FAILED  *****"
+	# 	exit 4
+	# fi
 
 	# Regex down to just the Site names
-	adminSites=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /user/sites/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	# adminSites=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /user/sites/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
 
 	# Set the osascript parameters and prompt User for Printer Selection.
-	promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$adminSites\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
+	promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$getSites\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
 	selectedSiteName=$(osascript -e "$promptForChoice")
 
 	# Handle if the user pushes the cancel button.
