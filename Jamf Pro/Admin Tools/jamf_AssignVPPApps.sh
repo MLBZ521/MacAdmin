@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  1.0 / Updated:  2/21/2018 / By:  ZT
+# Version:  1.0.1 / Updated:  4/2/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -63,7 +63,7 @@ getApps() {
 	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps)"
 	
 	# Check if the API call was successful or not.
-	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+	curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 	if [[ $curlCode != "200" ]]; then
 		informBy "ERROR:  API call failed with error:  ${curlCode}!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
@@ -71,7 +71,7 @@ getApps() {
 	fi
 	
 	# Regex down to just the ID numbers
-	appIDs=$(echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
+	appIDs=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 	
 	echo "Adding header to output file..."
 	header="App ID\tApp Name\tAuto Deploy\tRemove App\tTake Over\tApp Site\tScope to Group"
@@ -83,11 +83,11 @@ getApps() {
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General)"
 
 		# Check if the API call was successful or not.
-		curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode $appID
 
 		# Regex down to the info we want and output to a tab delimited file
-		echo "$curlReturn" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed | /mobile_device_application/general/take_over_management' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
+		echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed | /mobile_device_application/general/take_over_management' 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C /usr/bin/sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 	done
 
 	informBy "List has been saved to:  ${outFile}"
@@ -117,7 +117,7 @@ assignApps() {
 </mobile_device_application>")"
 
 		# Check if the API call was successful or not.
-		curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode $appID
 
 	done < <(/usr/bin/tail -n +2 "${inputFile}") # Essentially, skip the header line.
@@ -189,7 +189,7 @@ else
 	curlReturn="$(/usr/bin/curl $jamfPS/JSSResource/jssuser -i --silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}")"
 
 	# Check if the API call was successful or not.
-	curlCode=$(echo "$curlReturn" | awk -F statusCode: '{print $2}')
+	curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 	if [[ $curlCode != *"200"* ]]; then
 		informBy "ERROR:  Invalid API credentials provided!"
 		echo "*****  AssignVPPApps process:  FAILED  *****"
