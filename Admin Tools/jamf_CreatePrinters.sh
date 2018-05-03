@@ -211,7 +211,7 @@ fi
 
 # Loop through each printer to only get the printer name and add in it's printer "ID" -- node number in the xml.
 for ((i=1; i<=$numberOfPrinters; ++i)); do
-	printerName=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath /printers/printer[$i]/display_name 2>/dev/null| LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	printerName=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath /printers/printer[$i]/display_name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 	printerNames+=$"${i}) ${printerName}\n"
 done
 
