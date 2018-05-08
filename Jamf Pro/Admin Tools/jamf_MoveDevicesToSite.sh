@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.6 / Updated:  5/8/2018 / By:  ZT
+# Version:  0.7 / Updated:  5/8/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -188,22 +188,32 @@ checkStatusCode() {
 			# inform "Device ID:  ${2} -> Request to create or update object successful"
 		;;
 		400)
-			inform "${deviceType} ID:  ${2} -> Bad request. Verify the syntax of the request specifically the XML body."
+			inform "${deviceType} ID:  ${2} -> Something went wrong!"
+			echo "${deviceType} ID:  ${2}  Error 400 -> Bad request. Verify the syntax of the request specifically the XML body."
 		;;
 		401)
-			inform "${deviceType} ID:  ${2} -> Authentication failed. Verify the credentials being used for the request."
+			inform "${deviceType} ID:  ${2} -> Authentication failed."
+			echo "${deviceType} ID:  ${2}  Error 401 -> Authentication failed.  Verify the credentials being used for the request."
 		;;
 		403)
-			inform "${deviceType} ID:  ${2} -> Invalid permissions. Verify the account being used has the proper permissions for the object/resource you are trying to access."
+			inform "${deviceType} ID:  ${2} -> Invalid permissions"
+			echo "${deviceType} ID:  ${2}  Error 403 -> Invalid permissions. Verify the account being used has the proper permissions for the object/resource you are trying to access."
 		;;
 		404)
-			inform "${deviceType} ID:  ${2} -> Object/resource not found. Verify the URL path is correct."
+			inform "${deviceType} ID:  ${2} -> Object/resource not found. Verify the Device ID exists!"
+			echo "${deviceType} ID:  ${2}  Error 404 -> Object/resource not found. Verify the URL path is correct."
 		;;
 		409)
 			inform "${deviceType} ID:  ${2} -> Conflict"
+			echo "${deviceType} ID:  ${2}  Error 409 -> Conflict"
 		;;
 		500)
-			inform "${deviceType} ID:  ${2} -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
+			inform "${deviceType} ID:  ${2} -> Internal server error. Retry the request and contact SSM support if the error is persistent."
+			echo "${deviceType} ID:  ${2}  Error 403 -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
+		;;
+		"SiteError" )
+			inform "${deviceType} ID:  ${2} -> Error:  This device is not in a site you have permissions too."
+			echo "${siteAdminUser} tried to move ${deviceType} ID:  ${2} that was in a site they did not have permissions too."
 		;;
 	esac
 }
