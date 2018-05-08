@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.5 / Updated:  5/8/2018 / By:  ZT
+# Version:  0.6 / Updated:  5/8/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -34,6 +34,51 @@ curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}"
 
 ##################################################
 # Setup Functions
+
+actions() {
+	case "${1}" in
+		"Input" )
+			# Prompt to enter Device ID
+			devices=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter Device IDs (comma separated):" default answer "")')
+
+			# Function canceled
+			canceled "${devices}" "No devices were entered."
+
+			# Split IDs into an array
+			IFS=', ' read -a deviceIDs <<< "${devices}"
+		;;
+		"File" )
+			# Prompt for csv file of IDs
+			listLocation=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of(choose file with prompt "Select file:" of type {"csv", "txt"})' -e 'end tell')
+
+			# Function canceled
+			canceled "${listLocation}" "No file selection was made."
+
+			# Read in the file and assign to an array
+			while IFS=, read -a deviceID; do
+				deviceIDs+=("${deviceID}")
+			done < <(/bin/cat "${listLocation}")
+		;;
+		"Computer" )
+			# Function getComputers
+			getComputers
+		;;
+		"Mobile Device" )
+			# Function getMobileDevice
+			getMobileDevice
+		;;
+		"SelectSite" )
+			# Set the osascript parameters and prompt User for Printer Selection.
+			promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$siteNames\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
+			selectedSiteName=$(osascript -e "$promptForChoice")
+
+			# Function canceled
+			canceled $selectedSiteName "No Site selection was made."
+
+			echo "Site selected:  ${selectedSiteName}"
+		;;
+	esac
+}
 
 getSites() {
 	# Create a token based on user provided credentials
@@ -163,14 +208,13 @@ checkStatusCode() {
 	esac
 }
 
-fileExists() {
-	if [[ ! -e "${1}" && $2 == "create" ]]; then
-		echo "Creating output file at location:  ${1}"
-		/usr/bin/touch "${1}"
-	elif  [[ ! -e "${1}" && $2 == "trip" ]]; then
-		inform "ERROR:  Unable to find the input file!"
-		echo "*****  MoveDevicesToSite process:  FAILED  *****"
-		exit 3
+canceled() {
+	# Handle if the user selects the cancel button.
+	if [[ "${1}" == "false" || "${1}" == "" ]]; then
+		inform "Script canceled!"
+		echo "${2}"
+		echo "*****  MoveDevicesToSite process:  COMPLETE  *****"
+		exit 0
 	fi
 }
 
@@ -197,38 +241,39 @@ else
 		echo "*****  MoveDevicesToSite process:  FAILED  *****"
 		exit 2
 	fi
-
 	echo "API Credentials Valid -- continuing..."
-fi
-
-# Find out what device type we want to do move.
-deviceType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"Computer", "Mobile Device"}' -e 'set Action to choose from list availableActions with prompt "Which device type do you want to move?" default items {"Computer"}' -e 'end tell' 2>/dev/null)
-
-# Provide list of devices or single IDs?
-methodType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"List", "Single"}' -e 'set Action to choose from list availableActions with prompt "Do you want to move a single device or provide a list of devices?" default items {"Single"}' -e 'end tell' 2>/dev/null)
-
-# Get device IDs
-if [[ $methodType == "Single" ]]; then
-	# Prompt to enter Device ID
-	devices=$()
-else
-	# Prompt for csv file of IDs
-	devices=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of(choose file with prompt "Select file:" of type {"csv", "txt"})' -e 'end tell' 2>/dev/null)
 fi
 
 # Function getSites
 getSites
 
-case $deviceType in
-	"Computer" )
-		# Function getComputers
-		getComputers
-	;;
-	"Mobile Device" )
-		# Function getMobileDevice
-		getMobileDevice
-	;;
-esac
+# Either prompt to move another device or complete script.
+until [[ "${moveAnother}" == "button returned:No" ]]; do
+
+	# Clear the variable, in case we're rerunning the process.
+	unset deviceIDs
+
+	# Find out what device type we want to do move.
+	deviceType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Which device type do you want to move?" buttons {"Computer", "Mobile Device"} default button {"Computer"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
+	echo "Device Type selected:  ${deviceType}"
+
+	# Function actions
+	actions "SelectSite"
+
+	# Provide File or Input Device IDs?
+	methodType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "How do you want to provide the Device ID(s)?" buttons {"Input", "File"} default button {"Input"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
+	echo "Method Type selected:  ${methodType}"
+
+	# Function actions
+	actions "${methodType}"
+
+	# Function actions
+	actions "${deviceType}"
+
+	# Prompt if we want to move another device.
+	moveAnother=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Do you want to move another device?" buttons {"Yes", "No"}')
+
+done
 
 inform "Script successfully completed!"
 echo "*****  MoveDevicesToSite process:  COMPLETE  *****"
