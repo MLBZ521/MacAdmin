@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.4 / Updated:  5/8/2018 / By:  ZT
+# Version:  0.5 / Updated:  5/8/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -40,19 +40,36 @@ getSites() {
 	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | python -c "import sys,json; print json.load(sys.stdin)['token']")
 
 	echo "Getting a list of Sites..."
-	# GET list of Sites that user has permissions to.
-	getSites="$(/usr/bin/curl --silent --show-error --fail --output - --header "Content-Type: application/json" --header "Authorization: jamf-token ${authToken}" --request POST ${apiGetSites} | python -c 'import sys,json; print "\n".join( [i["name"] for i in json.loads( sys.stdin.read() )["sites"]] )')"
+	# GET All User Details
+	allDetails=$(/usr/bin/curl --silent --show-error --fail --output - --header "Content-Type: application/json" --header "Authorization: jamf-token ${authToken}" --request GET ${apiGetDetails})
 
-	# Set the osascript parameters and prompt User for Printer Selection.
-	promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$getSites\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
-	selectedSiteName=$(osascript -e "$promptForChoice")
+	# Get a list of all the Site IDs that the Site Admin has Enroll Permissions too
+	siteIDs=$(/usr/bin/printf "${allDetails}" | python -c '
+import sys, json
 
-	# Handle if the user pushes the cancel button.
-	if [[ $selectedSiteName == "false" ]]; then
-		echo "No Site selection was made."
-		createAnother="button returned:No"
-		return
-	fi
+objects = json.load(sys.stdin)
+
+for key in objects["accountGroups"]:
+    for privilege in key["privileges"]:
+        if privilege == "Enroll Computers and Mobile Devices":
+            print(key["siteId"])')
+
+# For each Site ID, get the Site Name
+	for siteID in $siteIDs; do
+		siteName=$(/usr/bin/printf "${allDetails}" | python -c "
+import sys, json
+
+objects = json.load(sys.stdin)
+
+for key in objects['sites']:
+    if key['id'] == ${siteID}:
+        print(key['name'])")
+
+		siteNames+=$"${siteName}\n"
+	done
+
+	# Drop the final \n (newline).
+	siteNames=$(echo -e ${siteNames} | /usr/bin/perl -pe 'chomp if eof')
 }
 
 getComputers() {
