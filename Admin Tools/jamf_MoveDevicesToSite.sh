@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.8 / Updated:  5/8/2018 / By:  ZT
+# Version:  0.9 / Updated:  5/8/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -17,13 +17,17 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 # JPS URL
 jamfPS="https://newjss.company.com:8443"
 apiGetToken="${jamfPS}/uapi/auth/tokens"
-apiGetSites="${jamfPS}/uapi/auth/current"
+apiGetDetails="${jamfPS}/uapi/auth"
 computersbyID="${jamfPS}/JSSResource/computers/id"
 mobileDevicesByID="${jamfPS}/JSSResource/mobiledevices/id"
 
 # Jamf API User that will have permissions to move devices.
-jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
-jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
+DecryptString() {
+	# Usage: ~$ DecryptString "Encrypted String" "Salt" "Passphrase"
+	echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
+}
+jamfAPIUser=$(DecryptString $4 'Salt' 'Passphrase')
+jamfAPIPassword=$(DecryptString $5 'Salt' 'Passphrase')
 
 # Site Admin Credentials to get which Sites they have permissions too.
 siteAdminUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
