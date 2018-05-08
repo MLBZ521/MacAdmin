@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.3 / Updated:  5/2/2018 / By:  ZT
+# Version:  0.4 / Updated:  5/8/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -56,18 +56,64 @@ getSites() {
 }
 
 getComputers() {
+	echo "Reading in device IDs..."
 
+	# Read in the file and assign to variables
+	while IFS=, read deviceID; do
 
+		# PUT changes to the JSS.
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${computersbyID}/${deviceID})"
 
+		# Check if the API call was successful or not.
+		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+		checkStatusCode $curlCode $deviceID
+
+		# Regex to get the Site
+		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /computer/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+
+		if [[ "${currentSite}" != "${selectedSiteName}" ]]; then
+			echo "Reassigning device:  ${deviceID}  to:  ${selectedSiteName}"
+
+			# PUT changes to the JSS.
+			curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${computersbyID}/${deviceID} --data "<computer><site><name>$selectedSiteName</name></site></computer>")"
+
+			# Check if the API call was successful or not.
+			curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+			checkStatusCode $curlCode $deviceID
+		fi
+
+	done < <(echo "${devices}")
 }
-
 
 getMobileDevice() {
+	echo "Reading in device IDs..."
 
+	# Read in the file and assign to variables
+	while IFS=, read deviceID; do
 
+		# PUT changes to the JSS.
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${mobileDevicesByID}/${deviceID})"
 
+		# Check if the API call was successful or not.
+		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+		checkStatusCode $curlCode $deviceID
+
+		# Regex to get the Site
+		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobileDevice/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+
+		if [[ "${currentSite}" != "${selectedSiteName}" ]]; then
+			echo "Reassigning device:  ${deviceID}  to:  ${selectedSiteName}"
+
+			# PUT changes to the JSS.
+			curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${mobileDevicesByID}/${deviceID} --data "<mobileDevice><site><name>$selectedSiteName</name></site></mobileDevice>")"
+
+			# Check if the API call was successful or not.
+			curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
+			checkStatusCode $curlCode $deviceID
+		fi
+
+	done < <(echo "${devices}")
 }
-
 
 checkStatusCode() {
 	case $1 in
@@ -158,8 +204,12 @@ getSites
 
 case $deviceType in
 	"Computer" )
+		# Function getComputers
+		getComputers
 	;;
 	"Mobile Device" )
+		# Function getMobileDevice
+		getMobileDevice
 	;;
 esac
 
