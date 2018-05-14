@@ -2,7 +2,7 @@
 
 Script Name:  jamf_MoveSites.ps1
 By:  Zack Thompson / Created:  4/18/2018
-Version:  1.0 / Updated:  4/18/2018 / By:  ZT
+Version:  1.1 / Updated:  5/14/2018 / By:  ZT
 
 Description:  This script will move a device record between Sites given information from a CSV.
 
@@ -15,16 +15,12 @@ Write-Host "jamf_MoveSites Process:  START"
 # ============================================================
 
 # Setup Credentials
-$jamfAPIUser = ""
-# Define Password from within the script.
-     $jamfAPIPassword = ConvertTo-SecureString -String 'SecurePassPhrase' -AsPlainText -Force
-# Create an encrypted password file.
-    $exportPassPhrase = 'SecurePassPhrase' | ConvertTo-Securestring -AsPlainText -Force
-    $exportPassPhrase | ConvertFrom-SecureString | Out-File $PSScriptRoot\Cred.txt
-# Read in encrypted password.
-    $jamfAPIPassword = Get-Content $PSScriptRoot\jamf_MoveSites_Creds.txt | ConvertTo-SecureString
-
+$jamfAPIUser = $(Read-Host "JPS Account")
+$jamfAPIPassword = $(Read-Host -AsSecureString "JPS Password")
 $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $jamfAPIUser, $jamfAPIPassword
+
+# Prompt for the Site to move objects into.
+$NewSite = $(Read-Host "New Site")
 
 # Setup API URLs
 $jamfPS="https://jss.company.com:8443"
@@ -34,13 +30,19 @@ $getComputer="${jamfPS}/JSSResource/computers/id"
 $getMobileDevices="${jamfPS}/JSSResource/mobiledevices"
 $getMobileDevice="${jamfPS}/JSSResource/mobiledevices/id"
 
-# Import the CSV File with the information we want to update.
-$csvComputers = Import-Csv "\path\to\file\MoveComputers.csv"
-$csvMobileDevices = Import-Csv "\path\to\file\MoveMobileDevices.csv"
-
 # ============================================================
 # Functions
 # ============================================================
+
+Function Prompt {
+	$Title = "Choose Device Type";
+	$Message = "Chose which device types you want to move:"
+	$Option1 = New-Object System.Management.Automation.Host.ChoiceDescription "&Both";
+	$Option2 = New-Object System.Management.Automation.Host.ChoiceDescription "&Computers";
+	$Option3 = New-Object System.Management.Automation.Host.ChoiceDescription "Mobile Devices";
+	$Options = [System.Management.Automation.Host.ChoiceDescription[]]($Option1,$Option2,$Option3);
+	$script:Answer = $Host.UI.PromptForChoice($Title,$Message,$Options,0)
+}
 
 function updateRecord($deviceType, $urlALL, $urlID, $csvValues, $columnName) {
 
@@ -56,10 +58,10 @@ function updateRecord($deviceType, $urlALL, $urlID, $csvValues, $columnName) {
         $currentSite = $objectOf_deviceGeneral.${deviceType}.general.site.name
 
         # Compare the values to what we do want them to be
-        If ( ( "${currentSite}" -ne "site1" ) -and ( "${currentSite}" -ne "site2" ) ) {
+        If ( ( "${currentSite}" -ne "${NewSite}" ) -and ( "${currentSite}" -ne "${NewSite}.dev" ) ) {
             Write-host "${deviceType} ID:  ${ID} is a member of ${currentSite}"
             
-            [xml]$upload_deviceEA = "<?xml version='1.0' encoding='UTF-8'?><${deviceType}><general><site><name>newSite</name></site></general></${deviceType}>"
+            [xml]$upload_deviceEA = "<?xml version='1.0' encoding='UTF-8'?><${deviceType}><general><site><name>${NewSite}</name></site></general></${deviceType}>"
             
             Try {
                 $Response = Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Credential $APIcredentials -Body $upload_deviceEA -ErrorVariable RestError -ErrorAction SilentlyContinue
@@ -69,8 +71,8 @@ function updateRecord($deviceType, $urlALL, $urlID, $csvValues, $columnName) {
                 $statusDescription = $_.Exception.Response.StatusDescription
 
                 If ($statusCode -notcontains "200") {
-                    Write-host "Failed to assign site for ${deviceType} ID:  ${ID}..."
-                    Write-Host "Response:  ${statusCode}/${statusDescription}"
+                    Write-host " -> Failed to assign site for ${deviceType} ID:  ${ID}..."
+                    Write-Host "  -> Response:  ${statusCode}/${statusDescription}"
                 }
             }
         }
@@ -101,8 +103,25 @@ Catch {
 
 Write-Host "API Credentials Valid -- continuing..."
 
-# Call Update function for each device type
-updateRecord computer $getComputers $getComputer $csvComputers 'JSS Computer ID'
-updateRecord mobile_device $getMobileDevices $getMobileDevice $csvMobileDevices "JSS Mobile Device ID"
+# Prompt for the CSV Files with the devices that need to be moved.
+Prompt
+
+# Request list of devices and call Update function for each device type
+switch ($Answer) {
+    0 { 
+        $csvComputers = Import-Csv -Path ($(Read-Host "List of Computers") -replace '"')
+        $csvMobileDevices = Import-Csv -Path ($(Read-Host "List of Mobile Devices") -replace '"')
+        updateRecord computer $getComputers $getComputer $csvComputers 'JSS Computer ID'
+        updateRecord mobile_device $getMobileDevices $getMobileDevice $csvMobileDevices "JSS Mobile Device ID"
+    }
+    1 { 
+        $csvComputers = Import-Csv -Path ($(Read-Host "List of Computers") -replace '"')
+        updateRecord computer $getComputers $getComputer $csvComputers 'JSS Computer ID'
+    }
+    2 { 
+        $csvMobileDevices = Import-Csv -Path ($(Read-Host "List of Mobile Devices") -replace '"')
+        updateRecord mobile_device $getMobileDevices $getMobileDevice $csvMobileDevices "JSS Mobile Device ID"
+    }
+}
 
 Write-Host "jamf_MoveSites Process:  COMPLETE"
