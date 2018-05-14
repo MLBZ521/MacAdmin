@@ -2,7 +2,7 @@
 
 Script Name:  jamf_createSite.ps1
 By:  Zack Thompson / Created:  5/11/2018
-Version:  0.2 / Updated:  5/11/2018 / By:  ZT
+Version:  0.3 / Updated:  5/14/2018 / By:  ZT
 
 Description:  This script will automate the creation of a new Site as much as possible with the information provided.
 
@@ -379,9 +379,14 @@ Catch {
 
 Write-Host "API Credentials Valid -- continuing..."
 
+# Active Directory Setup
+Write-Host "Creating Endpoint Management Security Group..."
+New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "CN=Users,DC=contoso,DC=Com" -Description "This group manages the ${Site} Jamf Site." -Credential PSCredential 
+
+Write-Host "Nesting customer Securty Group into Endpoint Management Security Group..."
+Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
 
 # Jamf Setup
-
 Write-host "Creating Site:  ${Site}"
 apiDo "${apiSite}/${Site}" "Post"
 
