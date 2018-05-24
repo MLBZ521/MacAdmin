@@ -1,8 +1,8 @@
-﻿<#
+<#
 
 Script Name:  jamf_createSite.ps1
 By:  Zack Thompson / Created:  5/11/2018
-Version:  0.4 / Updated:  5/15/2018 / By:  ZT
+Version:  0.5 / Updated:  5/23/2018 / By:  ZT
 
 Description:  This script will automate the creation of a new Site as much as possible with the information provided.
 
@@ -29,13 +29,13 @@ $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredenti
 
 # Setup API URLs
 $jamfPS="https://jss.company.com:8443"
-$apiSite="${jamfPS}/JSSResource/sites/name"
-$apiGroup="${jamfPS}/JSSResource/accounts/groupname"
-$apiDepartment="${jamfPS}/JSSResource/departments/name"
-$apiCategory="${jamfPS}/JSSResource/categories/name"
-$apiComputerGroup="${jamfPS}/JSSResource/computergroups/name"
-$apiMobileGroup="${jamfPS}/JSSResource/mobiledevicegroups/name"
-$apiPolicy="${jamfPS}/JSSResource/Policies/name"
+$apiSite="${jamfPS}/JSSResource/sites/id/0"
+$apiGroup="${jamfPS}/JSSResource/accounts/groupid/0"
+$apiDepartment="${jamfPS}/JSSResource/departments/id/0"
+$apiCategory="${jamfPS}/JSSResource/categories/id/0"
+$apiComputerGroup="${jamfPS}/JSSResource/computergroups/id/0"
+$apiMobileGroup="${jamfPS}/JSSResource/mobiledevicegroups/id/0"
+$apiPolicy="${jamfPS}/JSSResource/policies/id/0"
 
 # Active Directory OU Location for Endpoint Management Security Group
 $OU = "DC=Security Groups,DC=ad,DC=contoso,DC=com"
@@ -46,7 +46,7 @@ $OU = "DC=Security Groups,DC=ad,DC=contoso,DC=com"
 
 function apiDo($uri, $method, $config) {
     Try {
-        $Response = Invoke-RestMethod -Uri "${uri}" -Method $method -Credential $APIcredentials -Body $config -ErrorVariable RestError -ErrorAction SilentlyContinue
+        $Response = Invoke-RestMethod -Uri "${uri}" -Method $method -ContentType "application/xml" -Credential $APIcredentials -Body $config -ErrorVariable RestError -ErrorAction SilentlyContinue
     }
     Catch {
         $statusCode = $_.Exception.Response.StatusCode.value__
@@ -66,8 +66,9 @@ function SiteCreation {
 
 $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
 
-# Configuration XML
-# %5BDeskside%5D%20uto
+[xml]$configSites = "<?xml version='1.0' encoding='UTF-8'?><site>
+    <name>${SiteName}</name>
+</site>"
 
 [xml]$configSecurityGroup = "<?xml version='1.0' encoding='UTF-8'?><group>
   <name>${SecurityGroup}</name>
@@ -242,9 +243,11 @@ $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
       <privilege>Enroll Computers and Mobile Devices</privilege>
       <privilege>Flush Policy Logs</privilege>
       <privilege>Send Blank Pushes to Mobile Devices</privilege>
+      <privilege>Send Computer Delete User Account Command</privilege>
       <privilege>Send Computer Remote Command to Download and Install OS X Update</privilege>
       <privilege>Send Computer Remote Lock Command</privilege>
       <privilege>Send Computer Remote Wipe Command</privilege>
+      <privilege>Send Computer Unlock User Account Command</privilege>
       <privilege>Send Computer Unmanage Command</privilege>
       <privilege>Send Email to End Users via JSS</privilege>
       <privilege>Send Inventory Requests to Mobile Devices</privilege>
@@ -262,9 +265,12 @@ $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
       <privilege>Send Mobile Device Remote Wipe Command</privilege>
       <privilege>Send Mobile Device Remove Passcode Command</privilege>
       <privilege>Send Mobile Device Remove Restrictions Password Command</privilege>
+      <privilege>Send Mobile Device Restart Device Command</privilege>
       <privilege>Send Mobile Device Set Device Name Command</privilege>
       <privilege>Send Mobile Device Set Wallpaper Command</privilege>
       <privilege>Send Mobile Device Shared iPad Commands</privilege>
+      <privilege>Send Mobile Device Shut Down Command</privilege>
+      <privilege>Send Update Passcode Lock Grace Period Command</privilege>
       <privilege>Unmanage Mobile Devices</privilege>
       <privilege>View Activation Lock Bypass Code</privilege>
       <privilege>View Disk Encryption Recovery Key</privilege>
@@ -296,6 +302,14 @@ $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
     <casper_imaging/>
   </privileges>
 </group>"
+
+[xml]$configDepartment = "<?xml version='1.0' encoding='UTF-8'?><department>
+    <name>${Department}</name>
+</department>"
+
+[xml]$configCategory = "<?xml version='1.0' encoding='UTF-8'?><category>
+    <name>Testing - ${Department}</name>
+</category>"
 
 [xml]$configComputerGroup = "<?xml version='1.0' encoding='UTF-8'?><computer_group>
   <id>45</id>
@@ -361,48 +375,37 @@ $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
 # Some Verbosity
 Write-Host "Site:  ${SiteName}"
 Write-Host "Department:  ${Department}"
-Write-Host "NestSecurityGroup:  ${NestSecurityGroup}"
+Write-Host "Nested Security Group:  ${NestSecurityGroup}"
+Write-Host ""
 
 # Active Directory Setup
-    Write-Host "Creating Endpoint Management Security Group..."
+    Write-Host "Creating Endpoint Management Security Group:  ${SecurityGroup}"
     New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "${OU}" -Description "This group manages the ${SiteName} Jamf Site." #-Credential 
 
-    Write-Host "Nesting customer Securty Group into Endpoint Management Security Group..."
+    Write-Host "Nesting the Securty Group:  ${NestSecurityGroup} into:  ${SecurityGroup}"
     Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
 
     # Jamf Setup
     Write-host "Creating Site:  ${SiteName}"
-    apiDo "${apiSite}/${SiteName}" "Post"
+    apiDo "${apiSite}" "Post" $configSites
 
-    Write-host "Creating Management Group:  ${SecurityGroup}"
-    apiDo "${$apiGroup}/${SecurityGroup}" "Post" $configSecurityGroup
-
-    Write-host "Configuring permissions..."
-    apiDo "${$apiGroup}/${SecurityGroup}" "Put"
+    Write-host "Creating Management Group:  ${SecurityGroup}  and setting permissions..."
+    apiDo "${apiGroup}" "Post" $configSecurityGroup
 
     Write-host "Creating Department:  ${Department}"
-    apiDo "${apiDepartment}/${Department}" "Post"
-
-    Write-host "Creating Category:  ${SiteName}"
-    apiDo "${apiCategory}/Testing - ${Department}" "Post"
-
+    apiDo "${apiDepartment}" "Post" $configDepartment
+    
+    Write-host "Creating Category:  Testing - ${Department}"
+    apiDo "${apiCategory}" "Post" $configCategory
+    
     Write-host "Creating Computer Group:  [Deskside] ${SiteName}"
-    apiDo "${apiComputerGroup}/[Deskside] ${SiteName}" "Post"
-
-    Write-host "Configuring Computer Smart Group..."
-    apiDo "${apiComputerGroup}/[Deskside] ${SiteName}" "Put" $configComputerGroup
-
+    apiDo "${apiComputerGroup}" "Post" $configComputerGroup
+    
     Write-host "Creating Mobile Device Group:  [Deskside] ${SiteName}"
-    apiDo "${apiMobileGroup}/[Deskside] ${SiteName}" "Post"
-
-    Write-host "Configuring Mobile Device Smart Group..."
-    apiDo "${apiMobileGroup}/[Deskside] ${SiteName}" "Put" $configMobileGroup
-
+    apiDo "${apiMobileGroup}" "Post" $configMobileGroup
+    
     Write-host "Creating Policy:  Department Loading Policy - ${Department}"
-    apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Post"
-
-    Write-host "Configuring Mobile Device Smart Group..."
-    apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Put" $configPolicy
+    apiDo "${apiPolicy}" "Post" $configPolicy
 }
 
 # ============================================================
