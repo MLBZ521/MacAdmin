@@ -2,7 +2,7 @@
 
 Script Name:  jamf_createSite.ps1
 By:  Zack Thompson / Created:  5/11/2018
-Version:  0.3 / Updated:  5/14/2018 / By:  ZT
+Version:  0.4 / Updated:  5/15/2018 / By:  ZT
 
 Description:  This script will automate the creation of a new Site as much as possible with the information provided.
 
@@ -10,9 +10,9 @@ Description:  This script will automate the creation of a new Site as much as po
 
 param (
     [Parameter][string]$csv,
-    [Parameter][string]$Site,
-    [Parameter][string]$Department,
-    [Parameter][string]$NestSecurityGroup
+    [string]$SiteName,
+    [string]$Department,
+    [string]$NestSecurityGroup
     #[Parameter(Mandatory=$true)][string]$,
  )
 
@@ -23,14 +23,8 @@ Write-Host "jamf_createSite Process:  START"
 # ============================================================
 
 # Setup Credentials
-$jamfAPIUser = ""
-# Define Password from within the script.
-    # $jamfAPIPassword = ConvertTo-SecureString -String 'SecurePassPhrase' -AsPlainText -Force
-# Create an encrypted password file.
-    # $exportPassPhrase = 'SecurePassPhrase' | ConvertTo-Securestring -AsPlainText -Force
-    # $exportPassPhrase | ConvertFrom-SecureString | Out-File $PSScriptRoot\Cred.txt
-# Read in encrypted password.
-    $jamfAPIPassword = Get-Content $PSScriptRoot\jamf_assignSiteEA_Creds.txt | ConvertTo-SecureString
+$jamfAPIUser = $(Read-Host "JPS Account")
+$jamfAPIPassword = $(Read-Host -AsSecureString "JPS Password")
 $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $jamfAPIUser, $jamfAPIPassword
 
 # Setup API URLs
@@ -43,9 +37,34 @@ $apiComputerGroup="${jamfPS}/JSSResource/computergroups/name"
 $apiMobileGroup="${jamfPS}/JSSResource/mobiledevicegroups/name"
 $apiPolicy="${jamfPS}/JSSResource/Policies/name"
 
-# Active Directory Details
-$OU = ""
-$SecurityGroup = "EndPntMgmt.Apple ${Site}"
+# Active Directory OU Location for Endpoint Management Security Group
+$OU = "DC=Security Groups,DC=ad,DC=contoso,DC=com"
+
+# ============================================================
+# Functions
+# ============================================================
+
+function apiDo($uri, $method, $config) {
+    Try {
+        $Response = Invoke-RestMethod -Uri "${uri}" -Method $method -Credential $APIcredentials -Body $config -ErrorVariable RestError -ErrorAction SilentlyContinue
+    }
+    Catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $statusDescription = $_.Exception.Response.StatusDescription
+
+        If ($statusCode -notcontains "200") {
+            Write-host " -> Failed!"
+            Write-Host "  --> Response:  ${statusCode}/${statusDescription}: $($RestError.Message | ForEach { $_.Split(":")[1];} | ForEach { $_.Split([Environment]::NewLine)[0];})"
+        }
+    }
+}
+
+function SiteCreation {
+
+# ============================================================
+# Define Variables for current run...
+
+$SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
 
 # Configuration XML
 # %5BDeskside%5D%20uto
@@ -56,10 +75,10 @@ $SecurityGroup = "EndPntMgmt.Apple ${Site}"
   <privilege_set>Custom</privilege_set>
   <ldap_server>
     <id>1</id>
-    <name>asurite4 AD Connector</name>
+    <name>AD Connector</name>
   </ldap_server>
   <site>
-    <name>${Site}</name>
+    <name>${SiteName}</name>
   </site>
   <privileges>
     <jss_objects>
@@ -280,10 +299,10 @@ $SecurityGroup = "EndPntMgmt.Apple ${Site}"
 
 [xml]$configComputerGroup = "<?xml version='1.0' encoding='UTF-8'?><computer_group>
   <id>45</id>
-  <name>[Deskside] ${Site}</name>
+  <name>[Deskside] ${SiteName}</name>
   <is_smart>true</is_smart>
   <site>
-    <name>${Site}</name>
+    <name>${SiteName}</name>
   </site>
   <criteria>
     <size>2</size>
@@ -309,15 +328,15 @@ $SecurityGroup = "EndPntMgmt.Apple ${Site}"
   </computer_group>"
 
 [xml]$configMobileGroup = "<?xml version='1.0' encoding='UTF-8'?><mobile_device_group>
-  <name>[Deskside] ${Site}</name>
+  <name>[Deskside] ${SiteName}</name>
   <is_smart>true</is_smart>
   <site>
-    <name>${Site}</name>
-  </site>"
+    <name>${SiteName}</name>
+  </site></mobile_device_group>"
 
 [xml]$configPolicy = "<?xml version='1.0' encoding='UTF-8'?><policy>
   <general>
-    <name>[ASU] Configure Department Data - ${Site}</name>
+    <name>Configure Department Data - ${SiteName}</name>
     <enabled>true</enabled>
     <trigger_checkin>true</trigger_checkin>
     <trigger_enrollment_complete>true</trigger_enrollment_complete>
@@ -326,7 +345,7 @@ $SecurityGroup = "EndPntMgmt.Apple ${Site}"
       <name>Deskside Setup</name>
     </category>
     <site>
-      <name>${Site}</name>
+      <name>${SiteName}</name>
     </site>
   </general>
   <scope>
@@ -338,22 +357,52 @@ $SecurityGroup = "EndPntMgmt.Apple ${Site}"
 </policy>"
 
 # ============================================================
-# Functions
-# ============================================================
 
-function apiDo($uri, $method, $config) {
-    Try {
-        $Response = Invoke-RestMethod -Uri "${uri}" -Method $method -Credential $APIcredentials -Body $config -ErrorVariable RestError -ErrorAction SilentlyContinue
-    }
-    Catch {
-        $statusCode = $_.Exception.Response.StatusCode.value__
-        $statusDescription = $_.Exception.Response.StatusDescription
+# Some Verbosity
+Write-Host "Site:  ${SiteName}"
+Write-Host "Department:  ${Department}"
+Write-Host "NestSecurityGroup:  ${NestSecurityGroup}"
 
-        If ($statusCode -notcontains "200") {
-            Write-host " -> Failed!"
-            Write-Host "  --> Response:  ${statusCode}/${statusDescription}: $($RestError.Message | ForEach { $_.Split(":")[1];} | ForEach { $_.Split([Environment]::NewLine)[0];})"
-        }
-    }
+# Active Directory Setup
+    Write-Host "Creating Endpoint Management Security Group..."
+    New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "${OU}" -Description "This group manages the ${SiteName} Jamf Site." #-Credential 
+
+    Write-Host "Nesting customer Securty Group into Endpoint Management Security Group..."
+    Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
+
+    # Jamf Setup
+    Write-host "Creating Site:  ${SiteName}"
+    apiDo "${apiSite}/${SiteName}" "Post"
+
+    Write-host "Creating Management Group:  ${SecurityGroup}"
+    apiDo "${$apiGroup}/${SecurityGroup}" "Post" $configSecurityGroup
+
+    Write-host "Configuring permissions..."
+    apiDo "${$apiGroup}/${SecurityGroup}" "Put"
+
+    Write-host "Creating Department:  ${Department}"
+    apiDo "${apiDepartment}/${Department}" "Post"
+
+    Write-host "Creating Category:  ${SiteName}"
+    apiDo "${apiCategory}/Testing - ${Department}" "Post"
+
+    Write-host "Creating Computer Group:  [Deskside] ${SiteName}"
+    apiDo "${apiComputerGroup}/[Deskside] ${SiteName}" "Post"
+
+    Write-host "Configuring Computer Smart Group..."
+    apiDo "${apiComputerGroup}/[Deskside] ${SiteName}" "Put" $configComputerGroup
+
+    Write-host "Creating Mobile Device Group:  [Deskside] ${SiteName}"
+    apiDo "${apiMobileGroup}/[Deskside] ${SiteName}" "Post"
+
+    Write-host "Configuring Mobile Device Smart Group..."
+    apiDo "${apiMobileGroup}/[Deskside] ${SiteName}" "Put" $configMobileGroup
+
+    Write-host "Creating Policy:  Department Loading Policy - ${Department}"
+    apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Post"
+
+    Write-host "Configuring Mobile Device Smart Group..."
+    apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Put" $configPolicy
 }
 
 # ============================================================
@@ -379,45 +428,23 @@ Catch {
 
 Write-Host "API Credentials Valid -- continuing..."
 
-# Active Directory Setup
-Write-Host "Creating Endpoint Management Security Group..."
-New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "CN=Users,DC=contoso,DC=Com" -Description "This group manages the ${Site} Jamf Site." -Credential PSCredential 
+If ( $csv.Length -eq 0) {
+    # Use command line parameters...
+    siteCreation
+}
+Else {
+    # A CSV was provided...
+    $csvContents = Import-Csv "${csv}"
 
-Write-Host "Nesting customer Securty Group into Endpoint Management Security Group..."
-Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
+    ForEach ($Site in $csvContents) {
+        $SiteName = "$(${Site}.SiteName)"
+        $Department = "$(${Site}.Department)"
+        $NestSecurityGroup = "$(${Site}.SecurityGroup)"
 
-# Jamf Setup
-Write-host "Creating Site:  ${Site}"
-apiDo "${apiSite}/${Site}" "Post"
-
-Write-host "Creating Management Group:  ${SecurityGroup}"
-apiDo "${$apiGroup}/${SecurityGroup}" "Post" $configSecurityGroup
-
-Write-host "Configuring permissions..."
-apiDo "${$apiGroup}/${SecurityGroup}" "Put"
-
-Write-host "Creating Department:  ${Department}"
-apiDo "${apiDepartment}/${Department}" "Post"
-
-Write-host "Creating Category:  ${Site}"
-apiDo "${apiCategory}/Testing - ${Department}" "Post"
-
-Write-host "Creating Computer Group:  [Deskside] ${Site}"
-apiDo "${apiComputerGroup}/[Deskside] ${Site}" "Post"
-
-Write-host "Configuring Computer Smart Group..."
-apiDo "${apiComputerGroup}/[Deskside] ${Site}" "Put" $configComputerGroup
-
-Write-host "Creating Mobile Device Group:  [Deskside] ${Site}"
-apiDo "${apiMobileGroup}/[Deskside] ${Site}" "Post"
-
-Write-host "Configuring Mobile Device Smart Group..."
-apiDo "${apiMobileGroup}/[Deskside] ${Site}" "Put" $configMobileGroup
-
-Write-host "Creating Policy:  Department Loading Policy - ${Department}"
-apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Post"
-
-Write-host "Configuring Mobile Device Smart Group..."
-apiDo "${apiPolicy}/Department Loading Policy - ${Department}" "Put" $configPolicy
+        siteCreation
+        Write-Host ""
+    }
+    Write-Host "All provided Sites have been created!"
+}
 
 Write-Host "jamf_createSite Process:  COMPLETE"
