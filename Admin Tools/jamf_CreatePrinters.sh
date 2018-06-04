@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.4 / Updated:  3/23/2018 / By:  ZT
+# Version:  1.4.1 / Updated:  6/4/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -33,8 +33,8 @@ Actions:
 }
 
 DecryptString() {
-    # Usage: ~$ DecryptString "Encrypted String" "Salt" "Passphrase"
-    echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
+	# Usage: ~$ DecryptString "Encrypted String" "Salt" "Passphrase"
+	echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
 }
 
 createPrinter() {
@@ -54,10 +54,10 @@ createPrinter() {
 	printerID=$(/usr/bin/printf "${selectedPrinterName}" | cut -c 1)
 
 	# Get only the selected printers info.
-	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/,/g')
+	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g' | LANG=C /usr/bin/sed -e 's/\'$'\n[^\n]*$//')
 
 	# Read the printer info into variables.
-	while IFS="," read -r printerName printerCUPsName printerLocation printerIP printerModel; do
+	while IFS=$'\n' read -r printerName printerCUPsName printerLocation printerIP printerModel; do
 		if [[ -e "/private/etc/cups/ppd/${printerCUPsName}.ppd" ]]; then
 			printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
 			printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
