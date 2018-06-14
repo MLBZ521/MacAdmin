@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_verifyVPPApps.sh
 # By:  Zack Thompson / Created:  6/13/2018
-# Version:  0.1 / Updated:  6/13/2018 / By:  ZT
+# Version:  0.2 / Updated:  6/13/2018 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -25,8 +25,8 @@ echo "*****  verifyVPPApps process:  START  *****"
 	# Add -k (--insecure) to disable SSL verification
 	curlJamfAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
 
-	iTunesAPI="https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?p=mdm-lockup&caller=MDM&platform=itunes&cc=us&l=en&id="
-	curliTunesAPI=(--silent --show-error --fail --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/json" --request)
+	iTunesAPI="https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?version=1&p=mdm-lockup&caller=MDM&platform=itunes&cc=us&l=en&id="
+	curliTunesAPI=(--silent --show-error --fail --write-out "statusCode:%{http_code}" --output - --header "Accept: application/JSON" --request)
 
 	# Either use CLI arguments or prompt for choice
 	if [[ "${4}" == "Jamf" ]]; then
@@ -63,7 +63,7 @@ Actions:
 getAppInfo() {
 	echo "Requesting list of all App IDs..."
 	# GET list of App IDs from the JSS.
-	curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET $mobileApps)"
+	curlReturn="$(/usr/bin/curl "${curlJamfAPI[@]}" GET $mobileApps)"
 	
 	# Check if the API call was successful or not.
 	curlCode=$(echo "${curlReturn}" | awk -F statusCode: '{print $2}')
@@ -76,38 +76,50 @@ getAppInfo() {
 	# Regex down to just the ID numbers
 	appIDs=$(echo "${curlReturn}" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\n/g')
 	
-	# echo "Adding header to output file..."
-	# header="App ID\tApp Name\tAuto Deploy\tRemove App\tTake Over\tApp Site\tScope to Group"
-	# echo -e $header >> "${outFile}"
-
 	informBy "Getting info for each App from the JSS..."
 	# For Each ID, get additional information.
 	for appID in $appIDs; do
-		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General)"
+		curlReturn="$(/usr/bin/curl "${curlJamfAPI[@]}" GET ${mobileAppsByID}/${appID}/subset/General)"
 
 		# Check if the API call was successful or not.
 		curlCode=$(echo "${curlReturn}" | awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode $appID
 
 		# Regex down to the info we want and output to a tab delimited file
-		appInfo=$(echo "${curlReturn}" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/bundle_id | /mobile_device_application/general/itunes_store_url' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//') #>> "${outFile}"
+		appInfo="$(printf "${curlReturn}" | sed -e 's/statusCode\:.*//g' | xmllint --format - | xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/bundle_id | /mobile_device_application/general/itunes_store_url' 2>/dev/null | LANG=C sed -e 's/<[^/>]*>//g' | LANG=C sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C sed -e 's/\'$'\t[^\t]*$//')" #>> "${outFile}"
 
 
+	# Read in the file and assign to variables
+	while IFS=$'\t' read appID appName bundle_id itunes_store_url appSite; do
 
-		appAdamID=$(printf "${appInfo[3]}" | sed -e 's/.*\/id\(.*\)?.*/\1/')
 
+	#printf "${#appInfo[@]}"
+
+		printf '%s\n' "itunes_store_url:  ${itunes_store_url}"
+		appAdamID=$(printf "${itunes_store_url}" | sed -e 's/.*\/id\(.*\)?.*/\1/')
+		printf '%s\n' "AdamID:  ${appAdamID}"
 		# 
-		curlReturn="$(/usr/bin/curl "${iTunesAPI[@]}" GET $iTunesAPI/${appAdamID})"
+		#echo "${iTunesAPI}/${appAdamID}"
+		iTunesCurlReturn="$(/usr/bin/curl "${curliTunesAPI[@]}" GET ${iTunesAPI}${appAdamID})"
 
 		# Check if the API call was successful or not.
-		curlCode=$(printf "${curlReturn}" | awk -F statusCode: '{print $2}')
+		curlCode=$(printf "${iTunesCurlReturn}" | awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode $appID
 
-		printf "${appInfo}"
-		printf "${curlReturn}" | sed -e 's/statusCode\:.*//g' | python -mjson.tool | awk -F "is32bitOnly\": " '{print $2}' | xargs | sed 's/,//'
+		printf '%s\t' "${appInfo}"
+		#32bitness=$(
+		printf "${iTunesCurlReturn}" | sed -e 's/statusCode\:.*//g' | python -mjson.tool | awk -F "is32bitOnly\": " '{print $2}' | xargs | sed 's/,//' #)
+
+		unset appInfo
+
+		# echo "Adding header to output file..."
+		# header="App ID\tApp Name\tBundle ID\tiTunes Store URL\tJamf Site\t\t32Bit"
+		# echo -e $header >> "${outFile}"
 
 
+	done < <(printf '%s\n' "${appInfo}")
 
+	
 	done
 
 #	informBy "List has been saved to:  ${outFile}"
