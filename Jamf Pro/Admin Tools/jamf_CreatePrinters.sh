@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.4.1 / Updated:  6/4/2018 / By:  ZT
+# Version:  1.5 / Updated:  6/15/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -54,42 +54,52 @@ createPrinter() {
 	printerID=$(/usr/bin/printf "${selectedPrinterName}" | cut -c 1)
 
 	# Get only the selected printers info.
-	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g' | LANG=C /usr/bin/sed -e 's/\'$'\n[^\n]*$//')
+	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer/display_name | /printers/printer/cups_name | /printers/printer/location | /printers/printer/device_uri | /printers/printer/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
-	# Read the printer info into variables.
-	while IFS=$'\n' read -r printerName printerCUPsName printerLocation printerIP printerModel; do
-		if [[ -e "/private/etc/cups/ppd/${printerCUPsName}.ppd" ]]; then
-			printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerCUPsName}.ppd")
-			printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
-		else
-			informBy "Unable to locate the PPD file -- unable to create the printer."
-			return
-		fi
+	# Define array to hold the printer info 
+	printerSettings=()
 
-		echo " "
-		echo "*****  Selected Printer Configuration  *****"
-		echo " "
-		echo "Display Name:  ${printerName}"
-		echo "CUPS Name:  ${printerCUPsName}"
-		echo "Location:  ${printerLocation}"
-		echo "IP Address:  ${printerIP}"
-		echo "Driver Model:  ${printerModel}"
-		echo "PPD File:  ${printerPPDFile}"
-		echo " "
+	# Read the printer info into the array.
+	while IFS=$'\n' read -r printerSetting; do
+		printerSettings+=("${printerSetting}")
+	done < <(/usr/bin/printf '%s\n' "${selectedPrinterInfo}")
+
+	# Set the expected PPD File.
+	printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerSettings[1]}.ppd")
+
+	# Verify the PPD file exists and get it's contents
+	if [[ -e "${printerPPDFile}" ]]; then
+		printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
+	else
+		informBy "Error:  Unable to locate the PPD file -- unable to create the printer."
+		echo "Error:  Unable to locate the PPD file -- unable to create the printer."
+		return
+	fi
+
+	echo " "
+	echo "*****  Selected Printer Configuration  *****"
+	echo " "
+	echo "Display Name:  ${printerSettings[0]}"
+	echo "CUPS Name:  ${printerSettings[1]}"
+	echo "Location:  ${printerSettings[2]}"
+	echo "IP Address:  ${printerSettings[3]}"
+	echo "Driver Model:  ${printerSettings[4]}"
+	echo "PPD File:  ${printerPPDFile}"
+	echo " "
 
 		# POST changes to the JSS.
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data @- <<printerConfig
 <printer>
-<name>$printerName</name>
+<name>$printerSettings[0]</name>
 <category>Printers</category>
-<uri>${printerIP}</uri>
-<CUPS_name>${printerCUPsName}</CUPS_name>
-<location>${printerLocation}</location>
-<model>${printerModel}</model>
+<uri>${printerSettings[3]}</uri>
+<CUPS_name>${printerSettings[1]}</CUPS_name>
+<location>${printerSettings[2]}</location>
+<model>${printerSettings[4]}</model>
 <notes>Created by ${createdByUser} running the jamf_CreatePrinters.sh script.</notes>
-<ppd>${printerCUPsName}.ppd</ppd>
+<ppd>${printerSettings[1]}.ppd</ppd>
 <ppd_contents>${printerPPDContents}</ppd_contents>
-<ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerCUPsName}.ppd</ppd_path>
+<ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerSettings[1]}.ppd</ppd_path>
 </printer>
 printerConfig)"
 
@@ -109,8 +119,6 @@ printerConfig)"
 
 		# Prompt if we want to create another printer.
 		createAnother=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Do you want to create another printer?" buttons {"Yes", "No"}')
-
-	done < <(/usr/bin/printf '%s\n' "${selectedPrinterInfo}")
 }
 
 checkStatusCode() {
