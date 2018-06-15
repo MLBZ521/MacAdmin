@@ -3,10 +3,15 @@
 ###################################################################################################
 # Script Name:  jamf_verifyVPPApps.sh
 # By:  Zack Thompson / Created:  6/13/2018
-# Version:  0.3 / Updated:  6/14/2018 / By:  ZT
+# Version:  0.4 / Updated:  6/15/2018 / By:  ZT
 #
-# Description:  Gets details on all of the VPP Apps from the JSS and checks iTunes to see if they are 32bit and exports results to a csv file
+# Description:  Gets details on all of the Mobile Device VPP Apps from the JSS and checks the iTunes API to see if they are available, update to date, and 32bit only, and exports results to a csv file.
 #
+# Inspired by:
+# 		https://github.com/dnikles/Check32bitOnlyApps/blob/master/check32bit.sh
+# 		https://github.com/bumbletech/JSS_API_scripts/blob/master/JSS_API_check_stale_and_32bit_apps.sh
+# 		https://www.jamf.com/jamf-nation/discussions/28035/identifying-32-bit-apps-for-ios-before-vpp-purchase
+#	
 ###################################################################################################
 
 echo "*****  verifyVPPApps process:  START  *****"
@@ -80,10 +85,10 @@ getAppInfo() {
 		checkStatusCode $curlCode $appID
 
 		# Regex down to the info we want.
-		appInfo="$(echo "${curlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/bundle_id | /mobile_device_application/general/itunes_store_url' 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C /usr/bin/sed -e 's/\'$'\t[^\t]*$//')"
+		appInfo="$(echo "${curlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/bundle_id | /mobile_device_application/general/version | /mobile_device_application/general/itunes_store_url' 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C /usr/bin/sed -e 's/\'$'\t[^\t]*$//')"
 
 		# Read in the App Info and assign to variables
-		while IFS=$'\t' read appID appName bundle_id itunes_store_url appSite; do
+		while IFS=$'\t' read appID appName bundle_id jssVersion itunes_store_url appSite; do
 
 			# Get the Adam ID which is needed for the iTunes API
 			appAdamID=$(echo "${itunes_store_url}" | /usr/bin/sed -e 's/.*\/id\(.*\)?.*/\1/')
@@ -112,8 +117,19 @@ else:
 			# Extract if the App is 32bit Only			
 			bitness32=$(echo "${iTunesCurlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/python -mjson.tool | /usr/bin/awk -F "is32bitOnly\": " '{print $2}' | /usr/bin/xargs | /usr/bin/sed 's/,//')
 
+			# Extract the Version from iTunes
+			iTunesVersion=$(echo "${iTunesCurlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/python -mjson.tool | /usr/bin/awk -F "\"display\":" '{print $2}' | /usr/bin/xargs | /usr/bin/sed 's/,//')
+
+			# echo "iTunes:  ${iTunesVersion} and JSS:  ${jssVersion}"
+			# Check if the jssVersion is Out of Date
+			if [[ -n "${iTunesVersion}" && "${iTunesVersion}" == "${jssVersion}" ]]; then
+				outOfDate="Yes"
+			else
+				outOfDate="No"
+			fi
+
 			# Output to File
-			echo -e "${appInfo}\t${appExists}\t${bitness32}" >> "${outFile}"
+			echo -e "${appInfo}\t${appExists}\t${outOfDate}\t${iTunesVersion}\t${bitness32}" >> "${outFile}"
 
 			# Clear variable for next loop item
 			unset appInfo
@@ -140,7 +156,7 @@ fileExists() {
 		/usr/bin/touch "${1}"
 
 		echo "Adding header to output file..."
-		header="App ID\tApp Name\tBundle ID\tiTunes Store URL\tJamf Site\tAvailable\t32Bit"
+		header="App ID\tApp Name\tBundle ID\tJSS Version\tiTunes Store URL\tJamf Site\tAvailable\tOut Of Date\tiTunes Version\t32Bit"
 		echo -e $header >> "${outFile}"
 	elif  [[ ! -e "${1}" && $2 == "trip" ]]; then
 		informBy "ERROR:  Unable to find the input file!"
