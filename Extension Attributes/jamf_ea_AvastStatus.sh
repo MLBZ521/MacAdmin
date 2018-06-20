@@ -3,21 +3,21 @@
 ###################################################################################################
 # Script Name:  jamf_ea_AvastStatus.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  1.1 / Updated:  2/9/2018 / By:  ZT
+# Version:  1.2 / Updated:  6/19/2018 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
 #
 ###################################################################################################
 
-/bin/echo "Checking the Avast configuration..."
+echo "Checking the Avast configuration..."
 
 ##################################################
 # Define Array Variables for each item that we want to check for
 # The last item in each array is the "desired" state (0 = Disabled and 1 = Enabled)
 
-mailShield=("MailShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "mail" "ENABLED=" "1")
-webShield=("WebShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "web" "ENABLED=" "1")
-fileShield=("FileShield" "/Library/Application Support/Avast/config/com.avast.fileshield.conf" "ENABLED=" "1")
+mailShield=("MailShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "mailshield" "Enabled")
+webShield=("WebShield" "/Library/Application Support/Avast/config/com.avast.proxy.conf" "webshield" "Enabled")
+fileShield=("FileShield" "/Library/Application Support/Avast/config/com.avast.fileshield.conf" "fileshield" "Enabled")
 virusDefUpdates=("DefinitionUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "VPS_UPDATE_ENABLED=" "1")
 programUpdates=("ProgramUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "PROGRAM_UPDATE_ENABLED=" "1")
 betaUpdates=("BetaUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "BETA_CHANNEL=" "0")
@@ -39,12 +39,24 @@ returnResult=""
 
 searchType1() {
 	if [[ -e "${2}" ]]; then
-		result=$(/bin/cat "${2}" | /usr/bin/awk '/'"${3}"'/ {getline; print}' | /usr/bin/awk -F "${4}" '{print $2}')
 
-		if [[ $result == "${5}" ]]; then
-			/bin/echo "Desired State:  ${1}"
+		result=$(/bin/cat "${2}" | /usr/bin/python -c "import sys, json
+
+objects = json.load(sys.stdin)
+if \"${3}\" in objects:
+    shield_info = objects[\"${3}\"]
+
+    if 'enabled' in shield_info:
+        print('Disabled')
+    else:
+        print('Enabled')
+else:
+    print('Enabled')")
+
+		if [[ $result == "${4}" ]]; then
+			echo "Desired State:  ${1}"
 		else
-			/bin/echo "Misconfigured:  ${1}"
+			echo "Misconfigured:  ${1}"
 			disabled+="${1},"
 		fi
 	fi
@@ -55,13 +67,13 @@ searchType2() {
 		result=$(/bin/cat "${2}" | /usr/bin/awk -F "${3}" '{print $2}' | /usr/bin/xargs)
 
 		if [[ $result == "${4}" ]]; then
-			/bin/echo "Desired State:  ${1}"
+			echo "Desired State:  ${1}"
 
 		elif [[ "${1}" == "BetaUpdates" ]]; then
-			/bin/echo "Misconfigured State:  ${1}"
+			echo "Misconfigured State:  ${1}"
 
 		elif [[ "${1}" == "License Type" ]]; then
-			/bin/echo "Misconfigured:  ${1}"
+			echo "Misconfigured:  ${1}"
 			case $result in
 				0 )
 					license+="License Type:  Standard (Premium),";;
@@ -79,7 +91,7 @@ searchType2() {
 
 		elif [[ "${1}" == "Customer" ]]; then
 			# Unexpected Customer
-			/bin/echo "Misconfigured:  ${1}"
+			echo "Misconfigured:  ${1}"
 			license+="Unexpected Customer: ${result},"
 
 		elif [[ "${1}" == "Virus Definitions" ]]; then
@@ -87,12 +99,12 @@ searchType2() {
 			dateCheck=$(( $(date "+%y%m%d") - ${result%??} ))
 
 			if [[ $dateCheck -gt $virusDefVariance ]]; then
-				/bin/echo "Misconfigured:  ${1}"
+				echo "Misconfigured:  ${1}"
 				virusDef+="Virus Definitions are out of date"
 			fi
 
 		else
-			/bin/echo "Misconfigured:  ${1}"
+			echo "Misconfigured:  ${1}"
 			disabled+="${1},"
 		fi
 	fi
@@ -103,7 +115,7 @@ searchType2() {
 
 searchType1 "${mailShield[@]}"
 searchType1 "${webShield[@]}"
-searchType2 "${fileShield[@]}"
+searchType1 "${fileShield[@]}"
 searchType2 "${virusDefUpdates[@]}"
 searchType2 "${programUpdates[@]}"
 searchType2 "${betaUpdates[@]}"
@@ -130,9 +142,9 @@ fi
 # Return any errors or the all good.
 
 if [[ -n "${returnResult}" ]]; then
-	/bin/echo "<result>${returnResult%?}</result>"
+	echo "<result>${returnResult%?}</result>"
 else
-	/bin/echo "<result>Desired State</result>"
+	echo "<result>Desired State</result>"
 fi
 
 exit 0
