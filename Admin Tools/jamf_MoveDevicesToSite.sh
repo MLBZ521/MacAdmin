@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  0.9 / Updated:  5/8/2018 / By:  ZT
+# Version:  0.10 / Updated:  6/20/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -86,14 +86,14 @@ actions() {
 
 getSites() {
 	# Create a token based on user provided credentials
-	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | python -c "import sys,json; print json.load(sys.stdin)['token']")
+	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | /usr/bin/python -c "import sys,json; print json.load(sys.stdin)['token']")
 
 	echo "Getting a list of Sites..."
 	# GET All User Details
 	allDetails=$(/usr/bin/curl --silent --show-error --fail --output - --header "Content-Type: application/json" --header "Authorization: jamf-token ${authToken}" --request GET ${apiGetDetails})
 
 	# Get a list of all the Site IDs that the Site Admin has Enroll Permissions too
-	siteIDs=$(/usr/bin/printf "${allDetails}" | python -c '
+	siteIDs=$(echo "${allDetails}" | /usr/bin/python -c '
 import sys, json
 
 objects = json.load(sys.stdin)
@@ -105,7 +105,7 @@ for key in objects["accountGroups"]:
 
 # For each Site ID, get the Site Name
 	for siteID in $siteIDs; do
-		siteName=$(/usr/bin/printf "${allDetails}" | python -c "
+		siteName=$(echo "${allDetails}" | /usr/bin/python -c "
 import sys, json
 
 objects = json.load(sys.stdin)
@@ -143,7 +143,7 @@ getComputers() {
 		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /computer/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
 		# Verify device is from a site that the Site Admin has permissions too.
-		if [[ $(echo ${siteNames[@]} | grep -o "${currentSite}") != "${currentSite}" ]]; then
+		if [[ $(echo ${siteNames[@]} | /usr/bin/grep -o "${currentSite}") != "${currentSite}" ]]; then
 			checkStatusCode "SiteError" $deviceID
 			continue
 		fi
@@ -160,7 +160,7 @@ getComputers() {
 			checkStatusCode $curlCode $deviceID
 		fi
 
-	done < <(printf '%s\n' "${deviceIDs[@]}")
+	done < <(/usr/bin/printf '%s\n' "${deviceIDs[@]}")
 }
 
 getMobileDevice() {
@@ -185,7 +185,7 @@ getMobileDevice() {
 		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobileDevice/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
 		# Verify device is from a site that the Site Admin has permissions too.
-		if [[ $(echo ${siteNames[@]} | grep -o "${currentSite}") != "${currentSite}" ]]; then
+		if [[ $(echo ${siteNames[@]} | /usr/bin/grep -o "${currentSite}") != "${currentSite}" ]]; then
 			checkStatusCode "SiteError" $deviceID
 			continue
 		fi
@@ -202,7 +202,7 @@ getMobileDevice() {
 			checkStatusCode $curlCode $deviceID
 		fi
 
-	done < <(printf '%s\n' "${deviceIDs[@]}")
+	done < <(/usr/bin/printf '%s\n' "${deviceIDs[@]}")
 }
 
 checkStatusCode() {
