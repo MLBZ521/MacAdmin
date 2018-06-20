@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.5.2 / Updated:  6/18/2018 / By:  ZT
+# Version:  1.6 / Updated:  6/20/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -88,7 +88,7 @@ createPrinter() {
 	echo " "
 
 		# POST changes to the JSS.
-		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data @- <<printerConfig
+		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data-binary @- <<printerConfig
 <printer>
 <name>${printerSettings[0]}</name>
 <category>Printers</category>
