@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_QGIS.sh
 # By:  Zack Thompson / Created:  7/26/2017
-# Version:  1.5 / Updated:  5/9/2018 / By:  ZT
+# Version:  1.5.1 / Updated:  6/22/2018 / By:  ZT
 #
 # Description:  This script installs all the packages that are contained in the QGIS dmg.
 #
@@ -111,6 +111,7 @@ echo "All packages have been installed!"
 
 # Disable version check (this is done because the version compared is not always the latest available for macOS).
 if [[ "${QGISdmg}" == "QGIS-3"* ]]; then
+	echo "Disabling version check on launch is currently removed from this process for QGIS v3."
 	# Disabled this because the .ini file does not exist until the application is launched.
 	# echo "Disabling version check on launch..."
 	# /usr/bin/sed -Ei '' 's/checkVersion=true/checkVersion=false/g' "/${currentUser}/Library/Application Support/QGIS/QGIS3/profiles/default/qgis.org/QGIS3.ini"
