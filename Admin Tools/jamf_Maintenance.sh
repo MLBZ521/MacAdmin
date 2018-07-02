@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  jamf_Maintenance.sh
 # By:  Zack Thompson / Created:  9/15/2017
-# Version:  1.3 / Updated:  6/26/2018 / By:  ZT
+# Version:  1.3.1 / Updated:  7/2/2018 / By:  ZT
 #
-# Description:  This script is used for cleaning up packages in a Jamf Pro Server.
+# Description:  This script is used for cleaning up objects in a Jamf Pro Server.
 #
 ###################################################################################################
 
@@ -19,9 +19,10 @@
 	jamfPS="https://jss.company.com:8443"
 	apiPackages="${jamfPS}/JSSResource/packages/id"
 	apiPolicies="${jamfPS}/JSSResource/policies/id"
+	apiComputers="${jamfPS}/JSSResource/computers/id"
 	apiComputerGroups="${jamfPS}/JSSResource/computergroups/id"
-	jamfAPIUser=""
-	jamfAPIPassword=""
+	jamfAPIUser="APIUsername"
+	jamfAPIPassword="APIPassword"
 
 ##################################################
 # Setup Functions
@@ -46,6 +47,8 @@ Types:
 	--packages | -pkgs
 
 	--policies | -p
+
+	--computers | c
 
 	--computergroups | -g
 
@@ -105,6 +108,15 @@ deleteFunction() {
 			if [[ -e "${switch3}" ]]; then
 				# Function deleteObjects
 				deleteObjects "${switch3}" "${apiPolicies}"
+			else
+				# Function getHelp
+				getHelp
+			fi
+		;;
+		--computers | -c )
+			if [[ -e "${switch3}" ]]; then
+				# Function deleteObjects
+				deleteObjects "${switch3}" "${apiComputers}"
 			else
 				# Function getHelp
 				getHelp
