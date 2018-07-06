@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.0 / Updated:  6/20/2018 / By:  ZT
+# Version:  1.0.1 / Updated:  7/6/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -74,7 +74,7 @@ actions() {
 		"SelectSite" )
 			# Set the osascript parameters and prompt User for Printer Selection.
 			promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$siteNames\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
-			selectedSiteName=$(osascript -e "$promptForChoice")
+			selectedSiteName=$(/usr/bin/osascript -e "$promptForChoice")
 
 			# Function canceled
 			canceled $selectedSiteName "No Site selection was made."
@@ -299,7 +299,7 @@ until [[ "${moveAnother}" == "button returned:No" ]]; do
 	actions "SelectSite"
 
 	# Provide File or Input Device IDs?
-	methodType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "How do you want to provide the Device ID(s)?" buttons {"Input", "File"} default button {"Input"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
+	methodType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "How do you want to provide the Jamf Pro '"${deviceType}"' ID(s)?" buttons {"Input", "File"} default button {"Input"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
 	echo "Method Type selected:  ${methodType}"
 
 	# Function actions
