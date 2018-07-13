@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  build_macOSFirmware.sh
 # By:  Zack Thompson / Created: 6/4/2018
-# Version:  1.0 / Updated:  6/5/2018 / By:  ZT
+# Version:  1.0.1 / Updated:  7/12/2018 / By:  ZT
 #
 # Description:  This script extracts the firmware from a macOS Install <Version>.app, builds a pkg with it and also outputs a list of firmware updates.
 #
@@ -16,10 +16,10 @@ echo "*****  build_macOSFirmware process:  START  *****"
 ##################################################
 # Define Variables
 
-postinstall="#!/bin/sh
+postinstall='#!/bin/sh
 
-/usr/libexec/FirmwareUpdateLauncher -p \"$PWD/Tools\"
-/usr/libexec/efiupdater -p \"$PWD/Tools/EFIPayloads\""
+/usr/libexec/FirmwareUpdateLauncher -p "$PWD/Tools"
+/usr/libexec/efiupdater -p "$PWD/Tools/EFIPayloads"'
 
 ##################################################
 # Bits Staged
