@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.6 / Updated:  6/20/2018 / By:  ZT
+# Version:  1.7 / Updated:  7/17/2018 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -41,7 +41,8 @@ createPrinter() {
 
 	# Set the osascript parameters and prompt User for Printer Selection.
 	promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$printerNames\" with prompt \"Choose printer to create in the JSS:\" OK button name \"Select\" cancel button name \"Cancel\""
-	selectedPrinterName=$(osascript -e "$promptForChoice")
+	selectedPrinterName=$(/usr/bin/osascript -e "$promptForChoice")
+	echo "Selected Printer:  ${selectedPrinterName}"
 
 	# Handle if the user pushes the cancel button.
 	if [[ $selectedPrinterName == "false" ]]; then
@@ -51,7 +52,8 @@ createPrinter() {
 	fi
 
 	# Get the Printer ID of the selected printer.
-	printerID=$(/usr/bin/printf "${selectedPrinterName}" | cut -c 1)
+	printerID=$(/usr/bin/printf "${selectedPrinterName}" | /usr/bin/awk -F ")" '{print $1}')
+	echo "Selected Printer ID:  ${printerID}"
 
 	# Get only the selected printers info.
 	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
@@ -64,18 +66,6 @@ createPrinter() {
 		printerSettings+=("${printerSetting}")
 	done < <(/usr/bin/printf '%s\n' "${selectedPrinterInfo}")
 
-	# Set the expected PPD File.
-	printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerSettings[1]}.ppd")
-
-	# Verify the PPD file exists and get it's contents
-	if [[ -e "${printerPPDFile}" ]]; then
-		printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
-	else
-		informBy "Error:  Unable to locate the PPD file -- unable to create the printer."
-		echo "Error:  Unable to locate the PPD file -- unable to create the printer."
-		return
-	fi
-
 	echo " "
 	echo "*****  Selected Printer Configuration  *****"
 	echo " "
@@ -84,8 +74,21 @@ createPrinter() {
 	echo "Location:  ${printerSettings[2]}"
 	echo "IP Address:  ${printerSettings[3]}"
 	echo "Driver Model:  ${printerSettings[4]}"
-	echo "PPD File:  ${printerPPDFile}"
-	echo " "
+
+	# Set the expected PPD File.
+	printerPPDFile=$(/usr/bin/printf "/private/etc/cups/ppd/${printerSettings[1]}.ppd")
+
+	# Verify the PPD file exists and get it's contents
+	if [[ -e "${printerPPDFile}" ]]; then
+		printerPPDContents=$(/bin/cat "${printerPPDFile}" | /usr/bin/sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' )
+		echo "PPD File:  ${printerPPDFile}"
+		echo " "
+	else
+		echo " "
+		informBy "Error:  Unable to locate the PPD file -- unable to create the printer."
+		echo "Error:  Unable to locate the PPD file -- unable to create the printer."
+		return
+	fi
 
 		# POST changes to the JSS.
 		curlReturn="$(/usr/bin/curl "${curlAPI[@]}" POST ${apiPrinters}/0 --data-binary @- <<printerConfig
@@ -101,7 +104,8 @@ createPrinter() {
 <ppd_contents>${printerPPDContents}</ppd_contents>
 <ppd_path>/Library/Printers/PPDs/Contents/Resources/${printerSettings[1]}.ppd</ppd_path>
 </printer>
-printerConfig)"
+printerConfig
+)"
 
 		# Get the Exit Code
 		exitCode=$?
