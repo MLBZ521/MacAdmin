@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.3 / Updated:  6/4/2018 / By:  ZT
+# Version:  1.4 / Updated:  7/19/2018 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -29,7 +29,7 @@
 ##################################################
 # Setup Functions
 
-function modelCheck {
+modelCheck() {
 	if [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
 		/bin/echo "<result>Mojave</result>"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
@@ -61,32 +61,39 @@ function modelCheck {
 
 if [[ $systemRAM -ge $requiredRAM && $systemFreeSpace -ge $requiredFreeSpace ]]; then
 
-	# First parameter is for High Sierra, the second parameter is for El Capitan, to check compatible HW models.
+	# First parameter is for Mojave, the second parameter is for High Sierra, and the third for El Capitan, to check compatible HW models.
 	case $modelType in
 		"iMac" )
 			# Function modelCheck
-				modelCheck 13 10 7
-			;;
+			modelCheck 13 10 7
+		;;
 		"MacBook" )
 			# Function modelCheck
-				modelCheck 8 6 5
-			;;
+			modelCheck 8 6 5
+		;;
 		"MacBookPro" )
 			# Function modelCheck
-				modelCheck 9 7 3
-			;;
+			modelCheck 9 7 3
+		;;
 		"MacBookAir" )
 			# Function modelCheck
-				modelCheck 5 3 2
-			;;
+			modelCheck 5 3 2
+		;;
 		"Macmini" )
 			# Function modelCheck
-				modelCheck 6 4 3
-			;;
+			modelCheck 6 4 3
+		;;
 		"MacPro" )
 			# Function modelCheck
-				modelCheck 5 5 3
-			;;
+			modelCheck 5 5 3
+		;;
+		"iMacPro" )
+			# Function modelCheck
+			modelCheck 1 1
+		;;
+		* )
+			/bin/echo "<result>Unknown Model</result>"
+		;;
 	esac
 
 else
