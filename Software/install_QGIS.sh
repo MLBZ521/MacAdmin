@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_QGIS.sh
 # By:  Zack Thompson / Created:  7/26/2017
-# Version:  1.5.1 / Updated:  6/22/2018 / By:  ZT
+# Version:  1.6 / Updated:  8/20/2018 / By:  ZT
 #
 # Description:  This script installs all the packages that are contained in the QGIS dmg.
 #
@@ -49,19 +49,13 @@ if [[ $3 != "/" ]]; then
 	exit 1
 fi
 
+# Check which version of QGIS we're installing, and if QGIS 3, check if Python3.6 is installed.
 if [[ "${QGISdmg}" == "QGIS-3"* ]]; then
 	# Check if Python3 is installed
-	if [[ -x /usr/local/bin/python3 ]]; then
-		getVersion=$(/usr/local/bin/python3 --version | /usr/bin/awk -F "." '{print $2}')
-		if [[ $(/usr/bin/bc <<< "${getVersion} >= 6") -eq 1 ]]; then
-			echo "Python 3.6+ is installed!"
-		else
-			echo "ERROR:  Python 3.6+ is not installed!"
-			echo "*****  Install QGIS Process:  FAILED  *****"
-			exit 1
-		fi
+	if [[ ( -x /usr/local/bin/python3.6 ) || ( $(/usr/bin/bc <<< "$(/usr/local/bin/python3 --version | /usr/bin/awk -F "." '{print $2}') == 6") -eq 1 ) ]]; then
+		echo "Python 3.6 is installed!"
 	else
-		echo "ERROR:  Python 3.6+ is not installed!"
+		echo "ERROR:  Python 3.6 is required, but is not installed!"
 		echo "*****  Install QGIS Process:  FAILED  *****"
 		exit 1
 	fi
