@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  uninstall_Acrobat.sh
 # By:  Zack Thompson / Created:  6/30/2017
-# Version:  1.0 / Updated:  7/6/2018 / By:  ZT
+# Version:  1.1 / Updated:  9/7/2018 / By:  ZT
 #
 # Description:  This script uninstalls Acrobat DC versions.
 #
@@ -14,12 +14,14 @@ echo "*****  Uninstall Adobe Acrobat process:  START  *****"
 ##################################################
 # Define Variables
 exit="0"
+args="$@"
+echo "Provided arguments:  ${args}"
 
 # Turn on case-insensitive pattern matching
 shopt -s nocasematch
 
 # Determine what was requested to uninstall
-for arg in "$@"; do
+for arg in $args; do
 	case $arg in
 		"2015" | "v12" )
 			toRemove+=("12")
@@ -41,7 +43,7 @@ done
 # Turn off case-insensitive pattern matching
 shopt -u nocasematch
 
-echo "Provided versions to remove:  ${toRemove[@]}"
+echo "${#toRemove[@]} versions to remove:  ${toRemove[@]}"
 
 ##################################################
 # Bits staged...
