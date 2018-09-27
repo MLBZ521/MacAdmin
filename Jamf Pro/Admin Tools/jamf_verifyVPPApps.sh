@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_verifyVPPApps.sh
 # By:  Zack Thompson / Created:  6/13/2018
-# Version:  0.4 / Updated:  6/15/2018 / By:  ZT
+# Version:  0.5 / Updated:  9/24/2018 / By:  ZT
 #
 # Description:  Gets details on all of the Mobile Device VPP Apps from the JSS and checks the iTunes API to see if they are available, update to date, and 32bit only, and exports results to a csv file.
 #
@@ -28,7 +28,7 @@ echo "*****  verifyVPPApps process:  START  *****"
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
-	curlJamfAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
+	curlJamfAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --request)
 
 	iTunesAPI="https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?version=1&p=mdm-lockup&caller=MDM&platform=itunes&cc=us&l=en&id="
 	curliTunesAPI=(--silent --show-error --fail --write-out "statusCode:%{http_code}" --output - --header "Accept: application/JSON" --request)
@@ -53,10 +53,10 @@ usage:  jamf_verifyVPPApps.sh [-run | -r] [/path/to/file.csv] [-help]
 Info:	Gets details on all of the VPP Apps from the JSS and checks iTunes to see if they are 32bit and exports results to a csv file.
 
 Actions:
-	-run | -r	Run the report and output to a csv file.
+	--run | -r	Run the report and output to a csv file.
 			Example:  jamf_verifyVPPApps.sh -run output.csv
 
-	-help		Displays this help section.
+	--help		Displays this help section.
 			Example:  jamf_verifyVPPApps.sh -help
 "
 }
@@ -65,10 +65,11 @@ getAppInfo() {
 	echo "Requesting list of all App IDs..."
 	# GET list of App IDs from the JSS.
 	curlReturn="$(/usr/bin/curl "${curlJamfAPI[@]}" GET $mobileApps)"
-	
+
 	# Check if the API call was successful or not.
 	curlCode=$(echo "${curlReturn}" | /usr/bin/awk -F statusCode: '{print $2}' | /usr/bin/xargs )
-	
+	checkStatusCode $curlCode $appID
+
 	# Regex down to just the ID numbers
 	appIDs=$(echo "${curlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
@@ -123,9 +124,9 @@ else:
 			# echo "iTunes:  ${iTunesVersion} and JSS:  ${jssVersion}"
 			# Check if the jssVersion is Out of Date
 			if [[ -n "${iTunesVersion}" && "${iTunesVersion}" == "${jssVersion}" ]]; then
-				outOfDate="Yes"
-			else
 				outOfDate="No"
+			else
+				outOfDate="Yes"
 			fi
 
 			# Output to File
@@ -216,7 +217,7 @@ case $action in
 				getAppInfo
 		fi
 	;;
-	-help | -h | * )
+	--help | -h | * )
 		# Function getHelp
 		getHelp
 	;;
