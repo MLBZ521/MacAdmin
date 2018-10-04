@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.0.1 / Updated:  7/6/2018 / By:  ZT
+# Version:  1.0.2 / Updated:  10/4/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -34,7 +34,7 @@ siteAdminUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (di
 siteAdminPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
 
 # Add -k (--insecure) to disable SSL verification
-curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Content-Type: application/xml" --request)
+curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --request)
 
 ##################################################
 # Setup Functions
@@ -90,7 +90,7 @@ getSites() {
 
 	echo "Getting a list of Sites..."
 	# GET All User Details
-	allDetails=$(/usr/bin/curl --silent --show-error --fail --output - --header "Content-Type: application/json" --header "Authorization: jamf-token ${authToken}" --request GET ${apiGetDetails})
+	allDetails=$(/usr/bin/curl --silent --show-error --fail --output - --header "Accept: application/json" --header "Authorization: jamf-token ${authToken}" --request GET ${apiGetDetails})
 
 	# Get a list of all the Site IDs that the Site Admin has Enroll Permissions too
 	siteIDs=$(echo "${allDetails}" | /usr/bin/python -c '
