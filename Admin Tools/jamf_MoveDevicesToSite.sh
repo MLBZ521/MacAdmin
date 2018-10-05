@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.0.3 / Updated:  10/5/2018 / By:  ZT
+# Version:  1.0.4 / Updated:  10/5/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -35,6 +35,9 @@ siteAdminPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of
 
 # Add -k (--insecure) to disable SSL verification
 curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --header "Content-Type: application/xml" --request)
+
+# Exit Value
+exitCode="0"
 
 ##################################################
 # Setup Functions
@@ -141,16 +144,17 @@ getComputers() {
 
 		# Regex to get the Site
 		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /computer/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+		echo "${deviceType} ID ${deviceID} is in the ${currentSite} Site."
 
 		# Verify device is from a site that the Site Admin has permissions too.
 		if [[ $(printf '%s\n' ${siteNames[@]} | /usr/bin/grep -Eo "^(${currentSite})$") != "${currentSite}" ]]; then
-			checkStatusCode "SiteError" $deviceID
+			checkStatusCode "SiteError" $deviceID $currentSite
 			continue
 		fi
 
 		# If the Current Site isn't the new Site, move it.
 		if [[ "${currentSite}" != "${selectedSiteName}" ]]; then
-			echo "Reassigning device:  ${deviceID}  to:  ${selectedSiteName}"
+			echo "Reassigning device ${deviceID} to ${selectedSiteName}"
 
 			# PUT changes to the JSS.
 			curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${computersbyID}/${deviceID} --data "<computer><general><site><name>${selectedSiteName}</name></site></general></computer>")"
@@ -183,6 +187,7 @@ getMobileDevice() {
 
 		# Regex to get the Site
 		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobileDevice/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+		echo "${deviceType} ID ${deviceID} is in the ${currentSite} Site."
 
 		# Verify device is from a site that the Site Admin has permissions too.
 		if [[ $(echo ${siteNames[@]} | /usr/bin/grep -o "${currentSite}") != "${currentSite}" ]]; then
@@ -192,7 +197,7 @@ getMobileDevice() {
 
 		# If the Current Site isn't the new Site, move it.
 		if [[ "${currentSite}" != "${selectedSiteName}" ]]; then
-			echo "Reassigning device:  ${deviceID}  to:  ${selectedSiteName}"
+			echo "Reassigning device ${deviceID} to ${selectedSiteName}"
 
 			# PUT changes to the JSS.
 			curlReturn="$(/usr/bin/curl "${curlAPI[@]}" PUT ${mobileDevicesByID}/${deviceID} --data "<mobileDevice><general><site><name>${selectedSiteName}</name></site></general></mobileDevice>")"
@@ -240,8 +245,9 @@ checkStatusCode() {
 			echo "${deviceType} ID:  ${2}  Error 403 -> Internal server error. Retry the request or contact Jamf support if the error is persistent."
 		;;
 		"SiteError" )
-			inform "${deviceType} ID:  ${2} -> Error:  This device is not in a site you have permissions too."
-			echo "${siteAdminUser} tried to move ${deviceType} ID:  ${2} that was in a site they did not have permissions too."
+			inform "${deviceType} ID:  ${2} -> Error:  This device is not in a site you have enroll permissions too."
+			echo "ERROR:  ${siteAdminUser} tried to move ${deviceType} ID ${2} from ${3}."
+			exitCode="3"
 		;;
 	esac
 }
@@ -252,7 +258,7 @@ canceled() {
 		inform "Script canceled!"
 		echo "${2}"
 		echo "*****  MoveDevicesToSite process:  COMPLETE  *****"
-		exit 0
+		exit $exitCode
 	fi
 }
 
@@ -315,4 +321,4 @@ done
 
 inform "Script successfully completed!"
 echo "*****  MoveDevicesToSite process:  COMPLETE  *****"
-exit 0
+exit $exitCode
