@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.0.2 / Updated:  10/4/2018 / By:  ZT
+# Version:  1.0.3 / Updated:  10/5/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -34,7 +34,7 @@ siteAdminUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (di
 siteAdminPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
 
 # Add -k (--insecure) to disable SSL verification
-curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --request)
+curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --header "Content-Type: application/xml" --request)
 
 ##################################################
 # Setup Functions
@@ -143,7 +143,7 @@ getComputers() {
 		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /computer/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
 		# Verify device is from a site that the Site Admin has permissions too.
-		if [[ $(echo ${siteNames[@]} | /usr/bin/grep -o "${currentSite}") != "${currentSite}" ]]; then
+		if [[ $(printf '%s\n' ${siteNames[@]} | /usr/bin/grep -Eo "^(${currentSite})$") != "${currentSite}" ]]; then
 			checkStatusCode "SiteError" $deviceID
 			continue
 		fi
