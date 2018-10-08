@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_verifyVPPApps.sh
 # By:  Zack Thompson / Created:  6/13/2018
-# Version:  0.5 / Updated:  9/24/2018 / By:  ZT
+# Version:  0.6 / Updated:  10/8/2018 / By:  ZT
 #
 # Description:  Gets details on all of the Mobile Device VPP Apps from the JSS and checks the iTunes API to see if they are available, update to date, and 32bit only, and exports results to a csv file.
 #
@@ -70,6 +70,13 @@ getAppInfo() {
 	curlCode=$(echo "${curlReturn}" | /usr/bin/awk -F statusCode: '{print $2}' | /usr/bin/xargs )
 	checkStatusCode $curlCode $appID
 
+	numberOfApps=$(echo "${curlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobile_device_applications/size 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	echo "Total Number of Apps:  $numberOfApps"
+
+	# Set the ulimit as a large number of apps will start causing steps to error out because of "cannot make pipe for command substitution: Too many open files"
+	ulimitSize=$((numberOfApps + 256))
+	ulimit -n $ulimitSize
+	
 	# Regex down to just the ID numbers
 	appIDs=$(echo "${curlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
@@ -112,8 +119,6 @@ if not objects.get('results'):
     print('No')
 else:
     print('Yes')")
-
-			# echo "App Exists:  ${appExists}"
 
 			# Extract if the App is 32bit Only			
 			bitness32=$(echo "${iTunesCurlReturn}" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/python -mjson.tool | /usr/bin/awk -F "is32bitOnly\": " '{print $2}' | /usr/bin/xargs | /usr/bin/sed 's/,//')
