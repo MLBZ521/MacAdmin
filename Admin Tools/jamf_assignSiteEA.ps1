@@ -1,8 +1,8 @@
-﻿<#
+<#
 
 Script Name:  jamf_assignSiteEA.ps1
 By:  Zack Thompson / Created:  2/21/2018
-Version:  1.6 / Updated:  7/3/2018 / By:  ZT
+Version:  1.6.1 / Updated:  10/10/2018 / By:  ZT
 
 Description:  This script will basically update an EA to the value of the computers Site membership.
 
@@ -62,6 +62,9 @@ $getMobileDevice="${jamfPS}/JSSResource/mobiledevices/id"
 $getComputerEA="${jamfPS}/JSSResource/computerextensionattributes/id/${id_EAComputer}"
 $getMobileEA="${jamfPS}/JSSResource/mobiledeviceextensionattributes/id/${id_EAMobileDevice}"
 
+# Set the session to use TLS 1.2
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
 # ============================================================
 # Functions
 # ============================================================
@@ -70,7 +73,7 @@ function updateEAList($deviceType, $urlEA) {
 
     # Get the List of Site choices from the EA.
     Add-LogContent -Content "Pulling the Site choices in the ${deviceType} EA..."
-    $objectOf_EAdeviceType = Invoke-RestMethod -Uri $urlEA -Method Get -Credential $APIcredentials
+    $objectOf_EAdeviceType = Invoke-RestMethod -Uri $urlEA -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
     # Build lists for comparisions.
 	$SiteList = $objectOf_Sites.sites.site.Name
@@ -91,7 +94,7 @@ function updateEAList($deviceType, $urlEA) {
         # Upload the XML back.
         Add-LogContent -Content "Updating the ${deviceType} EA List..."
         Try {
-            $Response = Invoke-RestMethod -Uri $urlEA -Method Put -Credential $APIcredentials -Body $objectOf_EAdeviceType -ErrorVariable RestError -ErrorAction SilentlyContinue
+            $Response = Invoke-RestMethod -Uri $urlEA -Method Put -Headers @{"accept"="application/xml"} -Credential $APIcredentials -Body $objectOf_EAdeviceType -ErrorVariable RestError -ErrorAction SilentlyContinue
         }
         Catch {
             $statusCode = $_.Exception.Response.StatusCode.value__
@@ -137,7 +140,7 @@ function updateEAList($deviceType, $urlEA) {
             # Upload the XML back to the JPS.
             Add-LogContent -Content "Updating the ${deviceType} EA List in the JPS..."
             Try {
-                $Response = Invoke-RestMethod -Uri $urlEA -Method Put -Credential $APIcredentials -Body $objectOf_EAdeviceType -ErrorVariable RestError -ErrorAction SilentlyContinue
+                $Response = Invoke-RestMethod -Uri $urlEA -Method Put -Headers @{"accept"="application/xml"} -Credential $APIcredentials -Body $objectOf_EAdeviceType -ErrorVariable RestError -ErrorAction SilentlyContinue
             }
             Catch {
                 $statusCode = $_.Exception.Response.StatusCode.value__
@@ -159,7 +162,7 @@ function updateDeviceRecord($deviceType, $urlALL, $urlID, $idEA) {
 
     # Get a list of all records.
     Add-LogContent -Content "Pulling all ${deviceType} records..."
-    $objectOf_Devices = Invoke-RestMethod -Uri $urlALL -Method Get -Credential $APIcredentials
+    $objectOf_Devices = Invoke-RestMethod -Uri $urlALL -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
     # Get the ID of each device.
     Add-LogContent -Content "Pulling data for each individual ${deviceType} record..."
@@ -167,17 +170,17 @@ function updateDeviceRecord($deviceType, $urlALL, $urlID, $idEA) {
 
     ForEach ( $ID in $deviceList ) {
         # Get Computer's General Section.
-        $objectOf_deviceGeneral = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/General" -Method Get -Credential $APIcredentials
+        $objectOf_deviceGeneral = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/General" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
         # Get Computer's Extention Attribute Section.
-        $objectOf_deviceEA = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/extension_attributes" -Method Get -Credential $APIcredentials
+        $objectOf_deviceEA = Invoke-RestMethod -Uri "${urlID}/${ID}/subset/extension_attributes" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
         
         If ( $objectOf_deviceGeneral.$deviceType.general.site.name -ne $($objectOf_deviceEA.$deviceType.extension_attributes.extension_attribute | Select-Object ID, Value | Where-Object { $_.id -eq $idEA }).value) {
             Add-LogContent -Content "Site is incorrect for ${deviceType} ID:  ${ID} -- updating..."
             [xml]$upload_deviceEA = "<?xml version='1.0' encoding='UTF-8'?><${deviceType}><extension_attributes><extension_attribute><id>${idEA}</id><value>$(${objectOf_deviceGeneral}.$deviceType.general.site.name)</value></extension_attribute></extension_attributes></${deviceType}>"
             
             Try {
-                $Response = Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Credential $APIcredentials -Body $upload_deviceEA -ErrorVariable RestError -ErrorAction SilentlyContinue
+                $Response = Invoke-RestMethod -Uri "${urlID}/${ID}" -Method Put -Headers @{"accept"="application/xml"} -Credential $APIcredentials -Body $upload_deviceEA -ErrorVariable RestError -ErrorAction SilentlyContinue
             }
             Catch {
                 $statusCode = $_.Exception.Response.StatusCode.value__
@@ -200,7 +203,7 @@ function updateDeviceRecord($deviceType, $urlALL, $urlID, $idEA) {
 # Verify credentials that were provided by doing an API call and checking the result to verify permissions.
 Add-LogContent -Content "Verifying API credentials..."
 Try {
-    $Response = Invoke-RestMethod -Uri "${jamfPS}/JSSResource/jssuser" -Method Get -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
+	$Response = Invoke-RestMethod -Uri "${jamfPS}/JSSResource/jssuser" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
 }
 Catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -220,7 +223,7 @@ $StopWatch = New-Object -TypeName System.Diagnostics.Stopwatch
 $StopWatch.Start()
 
 # Get a list of all Sites.
-$objectOf_Sites = Invoke-RestMethod -Uri $getSites -Method Get -Credential $APIcredentials
+$objectOf_Sites = Invoke-RestMethod -Uri $getSites -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
 # Call EA Update function for each device type
 updateEAList computer $getComputerEA
