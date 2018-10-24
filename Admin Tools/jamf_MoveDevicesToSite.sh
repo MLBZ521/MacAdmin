@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.1.0 / Updated:  10/5/2018 / By:  ZT
+# Version:  1.1.1 / Updated:  10/24/2018 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -15,7 +15,7 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 # Define Variables
 
 # JPS URL
-jamfPS="https://newjss.company.com:8443"
+jamfPS=$(/usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/rev | /usr/bin/cut -c 2- | /usr/bin/rev)
 apiGetToken="${jamfPS}/uapi/auth/tokens"
 apiGetDetails="${jamfPS}/uapi/auth"
 computersbyID="${jamfPS}/JSSResource/computers/id"
@@ -137,7 +137,7 @@ getDevices() {
 		curlCode=$(echo "$curlReturn" | /usr/bin/awk -F statusCode: '{print $2}')
 		checkStatusCode $curlCode $deviceID
 
-		# Verify the Device exists 
+		# Verify the Device exists
 		if [[ $curlCode != *"200"* ]]; then
 			continue
 		fi
@@ -176,6 +176,7 @@ checkStatusCode() {
 		201)
 			# Turn off success notifications
 			# inform "Device ID:  ${2} -> Request to create or update object successful"
+			echo "${deviceType} ID:  ${2}  -> Successfully moved to ${selectedSiteName}."
 		;;
 		400)
 			inform "${deviceType} ID:  ${2} -> Something went wrong!"
