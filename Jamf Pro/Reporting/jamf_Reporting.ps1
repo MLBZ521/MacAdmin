@@ -1,8 +1,8 @@
-﻿<#
+<#
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.1 / Updated:  11/6/2018 / By:  ZT
+Version:  0.2.0 / Updated:  11/7/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -23,6 +23,7 @@ $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredenti
 $jamfPS = "https://jps.company.com:8443"
 $getPolicies = "${jamfPS}/JSSResource/policies/createdBy/jss"
 $getPolicy = "${jamfPS}/JSSResource/policies/id"
+$getComputerGroup = "${jamfPS}/JSSResource/computergroups/id"
 
 $fileDate=$(Get-Date -Format FileDateTime)
 
@@ -35,14 +36,15 @@ $fileDate=$(Get-Date -Format FileDateTime)
 
 function policyDisabled($objectOf_Policy) {
     #Write-Host "policyDisabled  $(${objectOf_Policy}.policy.general.id)"
-    if ( $objectOf_Policy.policy.general.enabled -eq $False) {
+    if ( $objectOf_Policy.policy.general.enabled -eq $false) {
         Write-host "  -> Is Disabled"
         policyOutputObject $objectOf_Policy "policy_Disabled"
     }
 }
 
+
 function policyNoScope($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.scope.all_computers -eq $False -and 
+    if ( $objectOf_Policy.policy.scope.all_computers -eq $false -and 
     $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
     $objectOf_Policy.policy.scope.computer_groups.Length -eq 0 -and 
     $objectOf_Policy.policy.scope.buildings.Length -eq 0 -and
@@ -66,6 +68,7 @@ function policyNoScope($objectOf_Policy) {
     }
 }
 
+
 function policyNoConfig($objectOf_Policy) {
     if ( $objectOf_Policy.policy.package_configuration.packages.size -eq 0 -and 
     $objectOf_Policy.policy.scripts.size -eq 0 -and 
@@ -75,23 +78,23 @@ function policyNoConfig($objectOf_Policy) {
     $objectOf_Policy.policy.account_maintenance.directory_bindings.size -eq 0 -and 
     $objectOf_Policy.policy.account_maintenance.management_account.action -eq "doNotChange" -and 
     $objectOf_Policy.policy.account_maintenance.open_firmware_efi_password.of_mode -eq "none" -and 
-    $objectOf_Policy.policy.maintenance.recon -eq $False -and 
-    $objectOf_Policy.policy.maintenance.reset_name -eq $False -and 
-    $objectOf_Policy.policy.maintenance.install_all_cached_packages -eq $False -and 
-    $objectOf_Policy.policy.maintenance.heal -eq $False -and 
-    $objectOf_Policy.policy.maintenance.prebindings -eq $False -and 
-    $objectOf_Policy.policy.maintenance.permissions -eq $False -and 
-    $objectOf_Policy.policy.maintenance.byhost -eq $False -and 
-    $objectOf_Policy.policy.maintenance.system_cache -eq $False -and 
-    $objectOf_Policy.policy.maintenance.user_cache -eq $False -and 
-    $objectOf_Policy.policy.maintenance.verify -eq $False -and 
+    $objectOf_Policy.policy.maintenance.recon -eq $false -and 
+    $objectOf_Policy.policy.maintenance.reset_name -eq $false -and 
+    $objectOf_Policy.policy.maintenance.install_all_cached_packages -eq $false -and 
+    $objectOf_Policy.policy.maintenance.heal -eq $false -and 
+    $objectOf_Policy.policy.maintenance.prebindings -eq $false -and 
+    $objectOf_Policy.policy.maintenance.permissions -eq $false -and 
+    $objectOf_Policy.policy.maintenance.byhost -eq $false -and 
+    $objectOf_Policy.policy.maintenance.system_cache -eq $false -and 
+    $objectOf_Policy.policy.maintenance.user_cache -eq $false -and 
+    $objectOf_Policy.policy.maintenance.verify -eq $false -and 
     $objectOf_Policy.policy.files_processes.search_by_path.Length -eq 0 -and 
-    $objectOf_Policy.policy.files_processes.delete_file -eq $False -and 
+    $objectOf_Policy.policy.files_processes.delete_file -eq $false -and 
     $objectOf_Policy.policy.files_processes.locate_file.Length -eq 0 -and 
-    $objectOf_Policy.policy.files_processes.update_locate_database -eq $False -and 
-    $objectOf_Policy.policy.files_processes.spotlight_search.Length -eq $False -and 
+    $objectOf_Policy.policy.files_processes.update_locate_database -eq $false -and 
+    $objectOf_Policy.policy.files_processes.spotlight_search.Length -eq $false -and 
     $objectOf_Policy.policy.files_processes.search_for_process.Length -eq 0 -and 
-    $objectOf_Policy.policy.files_processes.kill_process -eq $False -and 
+    $objectOf_Policy.policy.files_processes.kill_process -eq $false -and 
     $objectOf_Policy.policy.files_processes.run_command.Length -eq 0 -and 
     $objectOf_Policy.policy.disk_encryption.action -eq "none" ) {
 
@@ -99,6 +102,7 @@ function policyNoConfig($objectOf_Policy) {
         policyOutputObject $objectOf_Policy "policy_NoConfiguration"
     }
 }
+
 
 function policyNoCategory($objectOf_Policy) {
     if ( $objectOf_Policy.policy.general.category.name -eq "No category assigned" ) {
@@ -109,7 +113,7 @@ function policyNoCategory($objectOf_Policy) {
 
 
 function policySSNoDescription($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $True -and $objectOf_Policy.policy.self_service.self_service_description -eq $null) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_description -eq $null) {
         Write-host "  -> Has No Description"
         policyOutputObject $objectOf_Policy "policy_SSNoDescription"
     }
@@ -117,11 +121,65 @@ function policySSNoDescription($objectOf_Policy) {
 
 
 function policySSNoIcon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $True -and $objectOf_Policy.policy.self_service.self_service_icon -eq $null) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon -eq $null) {
         Write-host "  -> Has No Icon"
         policyOutputObject $objectOf_Policy "policy_SSNoIcon"
     }
 }
+
+
+# Can't be done yet
+function policyScopeAllUsers($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon -eq $null) {
+        Write-host "  -> Has No Icon"
+        policyOutputObject $objectOf_Policy "policy_SSNoIcon"
+    }
+}
+
+
+function policySiteLevelRecon($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.site.name -eq "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+        Write-host "  -> Performs Inventory"
+        policyOutputObject $objectOf_Policy "policy_SiteLevelRecon"
+    }
+}
+
+
+function policyOngoing($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
+    $objectOf_Policy.policy.package_configuration.packages.size -ne 0 -and
+    ( $objectOf_Policy.policy.general.trigger_checkin -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_enrollment_complete -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_login -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_logout -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_network_state_changed -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_startup -eq $true ) -and  
+    ( $objectOf_Policy.policy.scope.all_computers -eq $true -or
+        $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) ) {
+
+        ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups ) {
+            # Get Computer Group Details
+            $objectOf_ComputerGroup = Invoke-RestMethod -Uri "${getComputerGrop}/$($computerGroup.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+            
+            if ( $objectOf_ComputerGroup.is_smart -eq $false ) {
+                $ongoingCheck = 1
+            }
+        }
+
+        if ( $ongoingCheck -eq 1 ) {
+            Write-host "  -> Ongoing Installing Software"
+            policyOutputObject $objectOf_Policy "policy_Ongoing"
+        }
+    }
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -137,7 +195,6 @@ function policyOutputObject($objectOf_Policy, $condition) {
 }
 
 
-
 function output($outputObject, $condition) {
     # Export each Policy object to a file.
     Export-Csv -InputObject $outputObject -Path "\\Mac\Home\Desktop\testing\Reporting\${condition}_${fileDate}.csv" -Append -NoTypeInformation
@@ -151,19 +208,11 @@ function funcToRun($objectOf_Policy) {
     policyNoScope $objectOf_Policy
     policyNoConfig $objectOf_Policy
     policyNoCategory $objectOf_Policy
+    policySSNoDescription $objectOf_Policy
+    policySSNoIcon $objectOf_Policy
+    policySiteLevelRecon $objectOf_Policy
+    policyOngoing $objectOf_Policy
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ============================================================
@@ -197,7 +246,7 @@ $objectOf_AllPolicies = Invoke-RestMethod -Uri "${getPolicies}" -Method Get -Hea
 
 #$objectOf_PoliciesDetails = @()
 $objectOf_AllPoliciesDetails = New-Object System.Collections.Arraylist
-$Position=1
+$Position = 1
 
 # Loop through each Policy
 ForEach ($policy in $objectOf_AllPolicies.policies.policy) {
@@ -209,7 +258,7 @@ ForEach ($policy in $objectOf_AllPolicies.policies.policy) {
     $Position++
 }
 
-$Position=1
+$Position = 1
 
 ForEach ($objectOf_Policy in $objectOf_AllPoliciesDetails) {
     Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${objectOf_Policy}.policy.general.id) / $(${objectOf_Policy}.policy.general.name)" -PercentComplete (($Position/$objectOf_AllPoliciesDetails.Count)*100)
