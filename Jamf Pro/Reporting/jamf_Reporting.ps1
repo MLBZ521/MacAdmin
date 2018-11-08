@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.2.0 / Updated:  11/7/2018 / By:  ZT
+Version:  0.3.0 / Updated:  11/8/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -23,9 +23,12 @@ $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredenti
 $jamfPS = "https://jps.company.com:8443"
 $getPolicies = "${jamfPS}/JSSResource/policies/createdBy/jss"
 $getPolicy = "${jamfPS}/JSSResource/policies/id"
+$getComputerGroups = "${jamfPS}/JSSResource/computergroups"
 $getComputerGroup = "${jamfPS}/JSSResource/computergroups/id"
+$getPrinters = "${jamfPS}/JSSResource/printers"
 
 $fileDate=$(Get-Date -Format FileDateTime)
+$Position = 1
 
 # Set the session to use TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -33,6 +36,49 @@ $fileDate=$(Get-Date -Format FileDateTime)
 # ============================================================
 # Functions
 # ============================================================
+
+
+function getEndpoint($Endpoint, $details, $urlAll, $urlDetails) {
+
+    # Get all records
+    Write-host "Querying Type:  ${Endpoint}"
+    $objectOf_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+
+    if ( $details -eq "FullDetails" ) {
+        getEndpointDetails $Endpoint $urlDetails
+    }
+    else {
+        return $objectOf_AllRecords
+    }
+}
+
+
+function getEndpointDetails ($Endpoint, $urlDetails) {
+
+    $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
+
+    # Loop through each endpoint
+    ForEach ( $Record in $objectOf_AllRecords.SelectNodes("//${Endpoint}") ) {
+        Write-Progress -Activity "Processing ${Endpoint} records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$objectOf_AllRecords.SelectNodes("//${Endpoint}").Count)*100)
+
+        # Get the configuration of each Policy
+        $objectOf_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+        $objectOf_AllRecordDetails.add($objectOf_Record) | Out-Null
+        $Position++
+    }
+    return $objectOf_AllRecordDetails
+}
+
+
+function processEndpoints($Endpoint, $objectOf_AllRecords) {
+    ForEach ( $Record in $objectOf_AllRecords ) {
+        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//id")) / $(${Record}.SelectNodes("//name"))" -PercentComplete (($Position/$objectOf_AllRecords.Count)*100)
+        Write-host "Policy ID $(${Record}.policy.general.id):"
+        funcToRun $Record
+        $Position++
+    }
+}
+
 
 function policyDisabled($objectOf_Policy) {
     #Write-Host "policyDisabled  $(${objectOf_Policy}.policy.general.id)"
@@ -138,42 +184,140 @@ function policyScopeAllUsers($objectOf_Policy) {
 
 
 function policySiteLevelRecon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.site.name -eq "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
         Write-host "  -> Performs Inventory"
         policyOutputObject $objectOf_Policy "policy_SiteLevelRecon"
     }
 }
 
 
+function policyCheckinRecon($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.general.trigger_checkin -eq $true -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+        Write-host "  -> Performs Inventory @ Checkin"
+        policyOutputObject $objectOf_Policy "policy_CheckinRecon"
+    }
+}
+
+
+function policyOngoingRecon($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+        Write-host "  -> Performs Ongoing Inventory"
+        policyOutputObject $objectOf_Policy "policy_OngoingRecon"
+    }
+}
+
 function policyOngoing($objectOf_Policy) {
     if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
-    $objectOf_Policy.policy.package_configuration.packages.size -ne 0 -and
+    #$objectOf_Policy.policy.package_configuration.packages.size -ne 0 -and
     ( $objectOf_Policy.policy.general.trigger_checkin -eq $true -or 
         $objectOf_Policy.policy.general.trigger_enrollment_complete -eq $true -or 
         $objectOf_Policy.policy.general.trigger_login -eq $true -or 
         $objectOf_Policy.policy.general.trigger_logout -eq $true -or 
         $objectOf_Policy.policy.general.trigger_network_state_changed -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_startup -eq $true ) -and  
-    ( $objectOf_Policy.policy.scope.all_computers -eq $true -or
-        $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) ) {
+        $objectOf_Policy.policy.general.trigger_startup -eq $true ) ) {
 
-        ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups ) {
-            # Get Computer Group Details
-            $objectOf_ComputerGroup = Invoke-RestMethod -Uri "${getComputerGrop}/$($computerGroup.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
-            
-            if ( $objectOf_ComputerGroup.is_smart -eq $false ) {
-                $ongoingCheck = 1
+            if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
+                Write-host "  -> Ongoing Policy"
+                policyOutputObject $objectOf_Policy "policy_Ongoing"
+            }
+            elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
+
+                ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
+                     #$computerGroup.name
+                    if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                        $ongoingCheck = 1
+                    }
+                }
+
+                if ( $ongoingCheck -eq 1 ) {
+                    Write-host "  -> Ongoing Policy"
+                    policyOutputObject $objectOf_Policy "policy_Ongoing"
+                }
+            }
+    }
+}
+
+# Tester
+function policyOngoingEvent($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and $objectOf_Policy.policy.general.trigger_other.Length -eq 0 ) {
+
+        if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
+            Write-host "  -> Ongoing Policy"
+            policyOutputObject $objectOf_Policy "policy_OngoingEvent"
+        }
+        elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
+
+            ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
+                    #$computerGroup.name
+                if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                    $ongoingCheck = 1
+                }
+            }
+
+            if ( $ongoingCheck -eq 1 ) {
+                Write-host "  -> Ongoing Policy"
+                policyOutputObject $objectOf_Policy "policy_OngoingEvent"
             }
         }
+    }
+}
 
-        if ( $ongoingCheck -eq 1 ) {
-            Write-host "  -> Ongoing Installing Software"
-            policyOutputObject $objectOf_Policy "policy_Ongoing"
+function policyOngoingEventInventory($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and $objectOf_Policy.policy.general.trigger_other.Length -eq 0  -and $objectOf_Policy.policy.maintenance.recon -eq $true ) {
+
+        if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
+            Write-host "  -> Ongoing Inventory"
+            policyOutputObject $objectOf_Policy "policy_OngoingEventInventory"
+        }
+        elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
+
+            ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
+                    #$computerGroup.name
+                if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                    $ongoingCheck = 1
+                }
+            }
+
+            if ( $ongoingCheck -eq 1 ) {
+                Write-host "  -> Ongoing Inventory"
+                policyOutputObject $objectOf_Policy "policy_OngoingEventInventory"
+            }
         }
     }
 }
 
 
+function policyOngoingInventory($objectOf_Policy) {
+    if ( ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -or 
+        $objectOf_Policy.policy.general.frequency -eq "Once per day" ) -and 
+    ( $objectOf_Policy.policy.general.trigger_checkin -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_enrollment_complete -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_login -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_logout -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_network_state_changed -eq $true -or 
+        $objectOf_Policy.policy.general.trigger_startup -eq $true ) -and
+        $objectOf_Policy.policy.maintenance.recon -eq $true ) {
+
+            if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
+                Write-host "  -> Ongoing Inventory"
+                policyOutputObject $objectOf_Policy "policy_OngoingInventory"
+            }
+            elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
+
+                ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
+                     #$computerGroup.name
+                    if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                        $ongoingCheck = 1
+                    }
+                }
+
+                if ( $ongoingCheck -eq 1 ) {
+                    Write-host "  -> Ongoing Inventory"
+                    policyOutputObject $objectOf_Policy "policy_OngoingInventory"
+                }
+            }
+    }
+}
 
 
 
@@ -204,14 +348,19 @@ function output($outputObject, $condition) {
 
 function funcToRun($objectOf_Policy) {
     #Write-Host "FunctionToRun  $(${objectOf_Policy}.policy.general.id)"
-    policyDisabled $objectOf_Policy
-    policyNoScope $objectOf_Policy
-    policyNoConfig $objectOf_Policy
-    policyNoCategory $objectOf_Policy
-    policySSNoDescription $objectOf_Policy
-    policySSNoIcon $objectOf_Policy
-    policySiteLevelRecon $objectOf_Policy
-    policyOngoing $objectOf_Policy
+    #policyDisabled $objectOf_Policy
+    #policyNoScope $objectOf_Policy
+    #policyNoConfig $objectOf_Policy
+    #policyNoCategory $objectOf_Policy
+    #policySSNoDescription $objectOf_Policy
+    #policySSNoIcon $objectOf_Policy
+    #policySiteLevelRecon $objectOf_Policy
+    #policyOngoing $objectOf_Policy
+    #policyCheckinRecon $objectOf_Policy
+    #policyOngoingRecon $objectOf_Policy
+    #policyOngoingInventory $objectOf_Policy
+    #policyOngoingEvent $objectOf_Policy
+    policyOngoingEventInventory $objectOf_Policy
 }
 
 
@@ -238,34 +387,20 @@ function funcToRun($objectOf_Policy) {
 
 Write-Host "API Credentials Valid -- continuing..."
 
-#$saveDirectory = ($(Read-Host "Save Directiory") -replace '"')
 
-# Get all the Policies
-$objectOf_AllPolicies = Invoke-RestMethod -Uri "${getPolicies}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+# Call getEndpoint function for each type needed
+$objectOf_AllComputerGroupDetails = getEndpoint computer_group NoDetails $getComputerGroups $getComputerGroup
+$objectOf_AllPoliciesDetails = getEndpoint policy FullDetails $getPolicies $getPolicy
+$objectOf_AllPrinters = getEndpoint printer NoDetails $getPrinters
 
 
-#$objectOf_PoliciesDetails = @()
-$objectOf_AllPoliciesDetails = New-Object System.Collections.Arraylist
-$Position = 1
+# Call processEndpoints function to process each type
+processEndpoints policy $objectOf_AllPoliciesDetails
+#processEndpoints computer_group $objectOf_AllComputerGroupDetails
 
-# Loop through each Policy
-ForEach ($policy in $objectOf_AllPolicies.policies.policy) {
-    Write-Progress -Activity "Getting all Policy Configurations..." -Status "Policy:  $(${policy}.id) / $(${policy}.name)" -PercentComplete (($Position/$objectOf_AllPolicies.policies.policy.Count)*100)
-
-    # Get the configuration of each Policy
-    $objectOf_Policy = Invoke-RestMethod -Uri "${getPolicy}/$(${policy}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
-    $objectOf_AllPoliciesDetails.add($objectOf_Policy) | Out-Null
-    $Position++
-}
-
-$Position = 1
-
-ForEach ($objectOf_Policy in $objectOf_AllPoliciesDetails) {
-    Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${objectOf_Policy}.policy.general.id) / $(${objectOf_Policy}.policy.general.name)" -PercentComplete (($Position/$objectOf_AllPoliciesDetails.Count)*100)
-    Write-host "Policy ID $(${objectOf_Policy}.policy.general.id):"
-    funcToRun $objectOf_Policy
-    $Position++
-}
-
-Write-Host "All Policies have been processed."
+Write-Host ""
+Write-Host "All Criteria has been processed."
 Write-Host "jamf_Reporting Process:  COMPLETE"
+
+
+
