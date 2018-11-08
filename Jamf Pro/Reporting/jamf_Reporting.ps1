@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.3.0 / Updated:  11/8/2018 / By:  ZT
+Version:  0.3.1 / Updated:  11/8/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -34,9 +34,8 @@ $Position = 1
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ============================================================
-# Functions
+# Logic Functions
 # ============================================================
-
 
 function getEndpoint($Endpoint, $details, $urlAll, $urlDetails) {
 
@@ -51,7 +50,6 @@ function getEndpoint($Endpoint, $details, $urlAll, $urlDetails) {
         return $objectOf_AllRecords
     }
 }
-
 
 function getEndpointDetails ($Endpoint, $urlDetails) {
 
@@ -69,7 +67,6 @@ function getEndpointDetails ($Endpoint, $urlDetails) {
     return $objectOf_AllRecordDetails
 }
 
-
 function processEndpoints($Endpoint, $objectOf_AllRecords) {
     ForEach ( $Record in $objectOf_AllRecords ) {
         Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//id")) / $(${Record}.SelectNodes("//name"))" -PercentComplete (($Position/$objectOf_AllRecords.Count)*100)
@@ -79,6 +76,39 @@ function processEndpoints($Endpoint, $objectOf_AllRecords) {
     }
 }
 
+function funcToRun($objectOf_Policy) {
+    Write-Host "FunctionToRun  $(${objectOf_Policy}.policy.general.id)"
+    policyDisabled $objectOf_Policy
+    policyNoScope $objectOf_Policy
+    policyNoConfig $objectOf_Policy
+    policyNoCategory $objectOf_Policy
+    policySSNoDescription $objectOf_Policy
+    policySSNoIcon $objectOf_Policy
+    #policySiteLevelRecon $objectOf_Policy
+    policyOngoingEvent $objectOf_Policy
+    policyOngoingEventInventory $objectOf_Policy
+}
+
+function policyOutputObject($objectOf_Policy, $condition) {
+    $outputObject = New-Object PSObject -Property @{
+        id = $objectOf_Policy.policy.general.id  
+        name = $objectOf_Policy.policy.general.name
+        Site = $objectOf_Policy.policy.general.site.name
+        selfService = $objectOf_Policy.policy.self_service.use_for_self_service
+    }
+
+    output $outputObject $condition
+}
+
+function output($outputObject, $condition) {
+    # Export each Policy object to a file.
+    Export-Csv -InputObject $outputObject -Path "\\Mac\Home\Desktop\testing\Reporting\${condition}_${fileDate}.csv" -Append -NoTypeInformation
+    # Export-Csv -InputObject $policyNodes -Path "${workingDirectory}\AllPolicies_${fileDate}.csv" -Append -NoTypeInformation
+}
+
+# ============================================================
+# Criteria Functions
+# ============================================================
 
 function policyDisabled($objectOf_Policy) {
     #Write-Host "policyDisabled  $(${objectOf_Policy}.policy.general.id)"
@@ -87,7 +117,6 @@ function policyDisabled($objectOf_Policy) {
         policyOutputObject $objectOf_Policy "policy_Disabled"
     }
 }
-
 
 function policyNoScope($objectOf_Policy) {
     if ( $objectOf_Policy.policy.scope.all_computers -eq $false -and 
@@ -113,7 +142,6 @@ function policyNoScope($objectOf_Policy) {
         policyOutputObject $objectOf_Policy "policy_NoScope"
     }
 }
-
 
 function policyNoConfig($objectOf_Policy) {
     if ( $objectOf_Policy.policy.package_configuration.packages.size -eq 0 -and 
@@ -149,7 +177,6 @@ function policyNoConfig($objectOf_Policy) {
     }
 }
 
-
 function policyNoCategory($objectOf_Policy) {
     if ( $objectOf_Policy.policy.general.category.name -eq "No category assigned" ) {
         Write-host "  -> Has No Category"
@@ -157,89 +184,32 @@ function policyNoCategory($objectOf_Policy) {
     }
 }
 
-
 function policySSNoDescription($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_description -eq $null) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_description -eq "" ) {
         Write-host "  -> Has No Description"
         policyOutputObject $objectOf_Policy "policy_SSNoDescription"
     }
 }
 
-
 function policySSNoIcon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon -eq $null) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon.IsEmpty -ne $false) {
         Write-host "  -> Has No Icon"
         policyOutputObject $objectOf_Policy "policy_SSNoIcon"
     }
 }
-
 
 # Can't be done yet
 function policyScopeAllUsers($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon -eq $null) {
-        Write-host "  -> Has No Icon"
-        policyOutputObject $objectOf_Policy "policy_SSNoIcon"
+    if ( $objectOf_Policy.policy.scope.all_users -eq $true ) {
+        Write-host "  -> Scoped to All Users"
+        policyOutputObject $objectOf_Policy "policy_ScopeAllUsers"
     }
 }
 
-
-function policySiteLevelRecon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
-        Write-host "  -> Performs Inventory"
-        policyOutputObject $objectOf_Policy "policy_SiteLevelRecon"
-    }
-}
-
-
-function policyCheckinRecon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.general.trigger_checkin -eq $true -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
-        Write-host "  -> Performs Inventory @ Checkin"
-        policyOutputObject $objectOf_Policy "policy_CheckinRecon"
-    }
-}
-
-
-function policyOngoingRecon($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
-        Write-host "  -> Performs Ongoing Inventory"
-        policyOutputObject $objectOf_Policy "policy_OngoingRecon"
-    }
-}
-
-function policyOngoing($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
-    #$objectOf_Policy.policy.package_configuration.packages.size -ne 0 -and
-    ( $objectOf_Policy.policy.general.trigger_checkin -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_enrollment_complete -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_login -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_logout -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_network_state_changed -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_startup -eq $true ) ) {
-
-            if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
-                Write-host "  -> Ongoing Policy"
-                policyOutputObject $objectOf_Policy "policy_Ongoing"
-            }
-            elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
-
-                ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                     #$computerGroup.name
-                    if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
-                        $ongoingCheck = 1
-                    }
-                }
-
-                if ( $ongoingCheck -eq 1 ) {
-                    Write-host "  -> Ongoing Policy"
-                    policyOutputObject $objectOf_Policy "policy_Ongoing"
-                }
-            }
-    }
-}
-
-# Tester
 function policyOngoingEvent($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and $objectOf_Policy.policy.general.trigger_other.Length -eq 0 ) {
+    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
+    $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
+    $objectOf_Policy.policy.general.trigger_other.Length -eq 0 ) {
 
         if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
             Write-host "  -> Ongoing Policy"
@@ -248,7 +218,6 @@ function policyOngoingEvent($objectOf_Policy) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                    #$computerGroup.name
                 if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
@@ -263,7 +232,10 @@ function policyOngoingEvent($objectOf_Policy) {
 }
 
 function policyOngoingEventInventory($objectOf_Policy) {
-    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and $objectOf_Policy.policy.general.trigger_other.Length -eq 0  -and $objectOf_Policy.policy.maintenance.recon -eq $true ) {
+    if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
+    $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
+    $objectOf_Policy.policy.general.trigger_other.Length -eq 0 -and 
+    $objectOf_Policy.policy.maintenance.recon -eq $true ) {
 
         if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
             Write-host "  -> Ongoing Inventory"
@@ -272,7 +244,6 @@ function policyOngoingEventInventory($objectOf_Policy) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                    #$computerGroup.name
                 if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
@@ -286,83 +257,13 @@ function policyOngoingEventInventory($objectOf_Policy) {
     }
 }
 
-
-function policyOngoingInventory($objectOf_Policy) {
-    if ( ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -or 
-        $objectOf_Policy.policy.general.frequency -eq "Once per day" ) -and 
-    ( $objectOf_Policy.policy.general.trigger_checkin -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_enrollment_complete -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_login -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_logout -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_network_state_changed -eq $true -or 
-        $objectOf_Policy.policy.general.trigger_startup -eq $true ) -and
-        $objectOf_Policy.policy.maintenance.recon -eq $true ) {
-
-            if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
-                Write-host "  -> Ongoing Inventory"
-                policyOutputObject $objectOf_Policy "policy_OngoingInventory"
-            }
-            elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
-
-                ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                     #$computerGroup.name
-                    if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
-                        $ongoingCheck = 1
-                    }
-                }
-
-                if ( $ongoingCheck -eq 1 ) {
-                    Write-host "  -> Ongoing Inventory"
-                    policyOutputObject $objectOf_Policy "policy_OngoingInventory"
-                }
-            }
+# Keeping for now
+function policySiteLevelRecon($objectOf_Policy) {
+    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+        Write-host "  -> Site-Level Performs Inventory"
+        policyOutputObject $objectOf_Policy "policy_SiteLevelRecon"
     }
 }
-
-
-
-
-
-
-
-
-
-function policyOutputObject($objectOf_Policy, $condition) {
-    $outputObject = New-Object PSObject -Property @{
-        id = $objectOf_Policy.policy.general.id  
-        name = $objectOf_Policy.policy.general.name
-        Site = $objectOf_Policy.policy.general.site.name
-        selfService = $objectOf_Policy.policy.self_service.use_for_self_service
-    }
-
-    output $outputObject $condition
-}
-
-
-function output($outputObject, $condition) {
-    # Export each Policy object to a file.
-    Export-Csv -InputObject $outputObject -Path "\\Mac\Home\Desktop\testing\Reporting\${condition}_${fileDate}.csv" -Append -NoTypeInformation
-    # Export-Csv -InputObject $policyNodes -Path "${workingDirectory}\AllPolicies_${fileDate}.csv" -Append -NoTypeInformation
-}
-
-
-function funcToRun($objectOf_Policy) {
-    #Write-Host "FunctionToRun  $(${objectOf_Policy}.policy.general.id)"
-    #policyDisabled $objectOf_Policy
-    #policyNoScope $objectOf_Policy
-    #policyNoConfig $objectOf_Policy
-    #policyNoCategory $objectOf_Policy
-    #policySSNoDescription $objectOf_Policy
-    #policySSNoIcon $objectOf_Policy
-    #policySiteLevelRecon $objectOf_Policy
-    #policyOngoing $objectOf_Policy
-    #policyCheckinRecon $objectOf_Policy
-    #policyOngoingRecon $objectOf_Policy
-    #policyOngoingInventory $objectOf_Policy
-    #policyOngoingEvent $objectOf_Policy
-    policyOngoingEventInventory $objectOf_Policy
-}
-
 
 # ============================================================
 # Bits Staged...
@@ -391,7 +292,7 @@ Write-Host "API Credentials Valid -- continuing..."
 # Call getEndpoint function for each type needed
 $objectOf_AllComputerGroupDetails = getEndpoint computer_group NoDetails $getComputerGroups $getComputerGroup
 $objectOf_AllPoliciesDetails = getEndpoint policy FullDetails $getPolicies $getPolicy
-$objectOf_AllPrinters = getEndpoint printer NoDetails $getPrinters
+#$objectOf_AllPrinters = getEndpoint printer NoDetails $getPrinters
 
 
 # Call processEndpoints function to process each type
@@ -401,6 +302,4 @@ processEndpoints policy $objectOf_AllPoliciesDetails
 Write-Host ""
 Write-Host "All Criteria has been processed."
 Write-Host "jamf_Reporting Process:  COMPLETE"
-
-
 
