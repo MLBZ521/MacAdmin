@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.5.0 / Updated:  11/13/2018 / By:  ZT
+Version:  0.5.1 / Updated:  11/13/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -71,7 +71,7 @@ function getEndpointDetails ($Endpoint, $urlDetails, $xml_AllRecords) {
 
 function processEndpoints($typeOf_AllRecords, $xmlOf_UnusedComputerGroups, $xmlOf_UnusedPrinters) {
     ForEach ( $Record in $typeOf_AllRecords ) {
-        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//id")) / $(${Record}.SelectNodes("//name"))" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
+        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//general").id) / $(${Record}.SelectNodes("//general").name)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
         #Write-host "Policy ID $(${Record}.policy.general.id):"
         policyFunctionsToRun $Record
         $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
@@ -115,14 +115,14 @@ function createReport($outputObject, $Endpoint) {
     
     if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
          Write-Host "Creating folder..."
-         New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory
+         New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
     }
 
     # Export each Policy object to a file.
-    if ( $Endpoint -eq "Policy" ) {
+    if ( $Endpoint -eq "Policies" ) {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
-    else {        
+    else {
         ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}s.csv" -Append -NoTypeInformation
     }
 }
