@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.5.1 / Updated:  11/13/2018 / By:  ZT
+Version:  0.6.0 / Updated:  11/14/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -39,27 +39,26 @@ $Position = 1
 # Logic Functions
 # ============================================================
 
-function getEndpoint($Endpoint, $details, $urlAll, $urlDetails) {
-
+function getEndpoint($Endpoint, $urlAll) {
     # Get all records
-    Write-host "Querying Type:  ${Endpoint}"
+    Write-host "Querying:  ${Endpoint}"
     $xml_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
-    if ( $details -eq "FullDetails" ) {
-        getEndpointDetails $Endpoint $urlDetails $xml_AllRecords
-    }
-    else {
-        return $xml_AllRecords
-    }
+    return $xml_AllRecords
 }
 
-function getEndpointDetails ($Endpoint, $urlDetails, $xml_AllRecords) {
+function getEndpointDetails () {
+    [cmdletbinding()]
+    Param (
+        [Parameter(ValuefromPipeline)][String]$urlDetails,
+        [Parameter(ValuefromPipeline)][Xml]$xml_AllRecords      
+    )
 
     $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
 
     # Loop through each endpoint
-    ForEach ( $Record in $xml_AllRecords.SelectNodes("//${Endpoint}") ) {
-        Write-Progress -Activity "Processing ${Endpoint} records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//${Endpoint}").Count)*100)
+    ForEach ( $Record in $xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)") ) {
+        Write-Progress -Activity "Processing $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
 
         # Get the configuration of each Policy
         $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
@@ -94,8 +93,8 @@ function policyFunctionsToRun($objectOf_Policy) {
     $policy = policySSNoDescription $objectOf_Policy $policy
     $policy = policySSNoIcon $objectOf_Policy $policy
     # $policy = policySiteLevelRecon $objectOf_Policy $policy
-    $policy = policyOngoingEvent $objectOf_Policy $policy
-    $policy = policyOngoingEventInventory $objectOf_Policy $policy
+    #$policy = policyOngoingEvent $objectOf_Policy $policy
+    #$policy = policyOngoingEventInventory $objectOf_Policy $policy
 
     createReport $policy "Policies"
 }
@@ -370,9 +369,10 @@ function computerGroupUsage($objectOf_Policy, $xmlOf_UnusedComputerGroups) {
 Write-Host "API Credentials Valid -- continuing..."
 
 # Call getEndpoint function for each type needed
-$xml_AllComputerGroups = getEndpoint computer_group NoDetails $getComputerGroups $getComputerGroup
-$xml_AllPrinters = getEndpoint printer NoDetails $getPrinters
-$xmlArray_AllPoliciesDetails = getEndpoint policy FullDetails $getPolicies $getPolicy
+$xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
+$xml_AllPrinters = getEndpoint "Printers" $getPrinters
+$xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
+$xml_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
 
 # Call processEndpoints function to process each type
 processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
