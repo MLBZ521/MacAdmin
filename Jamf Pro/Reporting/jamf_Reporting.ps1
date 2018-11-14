@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.4.0 / Updated:  11/8/2018 / By:  ZT
+Version:  0.5.0 / Updated:  11/13/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -43,44 +43,48 @@ function getEndpoint($Endpoint, $details, $urlAll, $urlDetails) {
 
     # Get all records
     Write-host "Querying Type:  ${Endpoint}"
-    $objectOf_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+    $xml_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
     if ( $details -eq "FullDetails" ) {
-        getEndpointDetails $Endpoint $urlDetails
+        getEndpointDetails $Endpoint $urlDetails $xml_AllRecords
     }
     else {
-        return $objectOf_AllRecords
+        return $xml_AllRecords
     }
 }
 
-function getEndpointDetails ($Endpoint, $urlDetails) {
+function getEndpointDetails ($Endpoint, $urlDetails, $xml_AllRecords) {
 
     $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
 
     # Loop through each endpoint
-    ForEach ( $Record in $objectOf_AllRecords.SelectNodes("//${Endpoint}") ) {
-        Write-Progress -Activity "Processing ${Endpoint} records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$objectOf_AllRecords.SelectNodes("//${Endpoint}").Count)*100)
+    ForEach ( $Record in $xml_AllRecords.SelectNodes("//${Endpoint}") ) {
+        Write-Progress -Activity "Processing ${Endpoint} records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//${Endpoint}").Count)*100)
 
         # Get the configuration of each Policy
-        $objectOf_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
-        $objectOf_AllRecordDetails.add($objectOf_Record) | Out-Null
+        $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+        $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
         $Position++
     }
     return $objectOf_AllRecordDetails
 }
 
-function processEndpoints($Endpoint, $objectOf_AllRecords) {
-    ForEach ( $Record in $objectOf_AllRecords ) {
-        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//id")) / $(${Record}.SelectNodes("//name"))" -PercentComplete (($Position/$objectOf_AllRecords.Count)*100)
+function processEndpoints($typeOf_AllRecords, $xmlOf_UnusedComputerGroups, $xmlOf_UnusedPrinters) {
+    ForEach ( $Record in $typeOf_AllRecords ) {
+        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//id")) / $(${Record}.SelectNodes("//name"))" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
         #Write-host "Policy ID $(${Record}.policy.general.id):"
-        funcToRun $Record
+        policyFunctionsToRun $Record
+        $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
+        $xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
         $Position++
     }
+    createReport $xmlOf_UnusedPrinters "printer"
+    createReport $xmlOf_UnusedComputerGroups "computer_group"
 }
 
-function funcToRun($objectOf_Policy) {
+function policyFunctionsToRun($objectOf_Policy) {
     # Build the object for this policy
-    $policy = policyBuildObject $objectOf_Policy
+    $policy = build_PolicyObject $objectOf_Policy
 
     $policy = policyDisabled $objectOf_Policy $policy
     $policy = policyNoScope $objectOf_Policy $policy
@@ -93,14 +97,10 @@ function funcToRun($objectOf_Policy) {
     $policy = policyOngoingEvent $objectOf_Policy $policy
     $policy = policyOngoingEventInventory $objectOf_Policy $policy
 
-    createReport $policy
+    createReport $policy "Policies"
 }
 
-function policyOutputObject($objectOf_Policy, $condition) {
-    $outputObject = New-Object PSObject -Property @{
-        id = $objectOf_Policy.policy.general.id  
-        name = $objectOf_Policy.policy.general.name
-function policyBuildObject($objectOf_Policy) {
+function build_PolicyObject($objectOf_Policy) {
     $policy = New-Object PSObject -Property ([ordered]@{
         ID = $objectOf_Policy.policy.general.id
         Name = $objectOf_Policy.policy.general.name
@@ -111,15 +111,20 @@ function policyBuildObject($objectOf_Policy) {
     return $policy
 }
 
-function createReport($outputObject) {
-
+function createReport($outputObject, $Endpoint) {
+    
     if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
          Write-Host "Creating folder..."
          New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory
     }
 
     # Export each Policy object to a file.
-    Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report.csv" -Append -NoTypeInformation
+    if ( $Endpoint -eq "Policy" ) {
+        Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
+    }
+    else {        
+        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}s.csv" -Append -NoTypeInformation
+    }
 }
 
 # ============================================================
@@ -246,7 +251,7 @@ function policyOngoingEvent($objectOf_Policy, $policy) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xml_AllComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
@@ -279,7 +284,7 @@ function policyOngoingEventInventory($objectOf_Policy, $policy) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($objectOf_AllComputerGroupDetails.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xml_AllComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
@@ -310,6 +315,37 @@ function policySiteLevelRecon($objectOf_Policy, $policy) {
     }
 }
 
+
+function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
+   if ( $objectOf_Policy.policy.printers.size -ne 0 ) {
+#        Write-Host "Printer Size not 0"
+        ForEach ( $Printer in $objectOf_Policy.policy.printers.printer ) {
+            if ( $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) } ) {
+#                Write-Host "If printer object equals printer ID"
+#                Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Printer $($Printer.id) / $($Printer.name)"
+                $Remove = $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) }
+                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
+            }
+        }
+    }
+    return $xmlOf_UnusedPrinters
+}
+
+function computerGroupUsage($objectOf_Policy, $xmlOf_UnusedComputerGroups) {
+
+   if ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
+        ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
+            # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
+
+            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
+                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
+                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
+            }
+        }
+    }
+    return $xmlOf_UnusedComputerGroups
+}
+
 # ============================================================
 # Bits Staged...
 # ============================================================
@@ -333,16 +369,14 @@ function policySiteLevelRecon($objectOf_Policy, $policy) {
 
 Write-Host "API Credentials Valid -- continuing..."
 
-
 # Call getEndpoint function for each type needed
-$objectOf_AllComputerGroupDetails = getEndpoint computer_group NoDetails $getComputerGroups $getComputerGroup
-$objectOf_AllPoliciesDetails = getEndpoint policy FullDetails $getPolicies $getPolicy
-#$objectOf_AllPrinters = getEndpoint printer NoDetails $getPrinters
-
+$xml_AllComputerGroups = getEndpoint computer_group NoDetails $getComputerGroups $getComputerGroup
+$xml_AllPrinters = getEndpoint printer NoDetails $getPrinters
+$xmlArray_AllPoliciesDetails = getEndpoint policy FullDetails $getPolicies $getPolicy
 
 # Call processEndpoints function to process each type
-processEndpoints policy $objectOf_AllPoliciesDetails
-#processEndpoints computer_group $objectOf_AllComputerGroupDetails
+processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
+#processEndpoints $xml_AllComputerGroupDetails
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
