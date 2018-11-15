@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.6.0 / Updated:  11/14/2018 / By:  ZT
+Version:  0.7.0 / Updated:  11/14/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -69,16 +69,26 @@ function getEndpointDetails () {
 }
 
 function processEndpoints($typeOf_AllRecords, $xmlOf_UnusedComputerGroups, $xmlOf_UnusedPrinters) {
+function processEndpoints() {
+    [cmdletbinding()]
+    Param (
+        [Parameter(ValuefromPipeline)][System.Array]$typeOf_AllRecords,
+        [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_UnusedComputerGroups,
+        [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_UnusedPrinters
+    )
+
     ForEach ( $Record in $typeOf_AllRecords ) {
-        Write-Progress -Activity "Testing all Policies..." -Status "Policy:  $(${Record}.SelectNodes("//general").id) / $(${Record}.SelectNodes("//general").name)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
-        #Write-host "Policy ID $(${Record}.policy.general.id):"
-        policyFunctionsToRun $Record
-        $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-        $xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
+        Write-Progress -Activity "Testing all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
+       # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
+        #policyFunctionsToRun $Record
+        #$xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
+        #$xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
+        computerGroupCritera $Record
+        
         $Position++
     }
-    createReport $xmlOf_UnusedPrinters "printer"
-    createReport $xmlOf_UnusedComputerGroups "computer_group"
+    #createReport $xmlOf_UnusedPrinters "printer"
+    #createReport $xmlOf_UnusedComputerGroups "computer_group"
 }
 
 function policyFunctionsToRun($objectOf_Policy) {
@@ -118,11 +128,11 @@ function createReport($outputObject, $Endpoint) {
     }
 
     # Export each Policy object to a file.
-    if ( $Endpoint -eq "Policies" ) {
+    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" ) {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
     else {
-        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}s.csv" -Append -NoTypeInformation
+        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
     }
 }
 
@@ -345,6 +355,41 @@ function computerGroupUsage($objectOf_Policy, $xmlOf_UnusedComputerGroups) {
     return $xmlOf_UnusedComputerGroups
 }
 
+# Computer Group Criteria
+function computerGroupCriteria($objectOf_ComputerGroup){
+
+    $computerGroup = New-Object PSObject -Property ([ordered]@{
+        ID = $objectOf_ComputerGroup.computer_group.id
+        Name = $objectOf_ComputerGroup.computer_group.name
+        Site = $objectOf_ComputerGroup.computer_group.site.name
+        "Smart Group" = $objectOf_ComputerGroup.computer_group.is_smart
+    })
+
+    if ( $objectOf_ComputerGroup.computer_group.computers.size -eq 0 ) {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $true | Out-Null
+    }
+    else {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $false | Out-Null
+    }
+
+    if ( $objectOf_ComputerGroup.computer_group.criteria.size -eq 0 ) {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $true | Out-Null
+    }
+    else {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $false | Out-Null
+    }
+
+    if ( [int]$objectOf_ComputerGroup.computer_group.criteria.size -ge 10 ) {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $true | Out-Null
+    }
+    else {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $false | Out-Null
+    }
+ 
+    createReport $computerGroup "Computer Groups"  
+}
+
+
 # ============================================================
 # Bits Staged...
 # ============================================================
@@ -372,11 +417,11 @@ Write-Host "API Credentials Valid -- continuing..."
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
 $xml_AllPrinters = getEndpoint "Printers" $getPrinters
 $xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
-$xml_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
+$xmlArray_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
 
 # Call processEndpoints function to process each type
 processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
-#processEndpoints $xml_AllComputerGroupDetails
+processEndpoints $xmlArray_AllComputerGroupsDetails
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
