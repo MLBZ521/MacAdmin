@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.7.0 / Updated:  11/14/2018 / By:  ZT
+Version:  0.8.0 / Updated:  11/15/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -51,14 +51,14 @@ function getEndpointDetails () {
     [cmdletbinding()]
     Param (
         [Parameter(ValuefromPipeline)][String]$urlDetails,
-        [Parameter(ValuefromPipeline)][Xml]$xml_AllRecords      
+        [Parameter(ValuefromPipeline)][Xml]$xml_AllRecords
     )
 
     $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
 
     # Loop through each endpoint
     ForEach ( $Record in $xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)") ) {
-        Write-Progress -Activity "Processing $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
+        Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
 
         # Get the configuration of each Policy
         $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
@@ -68,60 +68,40 @@ function getEndpointDetails () {
     return $objectOf_AllRecordDetails
 }
 
-function processEndpoints($typeOf_AllRecords, $xmlOf_UnusedComputerGroups, $xmlOf_UnusedPrinters) {
 function processEndpoints() {
     [cmdletbinding()]
     Param (
-        [Parameter(ValuefromPipeline)][System.Array]$typeOf_AllRecords,
-        [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_UnusedComputerGroups,
+        [Parameter(Mandatory=$true,ValuefromPipeline)][System.Array]$typeOf_AllRecords,
+        [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_ComputerGroups,
         [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_UnusedPrinters
     )
 
+    # Using this object for two different tests, so need an "original" copy and one that will be modified
+    $xmlOf_UnusedComputerGroups = $xmlOf_ComputerGroups
+    
     ForEach ( $Record in $typeOf_AllRecords ) {
-        Write-Progress -Activity "Testing all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
-       # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
-        #policyFunctionsToRun $Record
-        #$xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-        #$xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
-        computerGroupCritera $Record
+        Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
+        # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
         
+        if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
+            policyCriteria $Record $xmlOf_ComputerGroups
+            $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
+            $xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
+        }
+        elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
+            computerGroupCriteria $Record
+            createReport $xmlOf_UnusedComputerGroups "computer_group"
+        }
+        
+        if ($Position -eq $typeOf_AllRecords.Count) {
+            createReport $xmlOf_UnusedPrinters "printer"
+        }
+
         $Position++
     }
-    #createReport $xmlOf_UnusedPrinters "printer"
-    #createReport $xmlOf_UnusedComputerGroups "computer_group"
-}
-
-function policyFunctionsToRun($objectOf_Policy) {
-    # Build the object for this policy
-    $policy = build_PolicyObject $objectOf_Policy
-
-    $policy = policyDisabled $objectOf_Policy $policy
-    $policy = policyNoScope $objectOf_Policy $policy
-    ### Cannot be determined at this time. ### $policy = policyScopeAllUsers $objectOf_Policy $policy
-    $policy = policyNoConfig $objectOf_Policy $policy
-    $policy = policyNoCategory $objectOf_Policy $policy
-    $policy = policySSNoDescription $objectOf_Policy $policy
-    $policy = policySSNoIcon $objectOf_Policy $policy
-    # $policy = policySiteLevelRecon $objectOf_Policy $policy
-    #$policy = policyOngoingEvent $objectOf_Policy $policy
-    #$policy = policyOngoingEventInventory $objectOf_Policy $policy
-
-    createReport $policy "Policies"
-}
-
-function build_PolicyObject($objectOf_Policy) {
-    $policy = New-Object PSObject -Property ([ordered]@{
-        ID = $objectOf_Policy.policy.general.id
-        Name = $objectOf_Policy.policy.general.name
-        Site = $objectOf_Policy.policy.general.site.name
-        "Self Service" = $objectOf_Policy.policy.self_service.use_for_self_service
-    })
-
-    return $policy
 }
 
 function createReport($outputObject, $Endpoint) {
-    
     if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
          Write-Host "Creating folder..."
          New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
@@ -140,16 +120,25 @@ function createReport($outputObject, $Endpoint) {
 # Criteria Functions
 # ============================================================
 
-function policyDisabled($objectOf_Policy, $policy) {
+function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
+
+    $policy = New-Object PSObject -Property ([ordered]@{
+        ID = $objectOf_Policy.policy.general.id
+        Name = $objectOf_Policy.policy.general.name
+        Site = $objectOf_Policy.policy.general.site.name
+        "Self Service" = $objectOf_Policy.policy.self_service.use_for_self_service
+    })
+
+    # Checks if Policy is Disabled
     if ( $objectOf_Policy.policy.general.enabled -eq $false) {
-        return $policy | Add-Member -PassThru NoteProperty "Disabled" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "Disabled" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "Disabled" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "Disabled" $false | Out-Null
     }
-}
 
-function policyNoScope($objectOf_Policy, $policy) {
+    # Checks if Policy has no Scope
+        # Cannot check for Scope of "All Users"
     if ( $objectOf_Policy.policy.scope.all_computers -eq $false -and 
     $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
     $objectOf_Policy.policy.scope.computer_groups.Length -eq 0 -and 
@@ -169,14 +158,14 @@ function policyNoScope($objectOf_Policy, $policy) {
     $objectOf_Policy.policy.scope.exclusions.network_segments.Length -eq 0 -and 
     $objectOf_Policy.policy.scope.exclusions.ibeacons.Length -eq 0 ) {
 
-        return $policy | Add-Member -PassThru NoteProperty "No Scope" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Scope" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "No Scope" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Scope" $false | Out-Null
     }
-}
 
-function policyNoConfig($objectOf_Policy, $policy) {
+    # Checks if Policy has no Configured Items
+        # Cannot check for Softare Updates or Restart Payloads
     if ( $objectOf_Policy.policy.package_configuration.packages.size -eq 0 -and 
     $objectOf_Policy.policy.scripts.size -eq 0 -and 
     $objectOf_Policy.policy.printers.size -eq 0 -and 
@@ -205,126 +194,144 @@ function policyNoConfig($objectOf_Policy, $policy) {
     $objectOf_Policy.policy.files_processes.run_command.Length -eq 0 -and 
     $objectOf_Policy.policy.disk_encryption.action -eq "none" ) {
 
-        return $policy | Add-Member -PassThru NoteProperty "No Configuration" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Configuration" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "No Configuration" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Configuration" $false | Out-Null
     }
-}
 
-function policyNoCategory($objectOf_Policy, $policy) {
+    # Checks if Policy does not have a Category Set
     if ( $objectOf_Policy.policy.general.category.name -eq "No category assigned" ) {
-        return $policy | Add-Member -PassThru NoteProperty "No Category" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Category" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "No Category" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "No Category" $false | Out-Null
     }
-}
 
-function policySSNoDescription($objectOf_Policy, $policy) {
+    # Checks if a Self Service Policy has a Description
+
     if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_description -eq "" ) {
-        return $policy | Add-Member -PassThru NoteProperty "SS No Description" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "SS No Description" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "SS No Description" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "SS No Description" $false | Out-Null
     }
-}
 
-function policySSNoIcon($objectOf_Policy, $policy) {
+    # Checks if a Self Service Policy has an Icon selected
+
     if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon.IsEmpty -ne $false) {
-        return $policy | Add-Member -PassThru NoteProperty "SS No Icon" $true
+        Add-Member -InputObject $policy -PassThru NoteProperty "SS No Icon" $true | Out-Null
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "SS No Icon" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "SS No Icon" $false | Out-Null
     }
-}
 
-# Can't be done yet
-function policyScopeAllUsers($objectOf_Policy, $policy) {
-    if ( $objectOf_Policy.policy.scope.all_users -eq $true ) {
-        return $policy | Add-Member -PassThru NoteProperty "Scope AllUsers" $true
-    }
-    else {
-        return $policy | Add-Member -PassThru NoteProperty "Scope AllUsers" $false
-    }
-}
+    # Checks if a Polcy is scoped to only "All Users"
+        # Can't be done yet
+#    if ( $objectOf_Policy.policy.scope.all_users -eq $true -and # This line is just an example, there isn't an actual element by this name
+#     $objectOf_Policy.policy.scope.all_computers -eq $false -and 
+#    $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.computer_groups.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.buildings.Length -eq 0 -and
+#    $objectOf_Policy.policy.scope.departments.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.limit_to_users.user_groups.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.limitations.users.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.limitations.user_groups.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.limitations.network_segments.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.limitations.ibeacons.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.computers.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.computer_groups.computer_group.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.buildings.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.departments.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.users.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.user_groups.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.network_segments.Length -eq 0 -and 
+#    $objectOf_Policy.policy.scope.exclusions.ibeacons.Length -eq 0 ) {   
+#
+#        Add-Member -InputObject $policy -PassThru NoteProperty "Scope AllUsers" $true | Out-Null
+#    }
+#    else {
+#        Add-Member -InputObject $policy -PassThru NoteProperty "Scope AllUsers" $false | Out-Null
+#    }
 
-function policyOngoingEvent($objectOf_Policy, $policy) {
+    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group
     if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
     $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
     $objectOf_Policy.policy.general.trigger_other.Length -eq 0 ) {
 
         if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
-            return $policy | Add-Member -PassThru NoteProperty "Ongoing Event" $true
+            Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $true | Out-Null
         }
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($xml_AllComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
 
             if ( $ongoingCheck -eq 1 ) {
-                return $policy | Add-Member -PassThru NoteProperty "Ongoing Event" $true
+                Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $true | Out-Null
             }
             else {
-                return $policy | Add-Member -PassThru NoteProperty "Ongoing Event" $false
+                Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $false | Out-Null
             }
         }
         else {
-            return $policy | Add-Member -PassThru NoteProperty "Ongoing Event" $false
+            Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $false | Out-Null
         }
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "Ongoing Event" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $false | Out-Null
     }
-}
 
-function policyOngoingEventInventory($objectOf_Policy, $policy) {
+    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group and Performs Inventory
     if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
     $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
     $objectOf_Policy.policy.general.trigger_other.Length -eq 0 -and 
     $objectOf_Policy.policy.maintenance.recon -eq $true ) {
 
         if ( $objectOf_Policy.policy.scope.all_computers -eq $true ) {
-            return $policy | Add-Member -PassThru NoteProperty "Ongoing Event Inventory" $true
+            Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $true | Out-Null
         }
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($xml_AllComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
 
             if ( $ongoingCheck -eq 1 ) {
-                return $policy | Add-Member -PassThru NoteProperty "Ongoing Event Inventory" $true
+                Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $true | Out-Null
             }
             else {
-                return $policy | Add-Member -PassThru NoteProperty "Ongoing Event Inventory" $false
+                Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $false | Out-Null
             }
         }
         else {
-            return $policy | Add-Member -PassThru NoteProperty "Ongoing Event Inventory" $false
+            Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $false | Out-Null
         }
     }
     else {
-        return $policy | Add-Member -PassThru NoteProperty "Ongoing Event Inventory" $false
+        Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $false | Out-Null
     }
+
+    # Checks if a Site-Level Policy performs a Inventory
+        # Keeping for now
+#    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+#        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $true | Out-Null
+#    }
+#    else {
+#        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $false | Out-Null
+#    }
+
+
+    createReport $policy "Policies"
+
 }
 
-# Keeping for now
-function policySiteLevelRecon($objectOf_Policy, $policy) {
-    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
-        return $policy | Add-Member -PassThru NoteProperty "Site Level Recon" $true
-    }
-    else {
-        return $policy | Add-Member -PassThru NoteProperty "Site Level Recon" $false
-    }
-}
-
-
+# Checks if a Printer is used in a Policy and removes it from the complete list of printers, to find unused printers
 function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
    if ( $objectOf_Policy.policy.printers.size -ne 0 ) {
 #        Write-Host "Printer Size not 0"
@@ -340,6 +347,7 @@ function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
     return $xmlOf_UnusedPrinters
 }
 
+# Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups
 function computerGroupUsage($objectOf_Policy, $xmlOf_UnusedComputerGroups) {
 
    if ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
@@ -388,7 +396,6 @@ function computerGroupCriteria($objectOf_ComputerGroup){
  
     createReport $computerGroup "Computer Groups"  
 }
-
 
 # ============================================================
 # Bits Staged...
