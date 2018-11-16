@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.9.0 / Updated:  11/16/2018 / By:  ZT
+Version:  0.10.0 / Updated:  11/16/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -98,7 +98,7 @@ function processEndpoints() {
                 $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
             }
             elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
-                computerGroupCriteria $Record
+                $Global:xmlOf_UnusedComputerGroups = computerGroupCriteria $Record $Global:xmlOf_UnusedComputerGroups
             }
             else {
                 $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
@@ -381,7 +381,7 @@ function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
 }
 
 # Computer Group Criteria
-function computerGroupCriteria($objectOf_ComputerGroup){
+function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGroups){
 
     $computerGroup = New-Object PSObject -Property ([ordered]@{
         ID = $objectOf_ComputerGroup.computer_group.id
@@ -410,8 +410,34 @@ function computerGroupCriteria($objectOf_ComputerGroup){
     else {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $false | Out-Null
     }
- 
-    createReport $computerGroup "Computer Groups"  
+    
+    $count = 0
+    # Check for Nested Computer Groups and remove from the UnusedComputerGroups Object
+    ForEach ( $criteria in $objectOf_ComputerGroup.computer_group.criteria.criterion ) {
+        if ( $criteria.name -eq "Computer Group" ) {
+            $nestedGroup = $xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.name -eq $($criteria.value) }
+            Write-Host "$($objectOf_ComputerGroup.FirstChild.NextSibling.LocalName) ID $($objectOf_ComputerGroup.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
+
+            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) } ) {
+                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) }
+                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
+            }
+
+            if ( $nestedGroup.is_smart -eq $true ) {
+                $count++
+            }
+        }
+    }
+
+    if ( $count -ge 4 ) {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $true | Out-Null
+    }
+    else {
+        Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $false | Out-Null
+    }
+
+    createReport $computerGroup "Computer Groups"
+    return $xmlOf_UnusedComputerGroups 
 }
 
 # ============================================================
@@ -440,6 +466,7 @@ Write-Host "API Credentials Valid -- continuing..."
 # Call getEndpoint function for each type needed
 $xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
+$xmlArray_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
 $xml_AllPrinters = getEndpoint "Printers" $getPrinters
 $xmlArray_AllComputerConfigProfileDetails = getEndpoint "Computer Config Profiles" $getComputerConfigProfiles | getEndpointDetails $getComputerConfigProfile
 $xmlArray_AllRestrictedSoftwareItemDetails = getEndpoint "Restricted Software Items" $getRestrictedSoftwareItems | getEndpointDetails $getRestrictedSoftwareItem
