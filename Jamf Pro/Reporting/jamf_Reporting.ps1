@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Reporting.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.8.0 / Updated:  11/15/2018 / By:  ZT
+Version:  0.9.0 / Updated:  11/16/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -26,7 +26,16 @@ $getPolicy = "${jamfPS}/JSSResource/policies/id"
 $getComputerGroups = "${jamfPS}/JSSResource/computergroups"
 $getComputerGroup = "${jamfPS}/JSSResource/computergroups/id"
 $getPrinters = "${jamfPS}/JSSResource/printers"
-
+$getComputerConfigProfiles = "${jamfPS}/JSSResource/osxconfigurationprofiles"
+$getComputerConfigProfile = "${jamfPS}/JSSResource/osxconfigurationprofiles/id"
+$getRestrictedSoftwareItems = "${jamfPS}/JSSResource/restrictedsoftware"
+$getRestrictedSoftwareItem = "${jamfPS}/JSSResource/restrictedsoftware/id"
+$getComputerAppStoreApps = "${jamfPS}/JSSResource/macapplications"
+$getComputerAppStoreApp = "${jamfPS}/JSSResource/macapplications/id"
+$getPatchPolicies = "${jamfPS}/JSSResource/patchpolicies"
+$getPatchPolicy = "${jamfPS}/JSSResource/patchpolicies/id"
+$geteBooks = "${jamfPS}/JSSResource/ebooks"
+$geteBook = "${jamfPS}/JSSResource/ebooks/id"
 
 $folderDate=$(Get-Date -Format FileDateTime)
 $saveDirectory = ($(Read-Host "Provide directiory to save the report") -replace '"')
@@ -53,51 +62,50 @@ function getEndpointDetails () {
         [Parameter(ValuefromPipeline)][String]$urlDetails,
         [Parameter(ValuefromPipeline)][Xml]$xml_AllRecords
     )
+    
+    if ($xml_AllRecords.FirstChild.NextSibling.size -ne 0) {
+        $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
 
-    $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
+        # Loop through each endpoint
+        ForEach ( $Record in $xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)") ) {
+            Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
 
-    # Loop through each endpoint
-    ForEach ( $Record in $xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)") ) {
-        Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
-
-        # Get the configuration of each Policy
-        $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
-        $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
-        $Position++
+            # Get the configuration of each Policy
+            $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+            $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
+            $Position++
+        }
+        return $objectOf_AllRecordDetails
     }
-    return $objectOf_AllRecordDetails
 }
 
 function processEndpoints() {
     [cmdletbinding()]
     Param (
-        [Parameter(Mandatory=$true,ValuefromPipeline)][System.Array]$typeOf_AllRecords,
+        [Parameter(Mandatory=$true,ValuefromPipeline)][AllowNull()][System.Array]$typeOf_AllRecords,
         [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_ComputerGroups,
         [Parameter(ValuefromPipeline)][System.Xml.XmlNode]$xmlOf_UnusedPrinters
     )
-
-    # Using this object for two different tests, so need an "original" copy and one that will be modified
-    $xmlOf_UnusedComputerGroups = $xmlOf_ComputerGroups
     
-    ForEach ( $Record in $typeOf_AllRecords ) {
-        Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
-        # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
+    if ( $typeOf_AllRecords -ne $null ) {    
+        ForEach ( $Record in $typeOf_AllRecords ) {
+            Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
+            # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
         
-        if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
-            policyCriteria $Record $xmlOf_ComputerGroups
-            $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-            $xmlOf_UnusedComputerGroups = computerGroupUsage $Record $xmlOf_UnusedComputerGroups
-        }
-        elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
-            computerGroupCriteria $Record
-            createReport $xmlOf_UnusedComputerGroups "computer_group"
-        }
-        
-        if ($Position -eq $typeOf_AllRecords.Count) {
-            createReport $xmlOf_UnusedPrinters "printer"
-        }
+            if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
+                policyCriteria $Record $xmlOf_ComputerGroups
+                $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
+                $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
+            }
+            elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
+                computerGroupCriteria $Record
+            }
+            else {
+                $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
+            }
 
-        $Position++
+            $Position++
+        }
     }
 }
 
@@ -348,11 +356,20 @@ function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
 }
 
 # Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups
-function computerGroupUsage($objectOf_Policy, $xmlOf_UnusedComputerGroups) {
+function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
 
-   if ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
-        ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-            # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
+   if ( $objectOf_Record.SelectNodes("//scope").computer_groups.IsEmpty -eq $false -and $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.IsEmpty -eq $false ) {
+        ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").computer_groups.computer_group ) {
+            Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
+
+            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
+                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
+                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
+            }
+        }
+
+        ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.computer_group ) {
+            Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
 
             if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
                 $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
@@ -421,14 +438,30 @@ function computerGroupCriteria($objectOf_ComputerGroup){
 Write-Host "API Credentials Valid -- continuing..."
 
 # Call getEndpoint function for each type needed
+$xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
 $xml_AllPrinters = getEndpoint "Printers" $getPrinters
-$xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
-$xmlArray_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
+$xmlArray_AllComputerConfigProfileDetails = getEndpoint "Computer Config Profiles" $getComputerConfigProfiles | getEndpointDetails $getComputerConfigProfile
+$xmlArray_AllRestrictedSoftwareItemDetails = getEndpoint "Restricted Software Items" $getRestrictedSoftwareItems | getEndpointDetails $getRestrictedSoftwareItem
+$xmlArray_AllComputerAppStoreAppDetails = getEndpoint "Computer App Store Apps" $getComputerAppStoreApps | getEndpointDetails $getComputerAppStoreApp
+$xmlArray_AllPatchPoliciesDetails = getEndpoint "Patch Policies" $getPatchPolicies | getEndpointDetails $getPatchPolicy
+$xmlArray_AlleBookDetails = getEndpoint "eBooks" $geteBooks | getEndpointDetails $geteBook
+
+# Using this object for two different tests, so need an "original" copy and one that will be modified
+$Global:xmlOf_UnusedComputerGroups =  $xml_AllComputerGroups.Clone()
 
 # Call processEndpoints function to process each type
 processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
 processEndpoints $xmlArray_AllComputerGroupsDetails
+processEndpoints $xmlArray_AllComputerConfigProfileDetails
+processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
+processEndpoints $xmlArray_AllComputerAppStoreAppDetails
+processEndpoints $xmlArray_AllPatchPoliciesDetails
+processEndpoints $xmlArray_AlleBookDetails
+
+# Create Reports for other criteria
+createReport $Global:xmlOf_UnusedComputerGroups "computer_group"
+createReport $xmlOf_UnusedPrinters "printer"
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
