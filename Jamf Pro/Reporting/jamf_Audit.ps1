@@ -1,14 +1,14 @@
-<#
+﻿<#
 
-Script Name:  jamf_Reporting.ps1
+Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  0.10.0 / Updated:  11/16/2018 / By:  ZT
+Version:  0.10.1 / Updated:  11/16/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
 #>
 
-Write-Host "jamf_Reporting Process:  START"
+Write-Host "jamf_Audit Process:  START"
 
 # ============================================================
 # Define Variables
@@ -37,7 +37,7 @@ $getPatchPolicy = "${jamfPS}/JSSResource/patchpolicies/id"
 $geteBooks = "${jamfPS}/JSSResource/ebooks"
 $geteBook = "${jamfPS}/JSSResource/ebooks/id"
 
-$folderDate=$(Get-Date -Format FileDateTime)
+$folderDate=$(Get-Date -UFormat %m-%d-%y)
 $saveDirectory = ($(Read-Host "Provide directiory to save the report") -replace '"')
 $Position = 1
 
@@ -48,6 +48,7 @@ $Position = 1
 # Logic Functions
 # ============================================================
 
+# This Function gets an inital list of all Endpoints.
 function getEndpoint($Endpoint, $urlAll) {
     # Get all records
     Write-host "Querying:  ${Endpoint}"
@@ -56,6 +57,7 @@ function getEndpoint($Endpoint, $urlAll) {
     return $xml_AllRecords
 }
 
+# This Function takes the reults of the inital functions and gets each records details, adding them to an Array.
 function getEndpointDetails () {
     [cmdletbinding()]
     Param (
@@ -79,6 +81,7 @@ function getEndpointDetails () {
     }
 }
 
+# This Functions loops individual records from a list of recordsobject, over defined criteria.
 function processEndpoints() {
     [cmdletbinding()]
     Param (
@@ -96,6 +99,11 @@ function processEndpoints() {
                 policyCriteria $Record $xmlOf_ComputerGroups
                 $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
                 $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
+                
+                # Create Printer Report
+                if ($Position -eq $typeOf_AllRecords.Count) {
+                    createReport $xmlOf_UnusedPrinters "printer"
+                }
             }
             elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
                 $Global:xmlOf_UnusedComputerGroups = computerGroupCriteria $Record $Global:xmlOf_UnusedComputerGroups
@@ -109,6 +117,7 @@ function processEndpoints() {
     }
 }
 
+# This Function creates files from the results of the defined criteria.
 function createReport($outputObject, $Endpoint) {
     if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
          Write-Host "Creating folder..."
@@ -128,8 +137,10 @@ function createReport($outputObject, $Endpoint) {
 # Criteria Functions
 # ============================================================
 
+# This Function contains criteria that is configured within a Policy object.
 function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 
+    # Build an object for this policy record.
     $policy = New-Object PSObject -Property ([ordered]@{
         ID = $objectOf_Policy.policy.general.id
         Name = $objectOf_Policy.policy.general.name
@@ -145,8 +156,8 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "Disabled" $false | Out-Null
     }
 
-    # Checks if Policy has no Scope
-        # Cannot check for Scope of "All Users"
+    # Checks if Policy has no Scope.
+        # Cannot check for Scope of "All Users".
     if ( $objectOf_Policy.policy.scope.all_computers -eq $false -and 
     $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
     $objectOf_Policy.policy.scope.computer_groups.Length -eq 0 -and 
@@ -172,8 +183,8 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "No Scope" $false | Out-Null
     }
 
-    # Checks if Policy has no Configured Items
-        # Cannot check for Softare Updates or Restart Payloads
+    # Checks if Policy has no Configured Items.
+        # Cannot check for Softare Updates or Restart Payloads.
     if ( $objectOf_Policy.policy.package_configuration.packages.size -eq 0 -and 
     $objectOf_Policy.policy.scripts.size -eq 0 -and 
     $objectOf_Policy.policy.printers.size -eq 0 -and 
@@ -208,7 +219,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "No Configuration" $false | Out-Null
     }
 
-    # Checks if Policy does not have a Category Set
+    # Checks if Policy does not have a Category Set.
     if ( $objectOf_Policy.policy.general.category.name -eq "No category assigned" ) {
         Add-Member -InputObject $policy -PassThru NoteProperty "No Category" $true | Out-Null
     }
@@ -216,8 +227,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "No Category" $false | Out-Null
     }
 
-    # Checks if a Self Service Policy has a Description
-
+    # Checks if a Self Service Policy has a Description.
     if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_description -eq "" ) {
         Add-Member -InputObject $policy -PassThru NoteProperty "SS No Description" $true | Out-Null
     }
@@ -225,8 +235,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "SS No Description" $false | Out-Null
     }
 
-    # Checks if a Self Service Policy has an Icon selected
-
+    # Checks if a Self Service Policy has an Icon selected.
     if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon.IsEmpty -ne $false) {
         Add-Member -InputObject $policy -PassThru NoteProperty "SS No Icon" $true | Out-Null
     }
@@ -234,8 +243,8 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "SS No Icon" $false | Out-Null
     }
 
-    # Checks if a Polcy is scoped to only "All Users"
-        # Can't be done yet
+    # Checks if a Polcy is scoped to only "All Users".
+        # Can't be done yet.
 #    if ( $objectOf_Policy.policy.scope.all_users -eq $true -and # This line is just an example, there isn't an actual element by this name
 #     $objectOf_Policy.policy.scope.all_computers -eq $false -and 
 #    $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
@@ -262,7 +271,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 #        Add-Member -InputObject $policy -PassThru NoteProperty "Scope AllUsers" $false | Out-Null
 #    }
 
-    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group
+    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group.
     if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
     $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
     $objectOf_Policy.policy.general.trigger_other.Length -eq 0 ) {
@@ -293,7 +302,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event" $false | Out-Null
     }
 
-    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group and Performs Inventory
+    # Checks if a Policy is configured for an Ongoing Event (that's not Enrollment) and has a scope that is not a Smart Group and Performs Inventory.
     if ( $objectOf_Policy.policy.general.frequency -eq "Ongoing" -and 
     $objectOf_Policy.policy.general.trigger -ne "USER_INITIATED" -and 
     $objectOf_Policy.policy.general.trigger_other.Length -eq 0 -and 
@@ -325,8 +334,8 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         Add-Member -InputObject $policy -PassThru NoteProperty "Ongoing Event Inventory" $false | Out-Null
     }
 
-    # Checks if a Site-Level Policy performs a Inventory
-        # Keeping for now
+    # Checks if a Site-Level Policy performs a Inventory.
+        # Keeping for now.
 #    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
 #        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $true | Out-Null
 #    }
@@ -334,19 +343,19 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 #        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $false | Out-Null
 #    }
 
-
     createReport $policy "Policies"
-
 }
 
-# Checks if a Printer is used in a Policy and removes it from the complete list of printers, to find unused printers
+# Checks if a Printer is used in a Policy and removes it from the complete list of printers, to find unused printers.
 function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
+   
+   # First confirm the there is at least one printer configured.
    if ( $objectOf_Policy.policy.printers.size -ne 0 ) {
-#        Write-Host "Printer Size not 0"
         ForEach ( $Printer in $objectOf_Policy.policy.printers.printer ) {
+
+            # Check if the printer ID is still in the list of unused printers.
             if ( $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) } ) {
-#                Write-Host "If printer object equals printer ID"
-#                Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Printer $($Printer.id) / $($Printer.name)"
+                # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Printer $($Printer.id) / $($Printer.name)"
                 $Remove = $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) }
                 $Remove.ParentNode.RemoveChild($Remove) | Out-Null
             }
@@ -355,12 +364,15 @@ function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
     return $xmlOf_UnusedPrinters
 }
 
-# Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups
+# Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups.
 function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
 
-   if ( $objectOf_Record.SelectNodes("//scope").computer_groups.IsEmpty -eq $false -and $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.IsEmpty -eq $false ) {
+    # First, check if the the scope nodes are empty.
+    if ( $objectOf_Record.SelectNodes("//scope").computer_groups.IsEmpty -eq $false -and $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.IsEmpty -eq $false ) {
+        
+        # For each Targeted Computer Group, remove it from the complete list of Computer Groups.
         ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").computer_groups.computer_group ) {
-            Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
+            # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
 
             if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
                 $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
@@ -368,8 +380,9 @@ function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
             }
         }
 
+        # For each Excluded Computer Group, remove it from the complete list of Computer Groups.
         ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.computer_group ) {
-            Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
+            # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
 
             if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
                 $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
@@ -380,9 +393,10 @@ function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
     return $xmlOf_UnusedComputerGroups
 }
 
-# Computer Group Criteria
+# This Function contains criteria that is configured within a Computer Group object.
 function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGroups){
 
+    # Build an object for this computer group record.
     $computerGroup = New-Object PSObject -Property ([ordered]@{
         ID = $objectOf_ComputerGroup.computer_group.id
         Name = $objectOf_ComputerGroup.computer_group.name
@@ -390,6 +404,7 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
         "Smart Group" = $objectOf_ComputerGroup.computer_group.is_smart
     })
 
+    # Check if the Computer Group is Empty.
     if ( $objectOf_ComputerGroup.computer_group.computers.size -eq 0 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $true | Out-Null
     }
@@ -397,6 +412,7 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $false | Out-Null
     }
 
+    # Check if the Computer Group has any defined criteria.
     if ( $objectOf_ComputerGroup.computer_group.criteria.size -eq 0 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $true | Out-Null
     }
@@ -404,6 +420,7 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $false | Out-Null
     }
 
+    # Check if the Computer Group has 10 or more defined criteria.
     if ( [int]$objectOf_ComputerGroup.computer_group.criteria.size -ge 10 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $true | Out-Null
     }
@@ -412,23 +429,27 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
     }
     
     $count = 0
-    # Check for Nested Computer Groups and remove from the UnusedComputerGroups Object
+    # Check for Nested Computer Groups and remove from the UnusedComputerGroups Object.
     ForEach ( $criteria in $objectOf_ComputerGroup.computer_group.criteria.criterion ) {
         if ( $criteria.name -eq "Computer Group" ) {
+            # Get the Computer Groups full details.
             $nestedGroup = $xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.name -eq $($criteria.value) }
-            Write-Host "$($objectOf_ComputerGroup.FirstChild.NextSibling.LocalName) ID $($objectOf_ComputerGroup.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
+            # Write-Host "$($objectOf_ComputerGroup.FirstChild.NextSibling.LocalName) ID $($objectOf_ComputerGroup.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
 
+            # Remove the Computer Group from the complete list of Computer Groups, if it still there.
             if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) } ) {
                 $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) }
                 $Remove.ParentNode.RemoveChild($Remove) | Out-Null
             }
 
+            # Tracking number of Nested Smart Groups
             if ( $nestedGroup.is_smart -eq $true ) {
                 $count++
             }
         }
     }
 
+    # Checking if the Computer Group has 4 or more Nested Smart Computer Groups
     if ( $count -ge 4 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $true | Out-Null
     }
@@ -488,9 +509,7 @@ processEndpoints $xmlArray_AlleBookDetails
 
 # Create Reports for other criteria
 createReport $Global:xmlOf_UnusedComputerGroups "computer_group"
-createReport $xmlOf_UnusedPrinters "printer"
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
-Write-Host "jamf_Reporting Process:  COMPLETE"
-
+Write-Host "jamf_Audit Process:  COMPLETE"
