@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.0.0 / Updated:  11/16/2018 / By:  ZT
+Version:  1.1.0 / Updated:  11/17/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -37,9 +37,10 @@ $getPatchPolicy = "${jamfPS}/JSSResource/patchpolicies/id"
 $geteBooks = "${jamfPS}/JSSResource/ebooks"
 $geteBook = "${jamfPS}/JSSResource/ebooks/id"
 
+$Position = 1
 $folderDate=$(Get-Date -UFormat %m-%d-%y)
 $saveDirectory = ($(Read-Host "Provide directiory to save the report") -replace '"')
-$Position = 1
+Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
 # Set the session to use TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -122,10 +123,9 @@ function createReport($outputObject, $Endpoint) {
     if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
          New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
     }
-    Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
     # Export each Policy object to a file.
-    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" ) {
+    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" -or $Endpoint -eq "Unused_Computer Groups") {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
     else {
@@ -508,7 +508,9 @@ processEndpoints $xmlArray_AllPatchPoliciesDetails
 processEndpoints $xmlArray_AlleBookDetails
 
 # Create Reports for other criteria
-createReport $Global:xmlOf_UnusedComputerGroups "computer_group"
+ForEach ( $computerGroup in $Global:xmlOf_UnusedComputerGroups.computer_groups.computer_group ) {
+    createReport $($xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.id -eq $computerGroup.id } | Select-Object id, name, @{Name="site"; Expression={$_.site.name}}, is_smart) "Unused_Computer Groups"
+}
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
