@@ -36,6 +36,12 @@ $getPatchPolicies = "${jamfPS}/JSSResource/patchpolicies"
 $getPatchPolicy = "${jamfPS}/JSSResource/patchpolicies/id"
 $geteBooks = "${jamfPS}/JSSResource/ebooks"
 $geteBook = "${jamfPS}/JSSResource/ebooks/id"
+$getMobileDeviceGroups = "${jamfPS}/JSSResource/mobiledevicegroups"
+$getMobileDeviceGroup = "${jamfPS}/JSSResource/mobiledevicegroups/id"
+$getMobileDeviceConfigProfiles = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles"
+$getMobileDeviceConfigProfile = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles/id"
+$getMobileDeviceAppStoreApps = "${jamfPS}/JSSResource/mobiledeviceapplications"
+$getMobileDeviceAppStoreApp = "${jamfPS}/JSSResource/mobiledeviceapplications/id"
 
 $Position = 1
 $folderDate=$(Get-Date -UFormat %m-%d-%y)
@@ -494,6 +500,10 @@ $xmlArray_AllRestrictedSoftwareItemDetails = getEndpoint "Restricted Software It
 $xmlArray_AllComputerAppStoreAppDetails = getEndpoint "Computer App Store Apps" $getComputerAppStoreApps | getEndpointDetails $getComputerAppStoreApp
 $xmlArray_AllPatchPoliciesDetails = getEndpoint "Patch Policies" $getPatchPolicies | getEndpointDetails $getPatchPolicy
 $xmlArray_AlleBookDetails = getEndpoint "eBooks" $geteBooks | getEndpointDetails $geteBook
+$xml_AllMobileDeviceGroups = getEndpoint "Mobile Device Groups" $getMobileDeviceGroups
+$xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Computer Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
+$xmlArray_AllMobileDeviceGroupsDetails = $xml_AllMobileDeviceGroups | getEndpointDetails $getMobileDeviceGroup
+$xmlArray_AllMobileDeviceAppStoreAppDetails = getEndpoint "Mobile Device App Store Apps" $getMobileDeviceAppStoreApps | getEndpointDetails $getMobileDeviceAppStoreApp
 
 # Using this object for two different tests, so need an "original" copy and one that will be modified
 $Global:xmlOf_UnusedComputerGroups =  $xml_AllComputerGroups.Clone()
