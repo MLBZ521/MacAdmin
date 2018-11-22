@@ -2,21 +2,22 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.1.0 / Updated:  11/17/2018 / By:  ZT
+Version:  1.2.0 / Updated:  11/22/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
 #>
 
 Write-Host "jamf_Audit Process:  START"
+Write-Host ""
 
 # ============================================================
 # Define Variables
 # ============================================================
 
 # Setup Credentials
-$jamfAPIUser = $(Read-Host "JPS Account")
-$jamfAPIPassword = $(Read-Host -AsSecureString "JPS Password")
+$jamfAPIUser = $( Read-Host "JPS Account" )
+$jamfAPIPassword = $( Read-Host -AsSecureString "JPS Password" )
 $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $jamfAPIUser, $jamfAPIPassword
 
 # Setup API URLs
@@ -36,14 +37,25 @@ $getPatchPolicies = "${jamfPS}/JSSResource/patchpolicies"
 $getPatchPolicy = "${jamfPS}/JSSResource/patchpolicies/id"
 $geteBooks = "${jamfPS}/JSSResource/ebooks"
 $geteBook = "${jamfPS}/JSSResource/ebooks/id"
+$getMobileDeviceGroups = "${jamfPS}/JSSResource/mobiledevicegroups"
+$getMobileDeviceGroup = "${jamfPS}/JSSResource/mobiledevicegroups/id"
+$getMobileDeviceConfigProfiles = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles"
+$getMobileDeviceConfigProfile = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles/id"
+$getMobileDeviceAppStoreApps = "${jamfPS}/JSSResource/mobiledeviceapplications"
+$getMobileDeviceAppStoreApp = "${jamfPS}/JSSResource/mobiledeviceapplications/id"
 
-$Position = 1
-$folderDate=$(Get-Date -UFormat %m-%d-%y)
-$saveDirectory = ($(Read-Host "Provide directiory to save the report") -replace '"')
+# Setup Save Directory
+$folderDate=$( Get-Date -UFormat %m-%d-%y )
+$saveDirectory = ( $( Read-Host "Provide directiory to save the report" ) -replace '"' )
 Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
 # Set the session to use TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Miscellaneous Variables
+$Used_Computer_Groups = @()
+$Used_MobileDevice_Groups = @()
+$Position = 1
 
 # ============================================================
 # Logic Functions
@@ -58,20 +70,21 @@ function getEndpoint($Endpoint, $urlAll) {
     return $xml_AllRecords
 }
 
-# This Function takes the reults of the inital functions and gets each records details, adding them to an Array.
-function getEndpointDetails () {
+# This Function takes the results of the inital function and gets each records details, adding them to an Array.
+function getEndpointDetails() {
     [cmdletbinding()]
     Param (
         [Parameter(ValuefromPipeline)][String]$urlDetails,
         [Parameter(ValuefromPipeline)][Xml]$xml_AllRecords
     )
     
-    if ($xml_AllRecords.FirstChild.NextSibling.size -ne 0) {
+    if ( $xml_AllRecords.FirstChild.NextSibling.size -ne 0 ) {
         $objectOf_AllRecordDetails = New-Object System.Collections.Arraylist
 
         # Loop through each endpoint
         ForEach ( $Record in $xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)") ) {
-            Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
+            Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Record:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
+            #Write-Host "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)"
 
             # Get the configuration of each Policy
             $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
@@ -82,7 +95,7 @@ function getEndpointDetails () {
     }
 }
 
-# This Functions loops individual records from a list of recordsobject, over defined criteria.
+# This Function processes individual records from a list of record objects, over defined criteria.
 function processEndpoints() {
     [cmdletbinding()]
     Param (
@@ -92,29 +105,46 @@ function processEndpoints() {
     )
     
     if ( $typeOf_AllRecords -ne $null ) {    
+        $usedGroups = @()
+
         ForEach ( $Record in $typeOf_AllRecords ) {
-            Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Policy:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
+            Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Record:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
             # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
         
             if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
                 policyCriteria $Record $xmlOf_ComputerGroups
                 $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-                $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
+                $usedGroups += groupUsage $Record
                 
                 # Create Printer Report
-                if ($Position -eq $typeOf_AllRecords.Count) {
+                if ( $Position -eq $typeOf_AllRecords.Count ) {
                     createReport $xmlOf_UnusedPrinters "printer"
                 }
             }
-            elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
-                $Global:xmlOf_UnusedComputerGroups = computerGroupCriteria $Record $Global:xmlOf_UnusedComputerGroups
+            elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_group" ) {
+                groupCriteria $Record $typeOf_AllRecords
             }
             else {
-                $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
+                # Proccessed during other configurations
+                $usedGroups += groupUsage $Record
             }
 
             $Position++
         }
+    }
+    return $usedGroups
+}
+
+# This Function processes unused Groups before passing them to the createReport Function
+function unusedGroups() {
+        [cmdletbinding()]
+    Param (
+        [Parameter(Mandatory=$true,ValuefromPipeline)][AllowNull()][System.Array]$typeOf_AllRecords,
+        [Parameter(ValuefromPipeline)][String]$Type,
+        [Parameter(Mandatory=$true,ValuefromPipeline)][String]$id
+    )
+    Process {
+        createReport $( $typeOf_AllRecords.FirstChild.NextSibling | Where-Object { $_.id -eq $id } | Select-Object id, name, @{Name="site"; Expression={$_.site.name}}, is_smart ) $Type
     }
 }
 
@@ -125,11 +155,14 @@ function createReport($outputObject, $Endpoint) {
     }
 
     # Export each Policy object to a file.
-    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" -or $Endpoint -eq "Unused_Computer Groups") {
+    if ( $Endpoint -eq "printer" ) {
+        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
+    }
+    elseif ( $Endpoint -notmatch "Unused" ) {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
-    else {
-        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
+    elseif ( $Endpoint -match "Unused" ) {
+        Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
 }
 
@@ -137,7 +170,7 @@ function createReport($outputObject, $Endpoint) {
 # Criteria Functions
 # ============================================================
 
-# This Function contains criteria that is configured within a Policy object.
+# This Function checks criteria that is configured within a Policy object.
 function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 
     # Build an object for this policy record.
@@ -149,7 +182,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
     })
 
     # Checks if Policy is Disabled
-    if ( $objectOf_Policy.policy.general.enabled -eq $false) {
+    if ( $objectOf_Policy.policy.general.enabled -eq $false ) {
         Add-Member -InputObject $policy -PassThru NoteProperty "Disabled" $true | Out-Null
     }
     else {
@@ -236,7 +269,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
     }
 
     # Checks if a Self Service Policy has an Icon selected.
-    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon.IsEmpty -ne $false) {
+    if ( $objectOf_Policy.policy.self_service.use_for_self_service -eq $true -and $objectOf_Policy.policy.self_service.self_service_icon.IsEmpty -ne $false ) {
         Add-Member -InputObject $policy -PassThru NoteProperty "SS No Icon" $true | Out-Null
     }
     else {
@@ -282,7 +315,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) } ).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
@@ -314,7 +347,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         elseif ( $objectOf_Policy.policy.scope.computer_groups.IsEmpty -eq $false ) {
 
             ForEach ( $computerGroup in $objectOf_Policy.policy.scope.computer_groups.computer_group ) {
-                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) }).is_smart -eq $false ) {
+                if ( $($xmlOf_ComputerGroups.SelectNodes("//computer_group") | Where-Object { $_.name -eq $($computerGroup.name) } ).is_smart -eq $false ) {
                     $ongoingCheck = 1
                 }
             }
@@ -336,7 +369,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 
     # Checks if a Site-Level Policy performs a Inventory.
         # Keeping for now.
-#    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true) {
+#    if ( $objectOf_Policy.policy.general.site.name -ne "None" -and $objectOf_Policy.policy.maintenance.recon -eq $true ) {
 #        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $true | Out-Null
 #    }
 #    else {
@@ -364,83 +397,68 @@ function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
     return $xmlOf_UnusedPrinters
 }
 
-# Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups.
-function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
+# Checks if a Group is used in the scope of a configuration and adds to a list of used groups.
+function groupUsage($objectOf_Record) {
+    $usedGroups = @()
 
-    # First, check if the the scope nodes are empty.
-    if ( $objectOf_Record.SelectNodes("//scope").computer_groups.IsEmpty -eq $false -and $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.IsEmpty -eq $false ) {
-        
-        # For each Targeted Computer Group, remove it from the complete list of Computer Groups.
-        ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").computer_groups.computer_group ) {
-            # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
-
-            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
-                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
-                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
-            }
-        }
-
-        # For each Excluded Computer Group, remove it from the complete list of Computer Groups.
-        ForEach ( $computerGroup in $objectOf_Record.SelectNodes("//scope").exclusions.computer_groups.computer_group ) {
-            # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Computer Group $($computerGroup.id) / $($computerGroup.name)"
-
-            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) } ) {
-                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.id -eq $($computerGroup.id) }
-                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
-            }
-        }
+    # For each Targeted Group, add it to a list of used groups.
+    ForEach ( $Group in $objectOf_Record.SelectNodes("//scope/*[contains(name(), 'groups') and not(contains(name(), 'user'))]/*[contains(name(), 'group')]") ) {
+        # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Group $($Group.id) / $($Group.name)"
+        $usedGroups += $Group
     }
-    return $xmlOf_UnusedComputerGroups
+
+    # For each Excluded Group, add it to a list of used groups.
+    ForEach ( $Group in $objectOf_Record.SelectNodes("//scope/exclusions/*[contains(name(), 'groups') and not(contains(name(), 'user'))]/*[contains(name(), 'group')]") ) {
+        # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Group $($Group.id) / $($Group.name)"
+        $usedGroups += $Group
+    }
+    
+    return $usedGroups
 }
 
-# This Function contains criteria that is configured within a Computer Group object.
-function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGroups){
+# This Function checks criteria that is configured within a Group object.
+function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
 
-    # Build an object for this computer group record.
-    $computerGroup = New-Object PSObject -Property ([ordered]@{
-        ID = $objectOf_ComputerGroup.computer_group.id
-        Name = $objectOf_ComputerGroup.computer_group.name
-        Site = $objectOf_ComputerGroup.computer_group.site.name
-        "Smart Group" = $objectOf_ComputerGroup.computer_group.is_smart
+    # Build an object for this group record.
+    $Group = New-Object PSObject -Property ([ordered]@{
+        ID = $objectOf_Group.FirstChild.NextSibling.id
+        Name = $objectOf_Group.FirstChild.NextSibling.name
+        Site = $objectOf_Group.FirstChild.NextSibling.site.name
+        "Smart Group" = $objectOf_Group.FirstChild.NextSibling.is_smart
     })
 
-    # Check if the Computer Group is Empty.
-    if ( $objectOf_ComputerGroup.computer_group.computers.size -eq 0 ) {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $true | Out-Null
+    # Check if the Group is Empty.
+    if ( $objectOf_Group.FirstChild.NextSibling.LastChild.size -eq 0 ) {
+        Add-Member -InputObject $Group -PassThru NoteProperty "Empty" $true | Out-Null
     }
     else {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $false | Out-Null
+        Add-Member -InputObject $Group -PassThru NoteProperty "Empty" $false | Out-Null
     }
 
-    # Check if the Computer Group has any defined criteria.
-    if ( $objectOf_ComputerGroup.computer_group.criteria.size -eq 0 ) {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $true | Out-Null
+    # Check if the Group has any defined criteria.
+    if ( $objectOf_Group.FirstChild.NextSibling.criteria.size -eq 0 ) {
+        Add-Member -InputObject $Group -PassThru NoteProperty "No Criteria" $true | Out-Null
     }
     else {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $false | Out-Null
+        Add-Member -InputObject $Group -PassThru NoteProperty "No Criteria" $false | Out-Null
     }
 
-    # Check if the Computer Group has 10 or more defined criteria.
-    if ( [int]$objectOf_ComputerGroup.computer_group.criteria.size -ge 10 ) {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $true | Out-Null
+    # Check if the Group has 10 or more defined criteria.
+    if ( [int]$objectOf_Group.FirstChild.NextSibling.criteria.size -ge 10 ) {
+        Add-Member -InputObject $Group -PassThru NoteProperty "10+ Criteria" $true | Out-Null
     }
     else {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $false | Out-Null
+        Add-Member -InputObject $Group -PassThru NoteProperty "10+ Criteria" $false | Out-Null
     }
     
     $count = 0
-    # Check for Nested Computer Groups and remove from the UnusedComputerGroups Object.
-    ForEach ( $criteria in $objectOf_ComputerGroup.computer_group.criteria.criterion ) {
-        if ( $criteria.name -eq "Computer Group" ) {
-            # Get the Computer Groups full details.
-            $nestedGroup = $xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.name -eq $($criteria.value) }
-            # Write-Host "$($objectOf_ComputerGroup.FirstChild.NextSibling.LocalName) ID $($objectOf_ComputerGroup.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
-
-            # Remove the Computer Group from the complete list of Computer Groups, if it still there.
-            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) } ) {
-                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) }
-                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
-            }
+    $usedGroups = @()
+    # Check for Nested Groups  and adds to a list of used groups.
+    ForEach ( $criteria in $objectOf_Group.FirstChild.NextSibling.criteria.criterion ) {
+        if ( $criteria.name -match "Group" ) {
+            # Get the Groups full details.
+            $usedGroups += $xmlOf_AllGroups.FirstChild.NextSibling | Where-Object { $_.name -eq $($criteria.value) }
+            # Write-Host "$($objectOf_Group.FirstChild.NextSibling.LocalName) ID $($objectOf_Group.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
 
             # Tracking number of Nested Smart Groups
             if ( $nestedGroup.is_smart -eq $true ) {
@@ -449,16 +467,16 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
         }
     }
 
-    # Checking if the Computer Group has 4 or more Nested Smart Computer Groups
+    # Checking if the Group has 4 or more Nested Smart Groups
     if ( $count -ge 4 ) {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $true | Out-Null
+        Add-Member -InputObject $Group -PassThru NoteProperty "4+ Criteria" $true | Out-Null
     }
     else {
-        Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $false | Out-Null
+        Add-Member -InputObject $Group -PassThru NoteProperty "4+ Criteria" $false | Out-Null
     }
 
-    createReport $computerGroup "Computer Groups"
-    return $xmlOf_UnusedComputerGroups 
+    createReport $Group $objectOf_Group.FirstChild.NextSibling.LocalName
+    return $usedGroups 
 }
 
 # ============================================================
@@ -494,23 +512,26 @@ $xmlArray_AllRestrictedSoftwareItemDetails = getEndpoint "Restricted Software It
 $xmlArray_AllComputerAppStoreAppDetails = getEndpoint "Computer App Store Apps" $getComputerAppStoreApps | getEndpointDetails $getComputerAppStoreApp
 $xmlArray_AllPatchPoliciesDetails = getEndpoint "Patch Policies" $getPatchPolicies | getEndpointDetails $getPatchPolicy
 $xmlArray_AlleBookDetails = getEndpoint "eBooks" $geteBooks | getEndpointDetails $geteBook
-
-# Using this object for two different tests, so need an "original" copy and one that will be modified
-$Global:xmlOf_UnusedComputerGroups =  $xml_AllComputerGroups.Clone()
+$xml_AllMobileDeviceGroups = getEndpoint "Mobile Device Groups" $getMobileDeviceGroups
+$xmlArray_AllMobileDeviceGroupsDetails = $xml_AllMobileDeviceGroups | getEndpointDetails $getMobileDeviceGroup
+$xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Mobile Device Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
+$xmlArray_AllMobileDeviceAppStoreAppDetails = getEndpoint "Mobile Device App Store Apps" $getMobileDeviceAppStoreApps | getEndpointDetails $getMobileDeviceAppStoreApp
 
 # Call processEndpoints function to process each type
-processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
-processEndpoints $xmlArray_AllComputerGroupsDetails
-processEndpoints $xmlArray_AllComputerConfigProfileDetails
-processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
-processEndpoints $xmlArray_AllComputerAppStoreAppDetails
-processEndpoints $xmlArray_AllPatchPoliciesDetails
-processEndpoints $xmlArray_AlleBookDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
+$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerConfigProfileDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerAppStoreAppDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AllPatchPoliciesDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AlleBookDetails
+$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerGroupsDetails
+$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceGroupsDetails
+$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceConfigProfileDetails
+$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceAppStoreAppDetails
 
-# Create Reports for other criteria
-ForEach ( $computerGroup in $Global:xmlOf_UnusedComputerGroups.computer_groups.computer_group ) {
-    createReport $($xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.id -eq $computerGroup.id } | Select-Object id, name, @{Name="site"; Expression={$_.site.name}}, is_smart) "Unused_Computer Groups"
-}
+# Compare All_Groups to Used_Groups to create a report of Unused Groups
+$( Compare-Object -ReferenceObject $($($xml_AllComputerGroups.computer_groups.computer_group).id) -DifferenceObject $( $($Used_Computer_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllComputerGroupsDetails "Unused_ComputerGroups"
+$( Compare-Object -ReferenceObject $($($xml_AllMobileDeviceGroups.mobile_device_groups.mobile_device_group).id) -DifferenceObject $( $($Used_MobileDevice_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllMobileDeviceGroupsDetails "Unused_MobileDeviceGroups"
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
