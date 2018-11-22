@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.1.0 / Updated:  11/17/2018 / By:  ZT
+Version:  1.1.0 / Updated:  11/21/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -88,7 +88,7 @@ function getEndpointDetails () {
     }
 }
 
-# This Functions loops individual records from a list of recordsobject, over defined criteria.
+# This Functions processes individual records from a list of record objects, over defined criteria.
 function processEndpoints() {
     [cmdletbinding()]
     Param (
@@ -113,9 +113,13 @@ function processEndpoints() {
                 }
             }
             elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" ) {
-                $Global:xmlOf_UnusedComputerGroups = computerGroupCriteria $Record $Global:xmlOf_UnusedComputerGroups
+                $Global:xmlOf_UnusedComputerGroups = groupCriteria $Record $Global:xmlOf_UnusedComputerGroups
+            }
+            elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_group" ) {
+                groupCriteria $Record
             }
             else {
+                # Proccessed during other configurations
                 $Global:xmlOf_UnusedComputerGroups = computerGroupUsage $Record $Global:xmlOf_UnusedComputerGroups
             }
 
@@ -130,8 +134,10 @@ function createReport($outputObject, $Endpoint) {
          New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
     }
 
+    #Write-Host "Create Report for:  " $Endpoint
+
     # Export each Policy object to a file.
-    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" -or $Endpoint -eq "Unused_Computer Groups") {
+    if ( $Endpoint -eq "Policies" -or $Endpoint -eq "Computer Groups" -or $Endpoint -eq "Unused_Computer Groups" -or $Endpoint -eq "computer_group" -or $Endpoint -eq "mobile_device_group") {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
     else {
@@ -370,7 +376,7 @@ function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
     return $xmlOf_UnusedPrinters
 }
 
-# Checks if a Computer Group is used in a Policy and removes it from the complete list of computer groups, to find unused computer groups.
+# Checks if a Computer Group is used in the scope of a configuration and removes it from the complete list of computer groups, to find unused computer groups.
 function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
 
     # First, check if the the scope nodes are empty.
@@ -400,18 +406,18 @@ function computerGroupUsage($objectOf_Record, $xmlOf_UnusedComputerGroups) {
 }
 
 # This Function contains criteria that is configured within a Computer Group object.
-function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGroups){
+function groupCriteria($objectOf_Group, $xmlOf_UnusedGroups){
 
     # Build an object for this computer group record.
     $computerGroup = New-Object PSObject -Property ([ordered]@{
-        ID = $objectOf_ComputerGroup.computer_group.id
-        Name = $objectOf_ComputerGroup.computer_group.name
-        Site = $objectOf_ComputerGroup.computer_group.site.name
-        "Smart Group" = $objectOf_ComputerGroup.computer_group.is_smart
+        ID = $objectOf_Group.FirstChild.NextSibling.id
+        Name = $objectOf_Group.FirstChild.NextSibling.name
+        Site = $objectOf_Group.FirstChild.NextSibling.site.name
+        "Smart Group" = $objectOf_Group.FirstChild.NextSibling.is_smart
     })
 
     # Check if the Computer Group is Empty.
-    if ( $objectOf_ComputerGroup.computer_group.computers.size -eq 0 ) {
+    if ( $objectOf_Group.FirstChild.NextSibling.LastChild.size -eq 0 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "Empty" $true | Out-Null
     }
     else {
@@ -419,7 +425,7 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
     }
 
     # Check if the Computer Group has any defined criteria.
-    if ( $objectOf_ComputerGroup.computer_group.criteria.size -eq 0 ) {
+    if ( $objectOf_Group.FirstChild.NextSibling.criteria.size -eq 0 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "No Criteria" $true | Out-Null
     }
     else {
@@ -427,7 +433,7 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
     }
 
     # Check if the Computer Group has 10 or more defined criteria.
-    if ( [int]$objectOf_ComputerGroup.computer_group.criteria.size -ge 10 ) {
+    if ( [int]$objectOf_Group.FirstChild.NextSibling.criteria.size -ge 10 ) {
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "10+ Criteria" $true | Out-Null
     }
     else {
@@ -436,15 +442,15 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
     
     $count = 0
     # Check for Nested Computer Groups and remove from the UnusedComputerGroups Object.
-    ForEach ( $criteria in $objectOf_ComputerGroup.computer_group.criteria.criterion ) {
-        if ( $criteria.name -eq "Computer Group" ) {
+    ForEach ( $criteria in $objectOf_Group.FirstChild.NextSibling.criteria.criterion ) {
+        if ( $criteria.name -match "Group" ) {
             # Get the Computer Groups full details.
-            $nestedGroup = $xmlArray_AllComputerGroupsDetails.computer_group | Where-Object { $_.name -eq $($criteria.value) }
-            # Write-Host "$($objectOf_ComputerGroup.FirstChild.NextSibling.LocalName) ID $($objectOf_ComputerGroup.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
+            $nestedGroup = $xmlArray_AllComputerGroupsDetails.FirstChild.NextSibling | Where-Object { $_.name -eq $($criteria.value) }
+            # Write-Host "$($objectOf_Group.FirstChild.NextSibling.LocalName) ID $($objectOf_Group.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
 
             # Remove the Computer Group from the complete list of Computer Groups, if it still there.
-            if ( $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) } ) {
-                $Remove = $xmlOf_UnusedComputerGroups.computer_groups.computer_group | Where-Object { $_.name -eq $($criteria.value) }
+            if ( $xmlOf_UnusedGroups.FirstChild.NextSibling.FirstChild.NextSibling.LocalName | Where-Object { $_.name -eq $($criteria.value) } ) {
+                $Remove = $xmlOf_UnusedGroups.FirstChild.NextSibling.FirstChild.NextSibling.LocalName | Where-Object { $_.name -eq $($criteria.value) }
                 $Remove.ParentNode.RemoveChild($Remove) | Out-Null
             }
 
@@ -463,8 +469,8 @@ function computerGroupCriteria($objectOf_ComputerGroup, $xmlOf_UnusedComputerGro
         Add-Member -InputObject $computerGroup -PassThru NoteProperty "4+ Criteria" $false | Out-Null
     }
 
-    createReport $computerGroup "Computer Groups"
-    return $xmlOf_UnusedComputerGroups 
+    createReport $computerGroup $objectOf_Group.FirstChild.NextSibling.LocalName
+    return $xmlOf_UnusedGroups 
 }
 
 # ============================================================
@@ -501,12 +507,13 @@ $xmlArray_AllComputerAppStoreAppDetails = getEndpoint "Computer App Store Apps" 
 $xmlArray_AllPatchPoliciesDetails = getEndpoint "Patch Policies" $getPatchPolicies | getEndpointDetails $getPatchPolicy
 $xmlArray_AlleBookDetails = getEndpoint "eBooks" $geteBooks | getEndpointDetails $geteBook
 $xml_AllMobileDeviceGroups = getEndpoint "Mobile Device Groups" $getMobileDeviceGroups
-$xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Computer Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
 $xmlArray_AllMobileDeviceGroupsDetails = $xml_AllMobileDeviceGroups | getEndpointDetails $getMobileDeviceGroup
+$xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Mobile Device Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
 $xmlArray_AllMobileDeviceAppStoreAppDetails = getEndpoint "Mobile Device App Store Apps" $getMobileDeviceAppStoreApps | getEndpointDetails $getMobileDeviceAppStoreApp
 
 # Using this object for two different tests, so need an "original" copy and one that will be modified
 $Global:xmlOf_UnusedComputerGroups =  $xml_AllComputerGroups.Clone()
+$Global:xmlOf_UnusedMobileDeviceGroups =  $xml_AllMobileDeviceGroups.Clone()
 
 # Call processEndpoints function to process each type
 processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
@@ -516,6 +523,7 @@ processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
 processEndpoints $xmlArray_AllComputerAppStoreAppDetails
 processEndpoints $xmlArray_AllPatchPoliciesDetails
 processEndpoints $xmlArray_AlleBookDetails
+processEndpoints $xmlArray_AllMobileDeviceGroupsDetails
 
 # Create Reports for other criteria
 ForEach ( $computerGroup in $Global:xmlOf_UnusedComputerGroups.computer_groups.computer_group ) {
