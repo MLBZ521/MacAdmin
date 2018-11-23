@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.2.0 / Updated:  11/22/2018 / By:  ZT
+Version:  1.3.0 / Updated:  11/22/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -516,6 +516,21 @@ $xml_AllMobileDeviceGroups = getEndpoint "Mobile Device Groups" $getMobileDevice
 $xmlArray_AllMobileDeviceGroupsDetails = $xml_AllMobileDeviceGroups | getEndpointDetails $getMobileDeviceGroup
 $xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Mobile Device Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
 $xmlArray_AllMobileDeviceAppStoreAppDetails = getEndpoint "Mobile Device App Store Apps" $getMobileDeviceAppStoreApps | getEndpointDetails $getMobileDeviceAppStoreApp
+
+# Create a file containing the total for each Endpoint
+$totalObjects=@()
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Policies"; Value= $( $xmlArray_AllPoliciesDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Computer Groups"; Value= $( $xmlArray_AllComputerGroupsDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Printers"; Value= $( $xml_AllPrinters.printers.printer | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Computer Config Profiles"; Value= $( $xmlArray_AllComputerConfigProfileDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Restricted Software"; Value= $( $xmlArray_AllRestrictedSoftwareItemDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Computer App Store Apps"; Value= $( $xmlArray_AllComputerAppStoreAppDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Patch Policies"; Value= $( $xmlArray_AllPatchPoliciesDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="eBooks"; Value= $( $xmlArray_AlleBookDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device Groups"; Value= $( $xmlArray_AllMobileDeviceGroupsDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device Config Profile"; Value= $( $xmlArray_AllMobileDeviceConfigProfileDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device App Store Apps"; Value= $( $xmlArray_AllMobileDeviceAppStoreAppDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Total Objects.csv" -Append -NoTypeInformation
 
 # Call processEndpoints function to process each type
 $Used_Computer_Groups += processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
