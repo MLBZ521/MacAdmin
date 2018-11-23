@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.3.0 / Updated:  11/22/2018 / By:  ZT
+Version:  1.4.0 / Updated:  11/23/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -63,10 +63,21 @@ $Position = 1
 
 # This Function gets an inital list of all Endpoints.
 function getEndpoint($Endpoint, $urlAll) {
-    # Get all records
     Write-host "Querying:  ${Endpoint}"
-    $xml_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
 
+    # Get all records
+    Try {
+        $xml_AllRecords = Invoke-RestMethod -Uri "${urlAll}" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
+    }
+    Catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $statusDescription = $_.Exception.Response.StatusDescription
+
+        If ($statusCode -notcontains "200") {
+            Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+            Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+        }
+    }
     return $xml_AllRecords
 }
 
@@ -87,8 +98,19 @@ function getEndpointDetails() {
             #Write-Host "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)"
 
             # Get the configuration of each Policy
-            $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials
-            $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
+            Try {
+                $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
+                $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
+            }
+            Catch {
+                $statusCode = $_.Exception.Response.StatusCode.value__
+                $statusDescription = $_.Exception.Response.StatusDescription
+
+                If ($statusCode -notcontains "200") {
+                    Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+                    Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+                }
+            }
             $Position++
         }
         return $objectOf_AllRecordDetails
