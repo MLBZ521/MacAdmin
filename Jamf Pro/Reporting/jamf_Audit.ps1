@@ -43,6 +43,7 @@ $getMobileDeviceConfigProfiles = "${jamfPS}/JSSResource/mobiledeviceconfiguratio
 $getMobileDeviceConfigProfile = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles/id"
 $getMobileDeviceAppStoreApps = "${jamfPS}/JSSResource/mobiledeviceapplications"
 $getMobileDeviceAppStoreApp = "${jamfPS}/JSSResource/mobiledeviceapplications/id"
+$iTunesAPI = "https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?version=1&p=mdm-lockup&caller=MDM&platform=itunes&cc=us&l=en&id="
 
 # Setup Save Directory
 $folderDate=$( Get-Date -UFormat %m-%d-%y )
@@ -501,6 +502,35 @@ function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
     return $usedGroups 
 }
 
+# This Function checks criteria against App Store App objects.
+function appStoreAppCriteria($objectOf_App) {
+
+    # Build an object for this App record.
+    $App = New-Object PSObject -Property ([ordered]@{
+        ID = $objectOf_App.FirstChild.NextSibling.general.id
+        Name = $objectOf_App.FirstChild.NextSibling.general.name
+        Site = $objectOf_App.FirstChild.NextSibling.general.site.name
+        "Bundle ID" = $objectOf_App.FirstChild.NextSibling.general.bundle_id
+        version = $objectOf_App.FirstChild.NextSibling.general.version
+        "iTunes Store URL" = $objectOf_App.FirstChild.NextSibling.general.itunes_store_url
+    })
+
+    $appAdamID = (($objectOf_App.FirstChild.NextSibling.general.itunes_store_url -split "/id")[1] -split "\?")[0]
+
+    Try {
+        $iTunesReturn = Invoke-RestMethod -Uri "${iTunesAPI}${appAdamID}" -Method Get
+    }
+    Catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $statusDescription = $_.Exception.Response.StatusDescription
+
+        If ($statusCode -notcontains "200") {
+            Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+            Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+        }
+    }
+
+}
 # ============================================================
 # Bits Staged...
 # ============================================================
