@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.4.0 / Updated:  11/23/2018 / By:  ZT
+Version:  1.5.0 / Updated:  11/24/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -43,6 +43,7 @@ $getMobileDeviceConfigProfiles = "${jamfPS}/JSSResource/mobiledeviceconfiguratio
 $getMobileDeviceConfigProfile = "${jamfPS}/JSSResource/mobiledeviceconfigurationprofiles/id"
 $getMobileDeviceAppStoreApps = "${jamfPS}/JSSResource/mobiledeviceapplications"
 $getMobileDeviceAppStoreApp = "${jamfPS}/JSSResource/mobiledeviceapplications/id"
+$iTunesAPI = "https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?version=1&p=mdm-lockup&caller=MDM&cc=us&l=en&id="
 
 # Setup Save Directory
 $folderDate=$( Get-Date -UFormat %m-%d-%y )
@@ -51,6 +52,11 @@ Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
 # Set the session to use TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Setup a Json.NET/JavaScriptSerializer Object
+# Credit to:  https://kevinmarquette.github.io/2016-11-06-powershell-hashtable-everything-you-wanted-to-know-about/
+[Reflection.Assembly]::LoadWithPartialName("System.Web.Script.Serialization")
+$JSSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
 
 # Miscellaneous Variables
 $Used_Computer_Groups = @()
@@ -133,24 +139,24 @@ function processEndpoints() {
             Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Record:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
             # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
         
-            if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
-                policyCriteria $Record $xmlOf_ComputerGroups
-                $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-                $usedGroups += groupUsage $Record
-                
-                # Create Printer Report
-                if ( $Position -eq $typeOf_AllRecords.Count ) {
-                    createReport $xmlOf_UnusedPrinters "printer"
-                }
-            }
-            elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_group" ) {
+            if ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_group" ) {
                 groupCriteria $Record $typeOf_AllRecords
             }
             else {
-                # Proccessed during other configurations
+                if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
+                    policyCriteria $Record $xmlOf_ComputerGroups
+                    $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
+                
+                    # Create Printer Report
+                    if ( $Position -eq $typeOf_AllRecords.Count ) {
+                        createReport $xmlOf_UnusedPrinters "printer"
+                    }
+                }
+                elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "mac_application"  -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_application" ) {
+                    appStoreAppCriteria $Record
+                }
                 $usedGroups += groupUsage $Record
             }
-
             $Position++
         }
     }
@@ -180,10 +186,7 @@ function createReport($outputObject, $Endpoint) {
     if ( $Endpoint -eq "printer" ) {
         ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
     }
-    elseif ( $Endpoint -notmatch "Unused" ) {
-        Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
-    }
-    elseif ( $Endpoint -match "Unused" ) {
+    else {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
 }
@@ -499,6 +502,62 @@ function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
 
     createReport $Group $objectOf_Group.FirstChild.NextSibling.LocalName
     return $usedGroups 
+}
+
+# This Function checks criteria against App Store App objects.
+function appStoreAppCriteria($objectOf_App) {
+
+    # Build an object for this App record.
+    $App = New-Object PSObject -Property ([ordered]@{
+        ID = $objectOf_App.FirstChild.NextSibling.general.id
+        Name = $objectOf_App.FirstChild.NextSibling.general.name
+        Site = $objectOf_App.FirstChild.NextSibling.general.site.name
+        "Bundle ID" = $objectOf_App.FirstChild.NextSibling.general.bundle_id
+        "Jamf Version" = $objectOf_App.FirstChild.NextSibling.general.version
+        "iTunes Store URL" = $(
+            if ( $objectOf_App.FirstChild.NextSibling.LocalName -eq "mobile_device_application" ) {
+                 $objectOf_App.FirstChild.NextSibling.general.itunes_store_url
+            }
+            elseif ( $objectOf_App.FirstChild.NextSibling.LocalName -eq "mac_application" ) {
+                $objectOf_App.FirstChild.NextSibling.general.url
+            }
+        )
+    })
+
+    # Get the Adam ID which is needed for the iTunes API.
+    $appAdamID = (($($App."iTunes Store URL") -split "/id")[1] -split "\?")[0]
+
+    # Get App details from Apple.
+    Try {
+        $iTunesReturn = Invoke-WebRequest -Uri "${iTunesAPI}${appAdamID}" -Method Get
+    }
+    Catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        $statusDescription = $_.Exception.Response.StatusDescription
+
+        If ($statusCode -notcontains "200") {
+            Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+            Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+        }
+    }
+
+    # Convert the JSON Object to a Hashtable -- this was the only way I could find to reliably test if the JSON results object property had a value.
+    $appConfig = $JSSerializer.Deserialize($iTunesReturn,'Hashtable')
+
+    # Check if App is available from Apple.
+    if ( $appConfig.results.Count -ne 0 ) {
+        Add-Member -InputObject $App -PassThru NoteProperty "Available" $true | Out-Null
+    }
+    else {
+        Add-Member -InputObject $App -PassThru NoteProperty "Available" $false | Out-Null
+    }
+
+    # Check if:  App is 32bit, the version available on iTunes, and if the version in Jamf is out of date.
+    Add-Member -InputObject $App -PassThru NoteProperty "32bit" $($appConfig.results.Values.is32bitOnly) | Out-Null
+    Add-Member -InputObject $App -PassThru NoteProperty "iTunes Version" $($appConfig.results.Values.offers.version.display) | Out-Null
+    Add-Member -InputObject $App -PassThru NoteProperty "Out of Date" $( $($App."iTunes Version") -ne $($App."Jamf Version") ) | Out-Null
+
+    createReport $App $objectOf_App.FirstChild.NextSibling.LocalName
 }
 
 # ============================================================
