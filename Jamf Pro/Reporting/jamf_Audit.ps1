@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.5.0 / Updated:  11/24/2018 / By:  ZT
+Version:  1.5.1 / Updated:  11/25/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -55,8 +55,9 @@ Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
 # Setup a Json.NET/JavaScriptSerializer Object
 # Credit to:  https://kevinmarquette.github.io/2016-11-06-powershell-hashtable-everything-you-wanted-to-know-about/
-[Reflection.Assembly]::LoadWithPartialName("System.Web.Script.Serialization")
-$JSSerializer = [System.Web.Script.Serialization.JavaScriptSerializer]::new()
+# And:  https://unhandled.wordpress.com/2016/12/18/powershell-performance-tip-use-javascriptserializer-instead-of-convertto-json/
+Add-Type -AssemblyName System.Web.Extensions
+$jsonSerializer = New-Object -TypeName System.Web.Script.Serialization.JavaScriptSerializer
 
 # Miscellaneous Variables
 $Used_Computer_Groups = @()
@@ -542,7 +543,7 @@ function appStoreAppCriteria($objectOf_App) {
     }
 
     # Convert the JSON Object to a Hashtable -- this was the only way I could find to reliably test if the JSON results object property had a value.
-    $appConfig = $JSSerializer.Deserialize($iTunesReturn,'Hashtable')
+    $appConfig = $jsonSerializer.Deserialize($iTunesReturn,'Hashtable')
 
     # Check if App is available from Apple.
     if ( $appConfig.results.Count -ne 0 ) {
