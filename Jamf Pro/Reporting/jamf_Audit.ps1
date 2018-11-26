@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.5.1 / Updated:  11/25/2018 / By:  ZT
+Version:  1.6.0 / Updated:  11/25/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -22,6 +22,7 @@ $APIcredentials = New-Object –TypeName System.Management.Automation.PSCredenti
 
 # Setup API URLs
 $jamfPS = "https://jps.company.com:8443"
+$getSites = "${jamfPS}/JSSResource/sites"
 $getPolicies = "${jamfPS}/JSSResource/policies/createdBy/jss"
 $getPolicy = "${jamfPS}/JSSResource/policies/id"
 $getComputerGroups = "${jamfPS}/JSSResource/computergroups"
@@ -585,6 +586,7 @@ Catch {
 Write-Host "API Credentials Valid -- continuing..."
 
 # Call getEndpoint function for each type needed
+$xml_AllSites = getEndpoint "Sites" $getSites
 $xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
 $xmlArray_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
@@ -612,6 +614,7 @@ $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="eBooks"; Value
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device Groups"; Value= $( $xmlArray_AllMobileDeviceGroupsDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device Config Profile"; Value= $( $xmlArray_AllMobileDeviceConfigProfileDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device App Store Apps"; Value= $( $xmlArray_AllMobileDeviceAppStoreAppDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Sites"; Value= $( $xml_AllSites.sites.site | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Total Objects.csv" -Append -NoTypeInformation
 
 # Call processEndpoints function to process each type
@@ -629,6 +632,9 @@ $Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceAppStoreA
 # Compare All_Groups to Used_Groups to create a report of Unused Groups
 $( Compare-Object -ReferenceObject $($($xml_AllComputerGroups.computer_groups.computer_group).id) -DifferenceObject $( $($Used_Computer_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllComputerGroupsDetails "Unused_ComputerGroups"
 $( Compare-Object -ReferenceObject $($($xml_AllMobileDeviceGroups.mobile_device_groups.mobile_device_group).id) -DifferenceObject $( $($Used_MobileDevice_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllMobileDeviceGroupsDetails "Unused_MobileDeviceGroups"
+
+# Create report of all Sites.
+$xml_AllSites.sites.site | Select-Object Name | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Sites.csv" -Append -NoTypeInformation
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
