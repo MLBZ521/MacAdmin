@@ -16,23 +16,21 @@ I have two methods documented in the `license_Avast.sh` script.  Either should w
 
 ## Configuration Notes ##
 
-Everything below is configuration details found in plists or configuration files that can be edited to set preferences found in the application GUI.  I use these in a Jamf Extension Attribute to get the status of the local client.
+Everything below is configuration details found in plists or configuration files that can be edited to set preferences found in the application GUI.  I use these in a Jamf Extension Attribute to get the status of the local client.  Around the release of version v13, the configuration files for the Shields changed from a traditional `ini` formatted file, to a `JSON` formatted file.
 
 Values
-* 0 = Disabled
-* 1 = Enabled
+  * 0 = Disabled
+  * 1 = Enabled
 
 
 Shields
   * File
-   * Location:  /Library/Application Support/Avast/config/com.avast.fileshield.conf
-   * ENABLED=1
+    * Location:  /Library/Application Support/Avast/config/com.avast.fileshield.conf
+    * If enabled, the file contains an empty json object `{}`
   * Mail and Web
-   * Location:  /Library/Application Support/Avast/config/com.avast.proxy.conf
-   * [mail]
-     * ENABLED=1
-   * [web]
-     * ENABLED=1
+    * Location:  /Library/Application Support/Avast/config/com.avast.proxy.conf
+    * JSON objects for mailshield and webshield
+      * The objects do not specify if the shields are enabled, only disabled
 
 
 Update Config
