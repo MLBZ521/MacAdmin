@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.7.0 / Updated:  11/25/2018 / By:  ZT
+Version:  1.7.1 / Updated:  11/29/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -49,7 +49,6 @@ $iTunesAPI = "https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.wo
 # Setup Save Directory
 $folderDate=$( Get-Date -UFormat %m-%d-%y )
 $saveDirectory = ( $( Read-Host "Provide directiory to save the report" ) -replace '"' )
-Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
 
 # Set the session to use TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -82,8 +81,8 @@ function getEndpoint($Endpoint, $urlAll) {
         $statusDescription = $_.Exception.Response.StatusDescription
 
         If ($statusCode -notcontains "200") {
-            Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
-            Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+           " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | ForEach-Object { Write-Host $_ ; Out-File -FilePath "${saveDirectory}\${folderDate}\errors.txt" -InputObject $_ -Append }
+            "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | ForEach-Object { Write-Host $_ ; Out-File -FilePath "${saveDirectory}\${folderDate}\errors.txt" -InputObject $_ -Append }
         }
     }
     return $xml_AllRecords
@@ -115,8 +114,8 @@ function getEndpointDetails() {
                 $statusDescription = $_.Exception.Response.StatusDescription
 
                 If ($statusCode -notcontains "200") {
-                    Write-Output " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
-                    Write-Output "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | Tee-Object -FilePath "${saveDirectory}\${folderDate}\errors.txt" -Append
+                    " -> Failed to get information for $($Record.LocalName) ID:  $(${Record}.id)" | ForEach-Object { Write-Host $_ ; Out-File -FilePath "${saveDirectory}\${folderDate}\errors.txt" -InputObject $_ -Append }
+                    "  --> Response:  ${statusCode} / $($RestError.Message | ForEach { $_.Split([Environment]::NewLine)[5];})" | ForEach-Object { Write-Host $_ ; Out-File -FilePath "${saveDirectory}\${folderDate}\errors.txt" -InputObject $_ -Append }
                 }
             }
             $Position++
@@ -180,10 +179,6 @@ function unusedGroups() {
 
 # This Function creates files from the results of the defined criteria.
 function createReport($outputObject, $Endpoint) {
-    if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
-         New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
-    }
-
     # Export each Policy object to a file.
     if ( $Endpoint -eq "printer" ) {
         ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
@@ -584,6 +579,13 @@ Catch {
 }
 
 Write-Host "API Credentials Valid -- continuing..."
+Write-Host ""
+Write-Host "Saving reports to:  ${saveDirectory}\${folderDate}"
+
+if ( !( Test-Path "${saveDirectory}\${folderDate}") ) {    
+        New-Item -Path "${saveDirectory}\${folderDate}" -ItemType Directory | Out-Null
+}
+
 Write-Host ""
 
 # Adding a stop watch object to monitor how long the audit takes.
