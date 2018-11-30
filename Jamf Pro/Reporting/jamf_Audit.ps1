@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.6.0 / Updated:  11/25/2018 / By:  ZT
+Version:  1.7.0 / Updated:  11/25/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -105,7 +105,7 @@ function getEndpointDetails() {
             Write-Progress -Activity "Getting details for $($Record.LocalName) records..." -Status "Record:  $(${Record}.id) / $(${Record}.name)" -PercentComplete (($Position/$xml_AllRecords.SelectNodes("//$($xml_AllRecords.FirstChild.NextSibling.LastChild.LocalName)").Count)*100)
             #Write-Host "Getting details for $($Record.LocalName) records..." -Status "Policy:  $(${Record}.id) / $(${Record}.name)"
 
-            # Get the configuration of each Policy
+            # Get the configuration of each record.
             Try {
                 $xml_Record = Invoke-RestMethod -Uri "${urlDetails}/$(${Record}.id)" -Method Get -Headers @{"accept"="application/xml"} -Credential $APIcredentials -ErrorVariable RestError -ErrorAction SilentlyContinue
                 $objectOf_AllRecordDetails.add($xml_Record) | Out-Null
@@ -165,7 +165,7 @@ function processEndpoints() {
     return $usedGroups
 }
 
-# This Function processes unused Groups before passing them to the createReport Function
+# This Function processes unused Groups before passing them to the createReport Function.
 function unusedGroups() {
         [cmdletbinding()]
     Param (
@@ -208,7 +208,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         "Self Service" = $objectOf_Policy.policy.self_service.use_for_self_service
     })
 
-    # Checks if Policy is Disabled
+    # Checks if Policy is Disabled.
     if ( $objectOf_Policy.policy.general.enabled -eq $false ) {
         Add-Member -InputObject $policy -PassThru NoteProperty "Disabled" $true | Out-Null
     }
@@ -305,7 +305,7 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 
     # Checks if a Polcy is scoped to only "All Users".
         # Can't be done yet.
-#    if ( $objectOf_Policy.policy.scope.all_users -eq $true -and # This line is just an example, there isn't an actual element by this name
+#    if ( $objectOf_Policy.policy.scope.all_users -eq $true -and # This line is just an example, there isn't an actual element by this name.
 #     $objectOf_Policy.policy.scope.all_computers -eq $false -and 
 #    $objectOf_Policy.policy.scope.computers.Length -eq 0 -and 
 #    $objectOf_Policy.policy.scope.computer_groups.Length -eq 0 -and 
@@ -494,7 +494,7 @@ function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
         }
     }
 
-    # Checking if the Group has 4 or more Nested Smart Groups
+    # Checking if the Group has 4 or more Nested Smart Groups.
     if ( $count -ge 4 ) {
         Add-Member -InputObject $Group -PassThru NoteProperty "4+ Criteria" $true | Out-Null
     }
@@ -584,8 +584,13 @@ Catch {
 }
 
 Write-Host "API Credentials Valid -- continuing..."
+Write-Host ""
 
-# Call getEndpoint function for each type needed
+# Adding a stop watch object to monitor how long the audit takes.
+$StopWatch = New-Object -TypeName System.Diagnostics.Stopwatch
+$StopWatch.Start()
+
+# Call getEndpoint function for each type needed.
 $xml_AllSites = getEndpoint "Sites" $getSites
 $xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpointDetails $getPolicy
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
@@ -601,7 +606,7 @@ $xmlArray_AllMobileDeviceGroupsDetails = $xml_AllMobileDeviceGroups | getEndpoin
 $xmlArray_AllMobileDeviceConfigProfileDetails = getEndpoint "Mobile Device Config Profiles" $getMobileDeviceConfigProfiles | getEndpointDetails $getMobileDeviceConfigProfile
 $xmlArray_AllMobileDeviceAppStoreAppDetails = getEndpoint "Mobile Device App Store Apps" $getMobileDeviceAppStoreApps | getEndpointDetails $getMobileDeviceAppStoreApp
 
-# Create a file containing the total for each Endpoint
+# Create a file containing the total for each Endpoint.
 $totalObjects=@()
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Policies"; Value= $( $xmlArray_AllPoliciesDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Computer Groups"; Value= $( $xmlArray_AllComputerGroupsDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
@@ -617,7 +622,9 @@ $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device 
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Sites"; Value= $( $xml_AllSites.sites.site | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Total Objects.csv" -Append -NoTypeInformation
 
-# Call processEndpoints function to process each type
+Write-Host "Processing endpoints against defined criteria..."
+
+# Call processEndpoints function to process each type.
 $Used_Computer_Groups += processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
 $Used_Computer_Groups += processEndpoints $xmlArray_AllComputerConfigProfileDetails
 $Used_Computer_Groups += processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
@@ -629,12 +636,17 @@ $Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceGroupsDet
 $Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceConfigProfileDetails
 $Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceAppStoreAppDetails
 
-# Compare All_Groups to Used_Groups to create a report of Unused Groups
+# Compare All_Groups to Used_Groups to create a report of Unused Groups.
 $( Compare-Object -ReferenceObject $($($xml_AllComputerGroups.computer_groups.computer_group).id) -DifferenceObject $( $($Used_Computer_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllComputerGroupsDetails "Unused_ComputerGroups"
 $( Compare-Object -ReferenceObject $($($xml_AllMobileDeviceGroups.mobile_device_groups.mobile_device_group).id) -DifferenceObject $( $($Used_MobileDevice_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllMobileDeviceGroupsDetails "Unused_MobileDeviceGroups"
 
 # Create report of all Sites.
 $xml_AllSites.sites.site | Select-Object Name | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Sites.csv" -Append -NoTypeInformation
+
+# Stopping the stop watch.
+$StopWatch.Stop()
+Write-Host ""
+Write-Host "Audit took" $StopWatch.Elapsed.Minutes "minutes and" $StopWatch.Elapsed.Seconds "seconds."
 
 Write-Host ""
 Write-Host "All Criteria has been processed."
