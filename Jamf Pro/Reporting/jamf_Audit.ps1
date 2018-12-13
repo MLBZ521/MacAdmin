@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.8.0 / Updated:  12/13/2018 / By:  ZT
+Version:  1.9.0 / Updated:  12/13/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -28,6 +28,8 @@ $getPolicy = "${jamfPS}/JSSResource/policies/id"
 $getComputerGroups = "${jamfPS}/JSSResource/computergroups"
 $getComputerGroup = "${jamfPS}/JSSResource/computergroups/id"
 $getPrinters = "${jamfPS}/JSSResource/printers"
+$getScripts = "${jamfPS}/JSSResource/scripts"
+$getPackages = "${jamfPS}/JSSResource/packages"
 $getComputerConfigProfiles = "${jamfPS}/JSSResource/osxconfigurationprofiles"
 $getComputerConfigProfile = "${jamfPS}/JSSResource/osxconfigurationprofiles/id"
 $getRestrictedSoftwareItems = "${jamfPS}/JSSResource/restrictedsoftware"
@@ -62,6 +64,8 @@ $jsonSerializer = New-Object -TypeName System.Web.Script.Serialization.JavaScrip
 # Miscellaneous Variables
 $usedComputerGroups = @()
 $usedPackages = @()
+$usedPrinters = @()
+$usedScripts = @()
 $usedMobileDeviceGroups = @()
 $Position = 1
 
@@ -402,6 +406,16 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
         $usedObjects += $Printer | Select-Object @{Name="type"; Expression={$($_)}}, id, name
     }
 
+    ForEach ( $Script in $objectOf_Policy.policy.scripts.script ) {
+        # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Script $($Script.id) / $($Script.name)"
+        $usedObjects += $Script | Select-Object @{Name="type"; Expression={$($_)}}, id, name
+    }
+
+    ForEach ( $Package in $objectOf_Policy.policy.package_configuration.packages.package ) {
+        # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Package $($Package.id) / $($Package.name)"
+        $usedObjects += $Package | Select-Object @{Name="type"; Expression={$($_)}}, id, name
+    }
+
     createReport -outputObject $policy -Endpoint "Policies"
     return $usedObjects
 }
@@ -585,6 +599,8 @@ $xmlArray_AllPoliciesDetails = getEndpoint "Policies" $getPolicies | getEndpoint
 $xml_AllComputerGroups = getEndpoint "Computer Groups" $getComputerGroups
 $xmlArray_AllComputerGroupsDetails = $xml_AllComputerGroups | getEndpointDetails $getComputerGroup
 $xml_AllPrinters = getEndpoint "Printers" $getPrinters
+$xml_AllScripts = getEndpoint "Scripts" $getScripts
+$xml_AllPackages = getEndpoint "Packages" $getPackages
 $xmlArray_AllComputerConfigProfileDetails = getEndpoint "Computer Config Profiles" $getComputerConfigProfiles | getEndpointDetails $getComputerConfigProfile
 $xmlArray_AllRestrictedSoftwareItemDetails = getEndpoint "Restricted Software Items" $getRestrictedSoftwareItems | getEndpointDetails $getRestrictedSoftwareItem
 $xmlArray_AllComputerAppStoreAppDetails = getEndpoint "Computer App Store Apps" $getComputerAppStoreApps | getEndpointDetails $getComputerAppStoreApp
@@ -609,6 +625,8 @@ $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device 
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device Config Profile"; Value= $( $xmlArray_AllMobileDeviceConfigProfileDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device App Store Apps"; Value= $( $xmlArray_AllMobileDeviceAppStoreAppDetails | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Sites"; Value= $( $xml_AllSites.sites.site | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Scripts"; Value= $( $xml_AllScripts.scripts.script | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
+$totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Packages"; Value= $( $xml_AllPackages.packages.package | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Total Objects.csv" -Append -NoTypeInformation
 
 Write-Host ""
@@ -635,8 +653,14 @@ ForEach ( $usedObject in $usedObjects ) {
         "mobile_device_group" {
             $usedMobileDeviceGroups += $usedObject | Select-Object id, name
         }
+        "package" {
+            $usedPackages += $usedObject | Select-Object id, name
+        }
         "printer" {
             $usedPrinters += $usedObject | Select-Object id, name
+        }
+        "script" {
+            $usedScripts += $usedObject | Select-Object id, name
         }
     }
 }
@@ -644,7 +668,9 @@ ForEach ( $usedObject in $usedObjects ) {
 # Find unused objects for each type of object.
 findUnusedObjects $xmlArray_AllComputerGroupsDetails $usedComputerGroups "computer_group"
 findUnusedObjects $xmlArray_AllMobileDeviceGroupsDetails $usedMobileDeviceGroups "mobile_device_group"
+findUnusedObjects $xml_AllPackages $usedPackages "package"
 findUnusedObjects $xml_AllPrinters $usedPrinters "printer"
+findUnusedObjects $xml_AllScripts $usedScripts "script"
 
 # Create report of all Sites.
 $xml_AllSites.sites.site | Select-Object Name | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Sites.csv" -Append -NoTypeInformation
