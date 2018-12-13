@@ -2,7 +2,7 @@
 
 Script Name:  jamf_Audit.ps1
 By:  Zack Thompson / Created:  11/6/2018
-Version:  1.7.1 / Updated:  11/29/2018 / By:  ZT
+Version:  1.8.0 / Updated:  12/13/2018 / By:  ZT
 
 Description:  This script is used to generate reports on specific configurations.
 
@@ -60,8 +60,9 @@ Add-Type -AssemblyName System.Web.Extensions
 $jsonSerializer = New-Object -TypeName System.Web.Script.Serialization.JavaScriptSerializer
 
 # Miscellaneous Variables
-$Used_Computer_Groups = @()
-$Used_MobileDevice_Groups = @()
+$usedComputerGroups = @()
+$usedPackages = @()
+$usedMobileDeviceGroups = @()
 $Position = 1
 
 # ============================================================
@@ -134,56 +135,52 @@ function processEndpoints() {
     )
     
     if ( $typeOf_AllRecords -ne $null ) {    
-        $usedGroups = @()
+        $usedObjects = @()
 
         ForEach ( $Record in $typeOf_AllRecords ) {
             Write-Progress -Activity "Checking all $($Record.FirstChild.NextSibling.LocalName)..." -Status "Record:  $($Record.SelectSingleNode("//id").innerText) / $($Record.SelectSingleNode("//name").innerText)" -PercentComplete (($Position/$typeOf_AllRecords.Count)*100)
             # Write-host "$($Record.FirstChild.NextSibling.LocalName) ID $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//id").innerText) / $($Record.SelectSingleNode("$($Record.FirstChild.NextSibling.LocalName)//name").innerText):"
         
             if ( $($Record.FirstChild.NextSibling.LocalName) -eq "computer_group" -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_group" ) {
-                groupCriteria $Record $typeOf_AllRecords
+                $usedObjects += groupCriteria $Record $typeOf_AllRecords
             }
             else {
                 if ( $($Record.FirstChild.NextSibling.LocalName) -eq "policy" ) {
-                    policyCriteria $Record $xmlOf_ComputerGroups
-                    $xmlOf_UnusedPrinters = printerUsage $Record $xmlOf_UnusedPrinters
-                
-                    # Create Printer Report
-                    if ( $Position -eq $typeOf_AllRecords.Count ) {
-                        createReport $xmlOf_UnusedPrinters "printer"
-                    }
+                    $usedObjects += policyCriteria $Record $xmlOf_ComputerGroups
                 }
                 elseif ( $($Record.FirstChild.NextSibling.LocalName) -eq "mac_application"  -or $($Record.FirstChild.NextSibling.LocalName) -eq "mobile_device_application" ) {
                     appStoreAppCriteria $Record
                 }
-                $usedGroups += groupUsage $Record
+                $usedObjects += groupUsage $Record
             }
             $Position++
         }
     }
-    return $usedGroups
+    return $usedObjects
 }
 
-# This Function processes unused Groups before passing them to the createReport Function.
-function unusedGroups() {
+# This Function is used to find unused objects and then write them to a report.
+function findUnusedObjects() {
         [cmdletbinding()]
     Param (
-        [Parameter(Mandatory=$true,ValuefromPipeline)][AllowNull()][System.Array]$typeOf_AllRecords,
-        [Parameter(ValuefromPipeline)][String]$Type,
-        [Parameter(Mandatory=$true,ValuefromPipeline)][String]$id
+        [Parameter(Mandatory=$true,ValuefromPipeline)][AllowNull()][System.Array]$typeOf_AllObjects,
+        [Parameter(Mandatory=$true,ValuefromPipeline)][AllowNull()][System.Array]$usedObjects,
+        [Parameter(ValuefromPipeline)][String]$Type
+        #[Parameter(Mandatory=$true,ValuefromPipeline)][String]$id
     )
     Process {
-        createReport $( $typeOf_AllRecords.FirstChild.NextSibling | Where-Object { $_.id -eq $id } | Select-Object id, name, @{Name="site"; Expression={$_.site.name}}, is_smart ) $Type
+        $( $typeOf_AllObjects.SelectNodes("//$($Type)") | Where-Object { $_.id -in $( Compare-Object -ReferenceObject $($($typeOf_AllObjects.SelectNodes("//$($Type)")).id) -DifferenceObject $( $($usedObjects).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) } | Select-Object id, name, @{Name="site"; Expression={$_.site.name}}, is_smart ) | createReport -Endpoint "Unused_$($Type)"
     }
 }
 
 # This Function creates files from the results of the defined criteria.
-function createReport($outputObject, $Endpoint) {
-    # Export each Policy object to a file.
-    if ( $Endpoint -eq "printer" ) {
-        ForEach-Object -InputObject $outputObject -Process { $_.SelectNodes("//$Endpoint") } | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Unused_${Endpoint}s.csv" -Append -NoTypeInformation
-    }
-    else {
+function createReport() {
+        [cmdletbinding()]
+    Param (
+        [Parameter(ValuefromPipeline)][String]$Endpoint,
+        [Parameter(Mandatory=$true,ValuefromPipeline)]$outputObject
+    )
+    Process {
         Export-Csv -InputObject $outputObject -Path "${saveDirectory}\${folderDate}\Report_${Endpoint}.csv" -Append -NoTypeInformation
     }
 }
@@ -398,25 +395,15 @@ function policyCriteria($objectOf_Policy, $xmlOf_ComputerGroups) {
 #        Add-Member -InputObject $policy -PassThru NoteProperty "Site Level Recon" $false | Out-Null
 #    }
 
-    createReport $policy "Policies"
-}
-
-# Checks if a Printer is used in a Policy and removes it from the complete list of printers, to find unused printers.
-function printerUsage($objectOf_Policy, $xmlOf_UnusedPrinters) {
-   
-   # First confirm the there is at least one printer configured.
-   if ( $objectOf_Policy.policy.printers.size -ne 0 ) {
-        ForEach ( $Printer in $objectOf_Policy.policy.printers.printer ) {
-
-            # Check if the printer ID is still in the list of unused printers.
-            if ( $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) } ) {
-                # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Printer $($Printer.id) / $($Printer.name)"
-                $Remove = $xmlOf_UnusedPrinters.printers.printer | Where-Object { $_.id -eq $($Printer.id) }
-                $Remove.ParentNode.RemoveChild($Remove) | Out-Null
-            }
-        }
+    # Check for configurable items.
+    $usedObjects = @()
+    ForEach ( $Printer in $objectOf_Policy.policy.printers.printer ) {
+        # Write-Host "Policy ID $($objectOf_Policy.policy.general.id) uses: Printer $($Printer.id) / $($Printer.name)"
+        $usedObjects += $Printer | Select-Object @{Name="type"; Expression={$($_)}}, id, name
     }
-    return $xmlOf_UnusedPrinters
+
+    createReport -outputObject $policy -Endpoint "Policies"
+    return $usedObjects
 }
 
 # Checks if a Group is used in the scope of a configuration and adds to a list of used groups.
@@ -426,13 +413,13 @@ function groupUsage($objectOf_Record) {
     # For each Targeted Group, add it to a list of used groups.
     ForEach ( $Group in $objectOf_Record.SelectNodes("//scope/*[contains(name(), 'groups') and not(contains(name(), 'user'))]/*[contains(name(), 'group')]") ) {
         # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Targets:  Group $($Group.id) / $($Group.name)"
-        $usedGroups += $Group
+        $usedGroups += $Group | Select-Object @{Name="type"; Expression={$($_)}}, id, name
     }
 
     # For each Excluded Group, add it to a list of used groups.
     ForEach ( $Group in $objectOf_Record.SelectNodes("//scope/exclusions/*[contains(name(), 'groups') and not(contains(name(), 'user'))]/*[contains(name(), 'group')]") ) {
         # Write-Host "$($objectOf_Record.FirstChild.NextSibling.LocalName) ID $($objectOf_Record.SelectSingleNode("//id").innerText) Excludes:  Group $($Group.id) / $($Group.name)"
-        $usedGroups += $Group
+        $usedGroups += $Group | Select-Object @{Name="type"; Expression={$($_)}}, id, name
     }
     
     return $usedGroups
@@ -479,8 +466,8 @@ function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
     ForEach ( $criteria in $objectOf_Group.FirstChild.NextSibling.criteria.criterion ) {
         if ( $criteria.name -match "Group" ) {
             # Get the Groups full details.
-            $usedGroups += $xmlOf_AllGroups.FirstChild.NextSibling | Where-Object { $_.name -eq $($criteria.value) }
             # Write-Host "$($objectOf_Group.FirstChild.NextSibling.LocalName) ID $($objectOf_Group.SelectSingleNode("//id").innerText) Targets:  Computer Group $($nestedGroup.id) / $($nestedGroup.name)"
+            $usedGroups += $xmlOf_AllGroups.FirstChild.NextSibling | Where-Object { $_.name -eq $($criteria.value) } | Select-Object @{Name="type"; Expression={$($_)}}, id, name
 
             # Tracking number of Nested Smart Groups
             if ( $nestedGroup.is_smart -eq $true ) {
@@ -497,8 +484,8 @@ function groupCriteria($objectOf_Group, $xmlOf_AllGroups) {
         Add-Member -InputObject $Group -PassThru NoteProperty "4+ Criteria" $false | Out-Null
     }
 
-    createReport $Group $objectOf_Group.FirstChild.NextSibling.LocalName
-    return $usedGroups 
+    createReport -outputObject $Group -Endpoint $objectOf_Group.FirstChild.NextSibling.LocalName
+    return $usedGroups
 }
 
 # This Function checks criteria against App Store App objects.
@@ -554,7 +541,7 @@ function appStoreAppCriteria($objectOf_App) {
     Add-Member -InputObject $App -PassThru NoteProperty "iTunes Version" $($appConfig.results.Values.offers.version.display) | Out-Null
     Add-Member -InputObject $App -PassThru NoteProperty "Out of Date" $( $($App."iTunes Version") -ne $($App."Jamf Version") ) | Out-Null
 
-    createReport $App $objectOf_App.FirstChild.NextSibling.LocalName
+    createReport -outputObject $App -Endpoint $objectOf_App.FirstChild.NextSibling.LocalName
 }
 
 # ============================================================
@@ -624,23 +611,40 @@ $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Mobile Device 
 $totalObjects += New-Object PSObject -Property ([ordered]@{ Name="Sites"; Value= $( $xml_AllSites.sites.site | Measure-Object | Select-Object Count -ExpandProperty Count ) } )
 $totalObjects | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Total Objects.csv" -Append -NoTypeInformation
 
+Write-Host ""
 Write-Host "Processing endpoints against defined criteria..."
 
 # Call processEndpoints function to process each type.
-$Used_Computer_Groups += processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups $xml_AllPrinters
-$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerConfigProfileDetails
-$Used_Computer_Groups += processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
-$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerAppStoreAppDetails
-$Used_Computer_Groups += processEndpoints $xmlArray_AllPatchPoliciesDetails
-$Used_Computer_Groups += processEndpoints $xmlArray_AlleBookDetails
-$Used_Computer_Groups += processEndpoints $xmlArray_AllComputerGroupsDetails
-$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceGroupsDetails
-$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceConfigProfileDetails
-$Used_MobileDevice_Groups += processEndpoints $xmlArray_AllMobileDeviceAppStoreAppDetails
+$usedObjects += processEndpoints $xmlArray_AllPoliciesDetails $xml_AllComputerGroups
+$usedObjects += processEndpoints $xmlArray_AllComputerConfigProfileDetails
+$usedObjects += processEndpoints $xmlArray_AllRestrictedSoftwareItemDetails
+$usedObjects += processEndpoints $xmlArray_AllComputerAppStoreAppDetails
+$usedObjects += processEndpoints $xmlArray_AllPatchPoliciesDetails
+$usedObjects += processEndpoints $xmlArray_AlleBookDetails
+$usedObjects += processEndpoints $xmlArray_AllComputerGroupsDetails
+$usedObjects += processEndpoints $xmlArray_AllMobileDeviceGroupsDetails
+$usedObjects += processEndpoints $xmlArray_AllMobileDeviceConfigProfileDetails
+$usedObjects += processEndpoints $xmlArray_AllMobileDeviceAppStoreAppDetails
 
-# Compare All_Groups to Used_Groups to create a report of Unused Groups.
-$( Compare-Object -ReferenceObject $($($xml_AllComputerGroups.computer_groups.computer_group).id) -DifferenceObject $( $($Used_Computer_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllComputerGroupsDetails "Unused_ComputerGroups"
-$( Compare-Object -ReferenceObject $($($xml_AllMobileDeviceGroups.mobile_device_groups.mobile_device_group).id) -DifferenceObject $( $($Used_MobileDevice_Groups).id | Sort-Object -Unique ) | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject } ) | unusedGroups $xmlArray_AllMobileDeviceGroupsDetails "Unused_MobileDeviceGroups"
+# Sort the used objects by type.
+ForEach ( $usedObject in $usedObjects ) {
+    Switch ( $usedObject.type.LocalName ) {
+        "computer_group" {
+            $usedComputerGroups += $usedObject | Select-Object id, name
+        }
+        "mobile_device_group" {
+            $usedMobileDeviceGroups += $usedObject | Select-Object id, name
+        }
+        "printer" {
+            $usedPrinters += $usedObject | Select-Object id, name
+        }
+    }
+}
+
+# Find unused objects for each type of object.
+findUnusedObjects $xmlArray_AllComputerGroupsDetails $usedComputerGroups "computer_group"
+findUnusedObjects $xmlArray_AllMobileDeviceGroupsDetails $usedMobileDeviceGroups "mobile_device_group"
+findUnusedObjects $xml_AllPrinters $usedPrinters "printer"
 
 # Create report of all Sites.
 $xml_AllSites.sites.site | Select-Object Name | Export-Csv -Path "${saveDirectory}\${folderDate}\Report_Sites.csv" -Append -NoTypeInformation
@@ -648,8 +652,9 @@ $xml_AllSites.sites.site | Select-Object Name | Export-Csv -Path "${saveDirector
 # Stopping the stop watch.
 $StopWatch.Stop()
 Write-Host ""
+Write-Host "All Criteria has been processed."
+Write-Host ""
 Write-Host "Audit took" $StopWatch.Elapsed.Minutes "minutes and" $StopWatch.Elapsed.Seconds "seconds."
 
 Write-Host ""
-Write-Host "All Criteria has been processed."
 Write-Host "jamf_Audit Process:  COMPLETE"
