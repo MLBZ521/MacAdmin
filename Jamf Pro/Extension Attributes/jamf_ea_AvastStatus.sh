@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_AvastStatus.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  1.2 / Updated:  6/19/2018 / By:  ZT
+# Version:  1.3.0 / Updated:  12/13/2018 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
 #
@@ -21,8 +21,8 @@ fileShield=("FileShield" "/Library/Application Support/Avast/config/com.avast.fi
 virusDefUpdates=("DefinitionUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "VPS_UPDATE_ENABLED=" "1")
 programUpdates=("ProgramUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "PROGRAM_UPDATE_ENABLED=" "1")
 betaUpdates=("BetaUpdates" "/Library/Application Support/Avast/config/com.avast.update.conf" "BETA_CHANNEL=" "0")
-licensedName=("Customer" "/Library/Application Support/Avast/config/license.avastlic" "CustomerName=" "Company Name")
-licenseType=("License Type" "/Library/Application Support/Avast/config/license.avastlic" "LicenseType=" "0")
+licenseID=("License ID" "/Library/Application Support/Avast/config/license.avastlic" "LicenseId=12345678-a9101-2b34-56cd-78ef9101a2bc")
+licenseType=("License Type" "/Library/Application Support/Avast/config/license.avastlic" "LicenseType=10")
 definitionStatus=("Virus Definitions" "/Library/Application Support/Avast/vps9/defs/aswdefs.ini" "Latest=")
 
 # The number of days before trigger virus definitions are out of date.
@@ -110,6 +110,44 @@ searchType2() {
 	fi
 }
 
+searchType3() {
+	if [[ -e "${2}" ]]; then
+
+		if [[ $(/bin/cat "${2}" | /usr/bin/grep "${3}") ]]; then
+			echo "Desired State:  ${1}"
+
+		elif [[ "${1}" == "License Type" ]]; then
+			echo "Misconfigured:  ${1}"
+
+			case "${result}" in
+				*"=0"* )
+					license+="License Type:  Standard (Premium),";;
+				*"=4"* )
+					license+="License Type:  Premium trial,";;
+				*"=10"* )
+					license+="License Type:  Paid,";;
+				*"=13"* )
+					license+="License Type:  Free, unapproved,";;
+				*"=14"* )
+					license+="License Type:  Free, approved,";;
+				*"=16"* )
+					license+="License Type:  Temporary,";;
+				* )
+					license+="License Type:  Unknown Type,";;
+			esac
+
+		elif [[ "${1}" == "License ID" ]]; then
+			# Unexpected License ID
+			echo "Misconfigured:  ${1}"
+			license+="Unexpected License ID,"
+
+		else
+			echo "Misconfigured:  ${1}"
+			disabled+="${1},"
+		fi
+	fi
+}
+
 ##################################################
 # Bits staged, collect the information...
 
@@ -119,8 +157,8 @@ searchType1 "${fileShield[@]}"
 searchType2 "${virusDefUpdates[@]}"
 searchType2 "${programUpdates[@]}"
 searchType2 "${betaUpdates[@]}"
-searchType2 "${licensedName[@]}"
-searchType2 "${licenseType[@]}"
+searchType3 "${licenseID[@]}"
+searchType3 "${licenseType[@]}"
 searchType2 "${definitionStatus[@]}"
 
 ##################################################
