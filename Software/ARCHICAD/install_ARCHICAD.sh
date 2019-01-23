@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_ARCHICAD.sh
 # By:  Zack Thompson / Created:  1/17/2019
-# Version:  1.0.0 / Updated:  1/17/2019 / By:  ZT
+# Version:  1.0.1 / Updated:  1/22/2019 / By:  ZT
 #
 # Description:  This script installs ARCHICAD in unattended mode.
 #
@@ -35,7 +35,7 @@ fi
 
 echo "Installing: " $( "${pkgDir}/${ARCHICADinstaller}/Contents/MacOS/installbuilder.sh" --version --mode unattended )
 
-installResult=$( "${pkgDir}/${ARCHICADinstaller}/Contents/MacOS/installbuilder.sh" --mode unattended --unattendedmodeui none --desktopshortcut 0 --dockshotcut 0 --eduSerialNumber "${eduSerialNumber}" --eduUserID "${eduUserID}" )
+installResult=$( "${pkgDir}/${ARCHICADinstaller}/Contents/MacOS/installbuilder.sh" --mode unattended --unattendedmodeui none --desktopshortcut 0 --dockshortcut 0 --eduSerialNumber "${eduSerialNumber}" --eduUserID "${eduUserID}" )
 exitCode=$?
 
 if [[ $exitCode != 0 ]]; then
