@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.1.0 / Updated:  1/30/2019 / By:  ZT
+# Version:  1.1.1 / Updated:  1/31/2019 / By:  ZT
 #
 # Description:  This script gets the configuration of Crowd Strike, if installed.
 #
@@ -29,7 +29,7 @@ returnResult=""
 
 echo "Checking if Crowd Strike is installed..."
 
-if [[ -e "/Library/CS/falconctl" ]]
+if [[ -e "/Library/CS/falconctl" ]]; then
 
     # Get the customer ID and compare.
     csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
