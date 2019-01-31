@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.5 / Updated:  9/26/2018 / By:  ZT
+# Version:  1.5.1 / Updated:  1/31/2019 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -77,7 +77,7 @@ macProModelCheck() {
 
 # Check the requirements for Mac Pros
 macProRequirements() {
-	if [[ $supportsMetal != "Supported" ]]; then
+	if [[ $supportsMetal != *"Supported"* ]]; then
 		macProResult+="GFX unsupported,"
 	fi
 
