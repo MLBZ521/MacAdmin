@@ -53,7 +53,11 @@ macProModelCheck() {
 
 	macProResult="<result>"
 
-	if [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
+	if [[ $modelMajorVersion -eq 6 ]]; then
+		# For MacPro 6,1 (2013/Trash Cans), these should be supported no matter the existing state, since they wouldn't be compatible with any OS that is old, nor have incompatible hardware.
+		echo "<result>Mojave</result>"
+
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
 		# Function macProRequirements
 		macProRequirements 
 
