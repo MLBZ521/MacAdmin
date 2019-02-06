@@ -13,7 +13,7 @@ echo "*****  CreatePrinters process:  START  *****"
 
 ##################################################
 # Define Variables
-	jamfPS="https://jss.company.com:8443"
+	jamfPS=$(/usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
 	apiPrinters="${jamfPS}/JSSResource/printers/id"
 
 ##################################################
