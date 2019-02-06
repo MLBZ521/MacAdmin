@@ -1,163 +1,21 @@
-JAMF Scripts
+Jamf Pro
 ======
 
-This repo will contain scripts I have written for a JAMF environment.
+**Update:**  *I've done some recent house cleaning, which included filing things into more appropriate locations, whether folders, or other repos.  If you can't find something in this repo, or another, feel free to reach out.*
+
+___
+
+This repo will contain content I have created while managing a Jamf Pro environment.
+
+**Admin Tools** - Scripts, etc, that are mainly intended for Full Jamf Pro Admins
+
+**Extension** Attributes - Various EAs that I have created
+
+**Scripts** - Various scripts for managing devices in Jamf Pro
+
+**Site Admin Tools** - Various "tools" I have created that help provide additional functionality for Site Admins that is not natively available.  Also "helper" tools, and tools that can be used to get information on a system.
 
 
-## Scripts ##
-
-
-#### assign_Mac2User.sh ####
-
-This script assigns a Mac to a User in JAMF Inventory records for a specific device.  I had a request for a way to tie users to machines where users were not using directory accounts to sign in.  This was as quick script that I threw together to accomplish this.  I later converted this to an application using Swift and Cocoa.
-
-
-#### config_SMBProtocol.sh ####
-
-This script uses Script Parameters to configure the SMB Protocol on a Mac.  There is also an Extension Attribute that can be used for scoping.
-
-**macOS Sierra 10.12**
-
-For macOS Sierra, set the JSS Script Parameter 6 to your desired configuration.
-* ex:  To enable SMBv2/v3 only; Script Parameter 6 = 6
-
-From the nsmb.conf man page:
-* Key = protocol_vers_map
-* Default Value = 7
-* Comment = Bitmap of SMB Versions that are enabled
-
-"Bitmap of SMB Versions that are enabled" can be one of:
-* 7 = SMB 1/2/3 should be enabled
-* 6 = SMB 2/3 should be enabled
-* 4 = SMB 3 should be enabled
-* 2 = SMB 2 should be enabled
-* 1 - SMB 1 should be enabled
-
-**Mac OS X El Capitan 10.11 and Yosemite 10.10**
-
-For OS X El Capitan and Yosemite, set the JSS Script Parameter 5 to your desired configuration.
-* ex:  To enable SMBv3 only; Script Parameter 5 = smb3_only
-
-From the nsmb.conf man page:
-* Key = smb_neg
-* Default Value = normal
-* Comment = How to negotiate SMB 1/2/3
-
-"How to negotiate SMB 1/2/3" can be one of:
-* normal = Negotiate with SMB 1 and attempt to negotiate to SMB 2/3.
-* smb1_only = Negotiate with only SMB 1.
-* smb2_only = Negotiate with only SMB 2. This also will set no_netbios.
-* smb3_only = Negotiate with only SMB 3. This also will set no_netbios.
-
-**Mac OS Mavericks 10.9**
-
-For OS X Mavericks or earlier, set the JSS Script Parameter 4 to your desired configuration.
-* ex:  To enable SMBv3 only; Script Parameter 4 = smb2_only
-
-From the nsmb.conf man page:
-* Key = smb_neg
-* Default Value = normal
-* Comment = How to negotiate SMB 2.x
-
-"How to negotiate SMB 2.x" can be one of:
-* normal = Negotiate with SMB 1.x and attempt to negotiate to SMB 2.x.
-* smb1_only = Negotiate with only SMB 1.x.
-* smb2_only = Negotiate with only SMB 2.x. This also will set no_netbios.
-
-
-#### jamf_policyCaller.sh ####
-
-Description:  This script uses Script Parameters to call other policies via Custom Triggers or Policy IDs.  Essentially add the script to a policy and then in the Script Parameters, list the trigger(s) and ID(s) you want to use, separated by commas.  Example format:
-* Custom Triggers
-  * Trigger1, Trigger2, A_Trigger3, Another_Trigger4
-* Policy IDs
-  * 1, 56, 237, 503, 290
-
-
-#### reissue_FileVaultPRK.sh ####
-
-Description:  This script is intended for scenarios where the JSS does not have a valid FileVault Personal Recovery Key and one of the two are known:
-* a FV_Enabled User accounts’ password; or
-* a FileVault Recovery Key that was created/saved outside of the JSS
-
-
-#### set_DefaultApplications.sh ####
-
-For additional information, also see:  info_DefaultApplication.md
-
-This script set default applications using Script Parameters.  This script will allow you to set the default application for both URL Schemes and Content Types (i.e. File Extensions).  There are eight parameters available for use with this script.  First we'll review the pre-configured ones to go over how to use the script.
-
-There are two pre-configured parameters to make it easy to set the default Mail/Calendar and Browser applications.  To use a pre-configured option, enter the name into the field exactly how it appears bolded below, or it will not work.
-* For the 'Set Web Browser' parameter, there are three built-in script options as well as a custom option:
-  * **Chrome**
-  * **Firefox**
-  * **Safari**
-  * (custom)
-* The same is done for the 'Set Mail/Calendar Application' parameter:
-  * **Outlook (Outlook for Mac)**
-  * **Parallels Outlook**
-  * **Apple Mail** (with Apple Calendar)
-  * (custom)
-
-For custom parameters, you will need to supply the values for the Application's CFBundleIdentifier and the URL Scheme or Content Type.
-
-In the first box in the parameter fields, you would enter the type of content/service that is accessed and the second field you would enter the application that will be assigned.  URL Schemes are a little more self-explanatory than the Extension fields or ContentType.  You will will have to gather the type of content for a file (it's not the '.extension' unfortunately).  This will take a bit of field work to figure out; you can use the `mdls` command to assist in getting this info.  To assign to an application, you will need to enter that applications 'CFBundleIdentifier'.  For most applications, you can easily pull that with the `defaults` command.
-* `mdls myFile.txt`
-* `defaults read /Applications/Microsoft\ Outlook.app/Contents/Info.plist CFBundleIdentifier`
-
-For an example, to set a custom 'ftp' application, you would need to use the Custom URL Scheme 1 and Custom URL App 1.  These two fields are linked as are the Custom [Extension|App] [1|2] or Content Type fields.
-
-Going back to the pre-configured parameters, to use an application that is not pre-configured, you would just need to enter the applications CFBundleIdentifier.  And yes, if there is a Parallels instance (with Windows) installed on the machine, it (should)/will find the CFBundleIdentifier for the Windows instance of Microsoft Outlook and set it as the default application.
-
-This parameters script is a little more complicated so if you have any questions or need help, feel free to let me know.
-
-(I highly recommend testing this before deploying -- there is not an 'undo' option!)
-
-
-
-## Extension Attributes ##
-
-
-##### jamf_ea_AvastStatus.sh #####
-
-Checks the current configuration of Avast.  The following are what is checked and what files these settings are found in:
-* Values
-  * 0 = Disabled
-  * 1 = Enabled
-* Mail and Web Shields:  /Library/Application Support/Avast/config/com.avast.proxy.conf
-* File Shield:  /Library/Application Support/Avast/config/com.avast.fileshield.conf
-* Updates:  /Library/Application Support/Avast/config/com.avast.update.conf
-  * Virus Definitions
-  * Program
-  * Beta Channel
-* Definition Updates:  /Library/Application Support/Avast/vps9/defs/aswdefs.ini
-* License Info:  /Library/Application Support/Avast/config/license.avastlic
-  * CustomerName
-  * LicenseType
-    * 0=Standard (Premium)
-    * 4=Premium trial
-    * 13=Free, unapproved
-    * 14=Free, approved
-    * 16=Temporary
-
-
-##### jamf_ea_GetSSID.sh ####
-
-Checks and returns one of the following:
-* the SSID of the currently connected WiFi Network
-* Not Connected
-* Off (If WiFi is off)
-
-
-##### jamf_ea_LatestOSSupported.sh ####
-
-Checks the latest compatible version of macOS that a device's current state supports.  i.e. current HW and OS Version can be upgraded to.  Supports:
-* High Sierra
-* Sierra
-* El Capitan
-
-
-##### jamf_ea_SMBProtocol.sh ####
-
-Check if the SMB Protocol is configured.  This is available for use with the config_SMBProtocol.sh script above.
-
+___
+##### Note: #####
+Everything in this repo is configured for a use in Jamf Pro, however, almost everything can be converted to work in another management solution.  I have other repos that are dedicated to macOS management content which is not configured explicitly for a Jamf environment.  Most content will not be duplicated, so what is in here, will not be there and vice versa.
