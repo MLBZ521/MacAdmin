@@ -12,14 +12,14 @@
 #
 ###################################################################################################
 
-/bin/echo "*****  policyCaller Process:  START  *****"
-/bin/echo "Calling provided parameters..."
+echo "*****  policyCaller Process:  START  *****"
+echo "Calling provided parameters..."
 
 # If custom triggers are provided, loop through them.
 if [[ -n $4 ]]; then
 	IFS=", " read customTriggers <<< $4
 		for customTrigger in $customTriggers; do
-			/bin/echo "Calling Policies that use the custom trigger:  ${customTrigger}"
+			echo "Calling Policies that use the custom trigger:  ${customTrigger}"
 			/usr/local/bin/jamf policy -trigger $customTrigger
 		done
 fi
@@ -28,12 +28,12 @@ fi
 if [[ -n $5 ]]; then
 	IFS=", " read policyIDs <<< $5
 		for policyID in $policyIDs; do
-			/bin/echo "Calling Policy ID:  ${policyID}"
+			echo "Calling Policy ID:  ${policyID}"
 			/usr/local/bin/jamf policy -id $policyID
 		done
 fi
 
-/bin/echo "All policies have been processed."
-/bin/echo "*****  policyCaller Process:  COMPLETE  *****"
+echo "All policies have been processed."
+echo "*****  policyCaller Process:  COMPLETE  *****"
 
 exit 0
