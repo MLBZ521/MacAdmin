@@ -4,6 +4,9 @@
 
 # Resources:  jaycohen @ https://www.jamf.com/jamf-nation/feature-requests/1474/manage-self-service-policy-icons
 
+#############################
+## Phase 1 of icon clean up
+
 # Create a backup of the icon table
 create table icons_backup like icons;
 insert icons_backup select * from icons;
@@ -73,3 +76,39 @@ create table icons_notinuse (icon_Id int(11), contents longblob);
 insert into icons_notinuse
 select distinct icons.icon_id, icons.contents from icons
 where icons.icon_id not in (select icon_id from icons_inuse);
+
+
+#############################
+## Phase 2 of icon clean up
+
+# Create a table with all icon_id and content for all icons in use
+create table icons_backup like icons;
+insert icons_backup select * from icons;
+
+# Create table of icons that are in use, but not including -1 and 0 IDs
+create table icon_ids_inuse (icon_Id int(11));
+insert into icon_ids_inuse select icon_attachment_id from (
+    select icon_attachment_id from ibooks union all
+    select icon_attachment_id from mobile_device_apps union all
+    select icon_attachment_id from mobile_device_configuration_profiles union all
+    select icon_attachment_id from mac_apps union all
+    select icon_attachment_id from os_x_configuration_profiles union all
+    select icon_attachment_id from self_service_plugins union all
+    select icon_id from vpp_mobile_device_app_license_app union all
+    select icon_id from wallpaper_auto_management_settings union all
+    select self_service_icon_id from os_x_configuration_profiles union all
+    select self_service_icon_id from patch_policies union all
+    select self_service_icon_id from policies )
+        foo where icon_attachment_id != -1 and icon_attachment_id != 0;
+
+# Delete VPP App Icons not in use
+delete icons_backup from icons_backup where icons_backup.icon_id not in ( select icon_id from icon_ids_inuse ) and icons_backup.filename in ("100x100bb.jpg", "100x100bb.png", "1024x1024bb.png", "512x512bb.png");
+
+
+#############################
+## Phase 3 of icon clean up
+
+# Delete icons that are not in use, but not specific IDs
+delete icons_backup from icons_backup where icons_backup.icon_id not in ( select icon_id from icon_ids_inuse ) 
+and icons_backup.icon_id not in (6, 14, 41, 89, 108, 484, 2286, 2580, 19513, 19514, 49370, 56529, 57582);
+
