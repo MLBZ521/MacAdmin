@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LicensedFonts.py
 # By:  Zack Thompson / Created:  1/12/2019
-# Version:  1.0.0 / Updated:  1/12/2019 / By:  ZT
+# Version:  1.0.1 / Updated:  3/12/2019 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check if any Licensed Fonts are installed.
 #
@@ -42,16 +42,16 @@ def check(dir):
     # Loop over the files.
     for file in files:
         # Check the file via regex and ignore case.
-        if re.search(r'(Name_or_Prefix_of_Font_Here)', file, flags=re.IGNORECASE):
+        if re.search(r'(Name_or_Prefix_of_Font_Here)', file, flags=re.IGNORECASE):  # Substitute "Name_or_Prefix_of_Font_Here" with the font you're looking for.
             count += 1
     return count
 
 def main():
-    
+
     # Define Variables
     cmd_all_Users = ['/usr/bin/dscl', '.', 'list', '/Users']
     home_directories = []
-    system_accounts = ['cas', 'cascom', 'daemon', 'Guest', 'nobody', 'root']
+    system_accounts = ['daemon', 'Guest', 'nobody', 'root']  # Add your Jamf Management Account to this dictionary.
     user_Font_Count = 0
 
     # Get a list of all user accounts on this system.
@@ -71,19 +71,17 @@ def main():
 
     # Loop over each home directory.
     for directory in home_directories:
-        #if directory != '/Users/utotth':
         # Calculate if the local accounts have matching fonts.
         user_Font_Count = user_Font_Count + check(directory + "/Library/Fonts")
 
     # Sum of system and user fonts.
-    quanity = system_Font_Count + user_Font_Count
+    quantity = system_Font_Count + user_Font_Count
 
     # Return the results.
-    if quanity == 0:
+    if quantity == 0:
         print ("<result>Not Installed</result>")
     else:
         print ("<result>Installed</result>")
-
 
 if __name__ == "__main__":
     main()
