@@ -2,17 +2,19 @@
 
 Script Name:  jamf_createSite.ps1
 By:  Zack Thompson / Created:  5/11/2018
-Version:  1.1.0 / Updated:  2/7/2019 / By:  ZT
+Version:  1.2.0 / Updated:  5/6/2019 / By:  ZT
 
-Description:  This script will automate the creation of a new Site as much as possible with the information provided.
+Description:  This script will automate the creation of a new Site with the information provided.
 
 #>
 
 param (
     [Parameter][string]$csv,
-    [string]$SiteName,
-    [string]$Department,
-    [string]$NestSecurityGroup
+    [Parameter(Mandatory=$true)][ValidateSet('prod', 'dev', IgnoreCase = $true)][string]$Environment,
+    [Parameter(Mandatory=$true)][ValidateSet('main', 'east', IgnoreCase = $true)][string]$Domain,
+    [Parameter(Mandatory=$true)][string]$SiteName,
+    [Parameter(Mandatory=$true)][string]$NestSecurityGroup,
+    [string]$Department
  )
 
 Write-Host "jamf_createSite Process:  START"
@@ -23,11 +25,13 @@ Write-Host "jamf_createSite Process:  START"
 
 # Setup instance of the Class
 $CreateSite = [PwshJamf]::new($(Get-Credential))
-$CreateSite.Server = "https://jss.company.com:8443"
 $CreateSite.Headers['Accept'] = "application/xml"
-
-# Active Directory OU Location for Endpoint Management Security Group
-$OU = "DC=Security Groups,DC=ad,DC=contoso,DC=com"
+if ( $Environment -eq "prod" ) {
+    $CreateSite.Server = "https://prod-jps.company.com:8443"
+}
+elseif ( $Environment -eq "dev" ) {
+    $CreateSite.Server = "https://dev-jps.company.com:8443"
+}
 
 # Get the standard group configuration from another previously create group
 [xml]$GroupTemplate = $CreateSite.GetAccountByGroupname("Group Template")
@@ -39,17 +43,39 @@ $GroupTemplate.SelectNodes("//site/id | //group/id") | ForEach-Object { $_.Paren
 # Functions
 # ============================================================
 
+Function Confirm {
+	$Title = "Continue?";
+	$Message = "Please review the configuration and confirm.  Enter ? for more information on the options."
+	$Yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes","Create the requested Site!";
+    $No = New-Object System.Management.Automation.Host.ChoiceDescription "&No","Do not create the requested Site!";
+    $Quit = New-Object System.Management.Automation.Host.ChoiceDescription "No to &All","Quit";
+    $Options = [System.Management.Automation.Host.ChoiceDescription[]]($Yes,$No,$Quit);
+	$script:Confirm = $Host.UI.PromptForChoice($Title,$Message,$Options,0)
+}
+
 function SiteCreation {
 
     # ============================================================
     # Define Variables for current run...
 
-    # AD Security Group Name
-    $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
+    # Active Directory Domain Dependant Configurations.
+    switch ( $Domain ) {
+        "main" {
+            $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
+            $OU = "DC=Security Groups,DC=contoso,DC=com"
+            $LDAPServer = "Constoso Main"
+        }
+        "east" {
+            $SecurityGroup = "${NestSecurityGroup}"
+            $OU = "DC=Security Groups,DC=east,DC=contoso,DC=com"
+            $LDAPServer = "Constoso East"
+        }
+    }
 
     # Edit group and Site names in the group template
-    $GroupTemplate.group.name = "EndPntMgmt.Apple ${SiteName}"
+    $GroupTemplate.group.name = "${SecurityGroup}"
     $GroupTemplate.group.site.name = "${SiteName}"
+    $GroupTemplate.group.ldap_server.name = "${LDAPServer}"
 
     # Build the computer group payload
     [xml]$configComputerGroup = "<?xml version='1.0' encoding='UTF-8'?>
@@ -74,36 +100,65 @@ function SiteCreation {
     # ============================================================
 
     # Some Verbosity
+    Write-Host "Environment:  ${Environment}"
+    Write-Host "LDAPServer:  ${LDAPServer}"
     Write-Host "Site:  ${SiteName}"
     Write-Host "Department:  ${Department}"
+    Write-Host "Site/Security Group:  ${SecurityGroup}"
     Write-Host "Nested Security Group:  ${NestSecurityGroup}"
     Write-Host ""
 
-    # Active Directory Setup
-    Write-Host "Creating Endpoint Management Security Group:  ${SecurityGroup}"
-    New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "${OU}" -Description "This group manages the ${SiteName} Jamf Site." #-Credential
+    # Function Confirm
+    Confirm
 
-    Write-Host "Nesting the Securty Group:  ${NestSecurityGroup} into:  ${SecurityGroup}"
-    Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
+    if ( $Confirm -eq 0 ) {
 
-    # Jamf Setup
-    Write-host "Creating Site:  ${SiteName}"
-    $CreateSite.CreateSite($SiteName)
+        # Check if the Security Group already exists.
+        if ( !( Get-ADGroup -Identity $SecurityGroup ) ) {
+            # Active Directory Setup
+            Write-Host "Creating Endpoint Management Security Group:  ${SecurityGroup}"
+            New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "${OU}" -Description "This group manages the ${SiteName} Jamf Site."
+        }
+        else {
+            Write-Host "Notice:  Endpoint Management Security Group already exists!"
+        }
 
-    Write-host "Creating Jamf Pro Management Group:  ${SecurityGroup}  and setting permissions..."
-    $CreateSite.CreateAccountGroup($GroupTemplate)
+        # Check if the $NestSecurityGroup is already a member.
+        if ( $NestSecurityGroup -notin $( Get-ADGroupMember -Identity $SecurityGroup | Select-Object Name ) ) {
+            Write-Host "Nesting the Securty Group:  ${NestSecurityGroup} into:  ${SecurityGroup}"
+            Add-ADGroupMember -Identity $SecurityGroup -Members $NestSecurityGroup
+        }
+        else {
+            Write-Host "Notice:  ${NestSecurityGroup} is already a member of:  ${SecurityGroup}"
+        }
 
-    Write-host "Creating Department:  ${Department}"
-    $CreateSite.CreateDepartment($Department)
+        # Create the Site.
+        Write-host "Creating Site:  ${SiteName}"
+        $CreateSite.CreateSite($SiteName)
 
-    Write-host "Creating Category:  Testing - ${SiteName}"
-    $CreateSite.CreateCategory("Testing - ${SiteName}")
+        # Create the Jamf Group.
+        Write-host "Creating Jamf Pro Management Group:  ${SecurityGroup}  and setting permissions..."
+        $CreateSite.CreateAccountGroup($GroupTemplate)
 
-    Write-host "Creating Computer Group:  [Deskside] ${SiteName}"
-    $CreateSite.CreateComputerGroup($configComputerGroup)
+        # Create the Department.
+        if ( $null -ne $Department ) {
+            Write-host "Creating Department:  ${Department}"
+            $CreateSite.CreateDepartment($Department)
+        }
 
-    Write-host "Creating Mobile Device Group:  [Deskside] ${SiteName}"
-    $CreateSite.CreateMobileDeviceGroup($configMobileGroup)
+        # Create Smart Groups for Computers and Mobile Devices
+        Write-host "Creating Computer Group:  [Deskside] ${SiteName}"
+        $CreateSite.CreateComputerGroup($configComputerGroup)
+
+        Write-host "Creating Mobile Device Group:  [Deskside] ${SiteName}"
+        $CreateSite.CreateMobileDeviceGroup($configMobileGroup)
+    }
+    elseif ( $Confirm -eq 3 ) {
+        Write-Host "Existing process..."
+    }
+    else {
+        Write-Host "Did not create the requested Site:  ${SiteName}"
+    }
 }
 
 # ============================================================
@@ -112,18 +167,34 @@ function SiteCreation {
 
 If ( $csv.Length -eq 0) {
     # Use command line parameters...
-    siteCreation
+    SiteCreation
 }
 Else {
     # A CSV was provided...
     $csvContents = Import-Csv "${csv}"
 
     ForEach ($Site in $csvContents) {
+        $Environment = "$(${Site}.Environment)"
+        $Domain = "$(${Site}.Domain)"
         $SiteName = "$(${Site}.SiteName)"
         $Department = "$(${Site}.Department)"
         $NestSecurityGroup = "$(${Site}.SecurityGroup)"
 
-        siteCreation
+        # Active Directory Domain Dependant Configurations.
+        switch ( $Domain ) {
+            "main" {
+                $SecurityGroup = "EndPntMgmt.Apple ${SiteName}"
+                $OU = "DC=Security Groups,DC=contoso,DC=com"
+                $LDAPServer = "Constoso Main"
+            }
+            "east" {
+                $SecurityGroup = "${NestSecurityGroup}"
+                $OU = "DC=Security Groups,DC=east,DC=contoso,DC=com"
+                $LDAPServer = "Constoso East"
+            }
+        }
+
+        SiteCreation
         Write-Host ""
     }
     Write-Host "All provided Sites have been created!"
