@@ -1,4 +1,17 @@
 #!/bin/bash
+
+###################################################################################################
+# Script Name:  uninstall_Spirion.sh
+# By:  Zack Thompson / Created:  6/3/2019
+# Version:  1.0.0 / Updated:  6/3/2019 / By:  ZT
+#
+# Description:  This script uninstalls Spirion and Identity Finder.
+#
+# Note:  This is a customzied version of the uninstall script provided by Spirion to be run from 
+#					a management solution, such as Jamf Pro.
+#
+###################################################################################################
+
 # On uninstall ask if user prefs should be preserved or not. If not, then blow away
 # license/activation info/all plists/etc  if preserve, then just unload launch agent 
 # and blow away everything except any identityfinder.lic, activation dat file, and user 
@@ -9,14 +22,27 @@
 shopt -s checkhash cmdhist nullglob;
 
 runSilently=0;
-answerYes=0;
-answerNo=0;
+# answerYes=0;
+# answerNo=0;
 askForPassword=0;
+
+case "${4}" in
+	Yes|yes|YES|Y|y)
+		answerYes=1
+		answerNo=0
+	;;
+	No|no|NO|N|n)
+		answerYes=0
+		answerNo=1
+	;;
+esac
+
+currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
 
 UsersSharedPathBase='/Users/Shared/.identityfinder';
 UsersSharedPathApp="$UsersSharedPathBase/Application";
 UsersSharedPath="$UsersSharedPathApp/{04964656e-7469-7479-2046-696e6465720}";
-UsersPrefsPath="$HOME/Library/Preferences";
+UsersPrefsPath="/Users/${currentUser}/Library/Preferences";
 SystemPrefsPath='/Library/Preferences';
 ReceiptsPath='/Library/Receipts';
 
@@ -25,7 +51,7 @@ IDFReverseDomainRoot='com.identityfinder';
 IDFAppName="$IDFBaseName.app";
 IDFPKGBuilderPrefsName="$IDFReverseDomainRoot.installerbuilder.plist";
 IDFPKGBuilderName="$IDFBaseName Client Custom PKG Builder.app"
-IDFUsersAppSupportBase="$HOME/Library/Application Support/$IDFBaseName";
+IDFUsersAppSupportBase="/Users/${currentUser}/Library/Application Support/$IDFBaseName";
 IDFUsersAppSupportFullPath="$IDFUsersAppSupportBase/$IDFBaseName Mac Edition";
 
 IDFSystemAppSupportPath="/Library/Application Support/$IDFBaseName";
@@ -38,7 +64,7 @@ IDFPrefsFirstRunXMLName="$IDFReverseDomainRoot.macedition.firstrun.xml";
 SpirionBaseName='Spirion'
 SpirionAppName="$SpirionBaseName.app";
 SpirionPKGBuilderName="$SpirionBaseName Client Custom PKG Builder.app"
-SpirionUsersAppSupportBase="$HOME/Library/Application Support/$SpirionBaseName";
+SpirionUsersAppSupportBase="/Users/${currentUser}/Library/Application Support/$SpirionBaseName";
 SpirionUsersAppSupportFullPath="$SpirionUsersAppSupportBase/$SpirionBaseName Mac Edition";
 
 SpirionSystemAppSupportPath="/Library/Application Support/$SpirionBaseName";
@@ -58,11 +84,12 @@ IDFPackageName='com.identityfinder.pkg';
 IDFReceiptName='Identityfinder.pkg';
 
 RemoveFileOrDirectory () {
-	sudoStr="";
-	if (($askForPassword==1)); then
-		sudoStr="sudo";
-	fi
-  $sudoStr rm -Rf "$1";
+	# sudoStr="";
+	# if (($askForPassword==1)); then
+	# 	sudoStr="sudo";
+	# fi
+  # $sudoStr rm -Rf "$1";
+	/bin/rm -Rf "$1"
   rmresult=$?;
   if (($runSilently==0)); then
     if [ $rmresult -eq 0 ]; then
@@ -113,16 +140,18 @@ UnloadAndDeleteLaunchDaemon () {
 			echo "$LaunchDaemon not installed.";
 		fi
 	else
-		if [ -n "$(sudo launchctl list|grep com.identityfinder.launchdaemon)" ]; then
+		# if [ -n "$(sudo launchctl list|grep com.identityfinder.launchdaemon)" ]; then
+		if [ -n "$( /bin/launchctl list | /usr/bin/grep com.identityfinder.launchdaemon)" ]; then
 			echo "$LaunchDaemon is running, unloading...";
-			sudo /bin/launchctl unload "/Library/LaunchDaemons/$LaunchDaemon";
+			# sudo /bin/launchctl unload "/Library/LaunchDaemons/$LaunchDaemon";
+			/bin/launchctl unload "/Library/LaunchDaemons/$LaunchDaemon";
 		else
 			echo "$LaunchDaemon is NOT running.";
 		fi
 
 		# Before removing, get the name of the current EndpointService binary, it may
 		# have been renamed.
-		EndpointServiceExeName=$(basename "$(grep -A 2 ProgramArguments /Library/LaunchDaemons/$LaunchDaemon |grep string| sed -e 's/^[[:space:]]*//;s/<[/]*string>//g')")
+		EndpointServiceExeName=$(/usr/bin/basename "$(/usr/bin/grep -A 2 ProgramArguments /Library/LaunchDaemons/$LaunchDaemon | /usr/bin/grep string | /usr/bin/sed -e 's/^[[:space:]]*//;s/<[/]*string>//g')")
 
 		echo "The current EndpointServiceExeName is $EndpointServiceExeName."
 
@@ -141,18 +170,18 @@ UnloadAndDeleteLaunchDaemon () {
 UnloadAndDeleteLaunchAgents () {
   # Look for the old launch agent.
 	if (($runSilently==0)); then
-		echo "Unload and delete $HOME/Library/LaunchAgents/$LaunchAgent...";
+		echo "Unload and delete /Users/${currentUser}/Library/LaunchAgents/$LaunchAgent...";
 	fi
-	if ! [ -e "$HOME/Library/LaunchAgents/$LaunchAgent" ]; then
+	if ! [ -e "/Users/${currentUser}/Library/LaunchAgents/$LaunchAgent" ]; then
 		if (($runSilently==0)); then
-			echo "$HOME/Library/LaunchAgents/$LaunchAgent not installed.";
+			echo "/Users/${currentUser}/Library/LaunchAgents/$LaunchAgent not installed.";
 		fi
 	else
-		/bin/launchctl unload "$HOME/Library/LaunchAgents/$LaunchAgent";
-		RemoveFileOrDirectory "$HOME/Library/LaunchAgents/$LaunchAgent";
-		if ! [ -e "$HOME/Library/LaunchAgents/$LaunchAgent" ]; then
+		/bin/launchctl unload "/Users/${currentUser}/Library/LaunchAgents/$LaunchAgent";
+		RemoveFileOrDirectory "/Users/${currentUser}/Library/LaunchAgents/$LaunchAgent";
+		if ! [ -e "/Users/${currentUser}/Library/LaunchAgents/$LaunchAgent" ]; then
 			if (($runSilently==0)); then
-				echo "SUCCEEDED removing $HOME/Library/LaunchAgents/$LaunchAgent.";
+				echo "SUCCEEDED removing /Users/${currentUser}/Library/LaunchAgents/$LaunchAgent.";
 			fi
 		fi
 	fi
@@ -165,11 +194,11 @@ UnloadAndDeleteLaunchAgents () {
 			echo "/Library/LaunchAgents/$LaunchAgent not installed.";
 		fi
 	else
-		sudo -u $USER /bin/launchctl unload -S Aqua "/Library/LaunchAgents/$LaunchAgent";
+		sudo -u $currentUser /bin/launchctl unload -S Aqua "/Library/LaunchAgents/$LaunchAgent";
 
 		# Before removing, get the name of the current UserAgent binary, it may
 		# have been renamed.
-		UserAgentExeName=$(basename "$(grep -A 2 ProgramArguments /Library/LaunchAgents/$LaunchAgent |grep string| sed -e 's/^[[:space:]]*//;s/<[/]*string>//g')")
+		UserAgentExeName=$(/usr/bin/basename "$( /usr/bin/grep -A 2 ProgramArguments /Library/LaunchAgents/$LaunchAgent | /usr/bin/grep string | /usr/bin/sed -e 's/^[[:space:]]*//;s/<[/]*string>//g')")
 
 		echo "The current UserAgentExeName is $UserAgentExeName."
 
@@ -181,7 +210,7 @@ UnloadAndDeleteLaunchAgents () {
 			fi
 		fi
 	# Remove any other Identity Finder files in this directory.
-	RemoveFileOrDirectory "$HOME/Library/LaunchAgents/$IDFReverseDomainRoot.*";
+	RemoveFileOrDirectory "/Users/${currentUser}/Library/LaunchAgents/$IDFReverseDomainRoot.*";
 	fi
 
 	if (($askForPassword==1)); then
@@ -289,8 +318,8 @@ DeleteEverythingExceptLicensesActivationAndPrefs () {
 	DeleteEndpointService
 
 	RemoveFileOrDirectory "$1/databases";
-  	RemoveFileOrDirectory "$1/endpointservice.log";
-  	RemoveFileOrDirectory "$1/autorecover";
+	RemoveFileOrDirectory "$1/endpointservice.log";
+	RemoveFileOrDirectory "$1/autorecover";
 	RemoveFileOrDirectory "$1/identitydb.dat";
 	RemoveFileOrDirectory "$1/identityinfo.dat";
 	RemoveFileOrDirectory "$1/identityinfo.sqlite";
@@ -338,19 +367,21 @@ DeleteLicensesActivationAndPrefs () {
 }
 
 CleanPackageMakerDB () {
-	sudoStr="";
-	if (($askForPassword==1)); then
-		sudoStr="sudo";
-	fi
+	# sudoStr="";
+	# if (($askForPassword==1)); then
+	# 	sudoStr="sudo";
+	# fi
 	if [ -n "$IDFPackageName" ]; then
 		if (($runSilently==0)); then
 			echo "Calling pkgutil unlink...";
 		fi
-		$sudoStr pkgutil --force --unlink "$IDFPackageName" > /dev/null 2> /dev/null;
+		# $sudoStr pkgutil --force --unlink "$IDFPackageName" > /dev/null 2> /dev/null;
+		/usr/sbin/pkgutil --force --unlink "$IDFPackageName" > /dev/null 2> /dev/null;
 		if (($runSilently==0)); then
 			echo "Calling pkgutil forget...";
 		fi
-		$sudoStr pkgutil --force --forget "$IDFPackageName" > /dev/null 2> /dev/null;
+		# $sudoStr pkgutil --force --forget "$IDFPackageName" > /dev/null 2> /dev/null;
+		/usr/sbin/pkgutil --force --forget "$IDFPackageName" > /dev/null 2> /dev/null;
     if [ -d "$ReceiptsPath/$IDFReceiptName" ]; then
       RemoveFileOrDirectory "$ReceiptsPath/$IDFReceiptName";
     else
@@ -366,16 +397,16 @@ CleanPackageMakerDB () {
 }
 
 OPTERR=0;
-while getopts synph opts
-do
-    case $opts in
-		s) runSilently=1;;
-		y) answerYes=1; answerNo=0;;
-		n) answerYes=0; answerNo=1;;
-		p) askForPassword=1;;
-		h) PrintHelp; exit 0;;
-    esac;
-done;
+# while getopts synph opts
+# do
+#     case $opts in
+# 		s) runSilently=1;;
+# 		y) answerYes=1; answerNo=0;;
+# 		n) answerYes=0; answerNo=1;;
+# 		p) askForPassword=1;;
+# 		h) PrintHelp; exit 0;;
+#     esac;
+# done;
 
 if (($runSilently==1)); then
 	if (($answerYes==1)); then
