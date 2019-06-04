@@ -2,20 +2,22 @@
 
 Script Name:  jamf_createSite.ps1
 By:  Zack Thompson / Created:  5/11/2018
-Version:  1.2.0 / Updated:  5/6/2019 / By:  ZT
+Version:  1.3.0 / Updated:  6/3/2019 / By:  ZT
 
 Description:  This script will automate the creation of a new Site with the information provided.
 
 #>
 
+[CmdletBinding(DefaultParameterSetName="SingleRun")]
 param (
-    [Parameter][string]$csv,
-    [Parameter(Mandatory=$true)][ValidateSet('prod', 'dev', IgnoreCase = $true)][string]$Environment,
-    [Parameter(Mandatory=$true)][ValidateSet('main', 'east', IgnoreCase = $true)][string]$Domain,
-    [Parameter(Mandatory=$true)][string]$SiteName,
-    [Parameter(Mandatory=$true)][string]$NestSecurityGroup,
-    [string]$Department
- )
+    [Parameter(Mandatory=$true, ParameterSetName="SingleRun", HelpMessage = "Specify prod or dev server instance")][ValidateSet('prod', 'dev', IgnoreCase = $true)][string]$Environment,
+    [Parameter(Mandatory=$true, ParameterSetName="SingleRun", HelpMessage = "Specify domain")][ValidateSet('main', 'east', IgnoreCase = $true)][string]$Domain,
+    [Parameter(Mandatory=$true, ParameterSetName="SingleRun", HelpMessage = "Provide desired Site name")][string]$SiteName,
+    [Parameter(Mandatory=$true, ParameterSetName="SingleRun", HelpMessage = "Provide a Security Group")][string]$NestSecurityGroup,
+    [Parameter(Mandatory=$false, ParameterSetName="SingleRun", HelpMessage = "Provide to create a Department")][string]$Department,
+
+    [Parameter(Mandatory=$true, ParameterSetName="csv")][string]$csv
+)
 
 Write-Host "jamf_createSite Process:  START"
 
@@ -114,13 +116,14 @@ function SiteCreation {
     if ( $Confirm -eq 0 ) {
 
         # Check if the Security Group already exists.
-        if ( !( Get-ADGroup -Identity $SecurityGroup ) ) {
+        try { 
+            Get-ADGroup -Identity $SecurityGroup | Out-Null
+            Write-Host "Notice:  The Endpoint Management Security Group `'${SecurityGroup}`' already exists!"
+        }
+        catch {
             # Active Directory Setup
             Write-Host "Creating Endpoint Management Security Group:  ${SecurityGroup}"
             New-ADGroup -Name $SecurityGroup -DisplayName $SecurityGroup -SamAccountName $SecurityGroup -GroupCategory Security -GroupScope Universal -Path "${OU}" -Description "This group manages the ${SiteName} Jamf Site."
-        }
-        else {
-            Write-Host "Notice:  Endpoint Management Security Group already exists!"
         }
 
         # Check if the $NestSecurityGroup is already a member.
