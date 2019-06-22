@@ -3,11 +3,12 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.5.3 / Updated:  4/30/2019 / By:  ZT
+# Version:  1.6.0 / Updated:  6/21/2019 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
-#	System Requirements can be found here:  
+#	System Requirements can be found here:
+#		Catalina - https://www.apple.com/macos/catalina-preview/
 #		Mojave - https://support.apple.com/en-us/HT201475
 #			* MacPro5,1's = https://support.apple.com/en-us/HT208898
 #		High Sierra - https://support.apple.com/en-us/HT208969
@@ -31,13 +32,15 @@
 # Setup Functions
 
 modelCheck() {
-	if [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+	if [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+		echo "<result>Catalina</result>"
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
 		echo "<result>Mojave</result>"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
 		echo "<result>High Sierra</result>"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 7.5") -eq 1 ]]; then
 		echo "<result>Sierra / OS Limitation</result>"  # (Current OS Limitation, 10.13 Compatible)
-	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
 		echo "<result>El Capitan</result>"
 	else
 		echo "<result>Model or Current OS Not Supported</result>"
@@ -46,22 +49,24 @@ modelCheck() {
 
 # Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to my simplistic logic in this script.
 macProModelCheck() {
-	# Check if the Graphics Card supports Metal
-		supportsMetal=$(/usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs)
-	# Check if FileVault is enabled
-		fvStatus=$(/usr/bin/fdesetup status | /usr/bin/awk -F 'FileVault is ' '{print $2}' | /usr/bin/xargs)
 
-	macProResult="<result>"
-
-	if [[ $modelMajorVersion -eq 6 ]]; then
+	if [[ $modelMajorVersion -ge $4 ]]; then
 		# For MacPro 6,1 (2013/Trash Cans), these should be supported no matter the existing state, since they wouldn't be compatible with any OS that is old, nor have incompatible hardware.
-		echo "<result>Mojave</result>"
+		echo "<result>Catalina</result>"
 
-	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
+
+		# Check if the Graphics Card supports Metal
+			supportsMetal=$(/usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs)
+		# Check if FileVault is enabled
+			fvStatus=$(/usr/bin/fdesetup status | /usr/bin/awk -F 'FileVault is ' '{print $2}' | /usr/bin/xargs)
+
+		macProResult="<result>"
+
 		# Function macProRequirements
-		macProRequirements 
+		macProRequirements
 
-	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} <= 13.6") -eq 1 ]]; then		
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} <= 13.6") -eq 1 ]]; then
 		macProResult+="High Sierra / OS Limitation,"
 
 		# Function macProRequirements
@@ -72,7 +77,7 @@ macProModelCheck() {
 
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 7.5") -eq 1 ]]; then
 		echo "<result>Sierra / OS Limitation</result>"  # (Current OS Limitation, 10.13 Compatible)
-	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
 		echo "<result>El Capitan</result>"
 	else
 		echo "<result>Model or Current OS Not Supported</result>"
@@ -116,31 +121,31 @@ if [[ $systemRAM -ge $requiredRAM && $systemFreeSpace -ge $requiredFreeSpace ]];
 	case $modelType in
 		"iMac" )
 			# Function modelCheck
-			modelCheck 13 10 7
+			modelCheck 7 10 13 13
 		;;
 		"MacBook" )
 			# Function modelCheck
-			modelCheck 8 6 5
+			modelCheck 5 6 8 8
 		;;
 		"MacBookPro" )
 			# Function modelCheck
-			modelCheck 9 6 3
+			modelCheck 3 6 9 9
 		;;
 		"MacBookAir" )
 			# Function modelCheck
-			modelCheck 5 3 2
+			modelCheck 2 3 5 5
 		;;
 		"Macmini" )
 			# Function modelCheck
-			modelCheck 6 4 3
+			modelCheck 3 4 6 6
 		;;
 		"MacPro" )
 			# Function modelCheck
-			macProModelCheck 5 5 3
+			macProModelCheck 3 5 5 6
 		;;
 		"iMacPro" )
 			# Function modelCheck
-			modelCheck 1 1
+			modelCheck 1 1 1 1
 		;;
 		* )
 			echo "<result>Unknown Model</result>"
