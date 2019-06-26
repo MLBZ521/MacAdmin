@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  uninstall_Spirion.sh
 # By:  Zack Thompson / Created:  6/3/2019
-# Version:  1.0.0 / Updated:  6/3/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  6/26/2019 / By:  ZT
 #
 # Description:  This script uninstalls Spirion and Identity Finder.
 #
@@ -21,10 +21,10 @@
 
 shopt -s checkhash cmdhist nullglob;
 
-runSilently=0;
-# answerYes=0;
-# answerNo=0;
-askForPassword=0;
+runSilently=0
+# answerYes=0
+# answerNo=0
+askForPassword=0
 
 case "${4}" in
 	Yes|yes|YES|Y|y)
@@ -282,7 +282,8 @@ DeleteUsersShared () {
 	RemoveFileOrDirectory "$UsersSharedPath/TasksMonitor";
 	RemoveFileOrDirectory "$UsersSharedPath/Temp";
 
-	lsOutput=$(ls "$UsersSharedPath");
+	# lsOutput=$(ls "$UsersSharedPath");
+	lsOutput=$(ls "$UsersSharedPath" 2> /dev/null )
 
 	if [ -n "$lsOutput" ]; then
 		echo "$UsersSharedPath is not empty."
@@ -327,7 +328,8 @@ DeleteEverythingExceptLicensesActivationAndPrefs () {
 	RemoveFileOrDirectory "$1/logs";
 	RemoveFileOrDirectory "$1/logtime.dat";
 
-	lsOutput=$(ls "$1");
+	# lsOutput=$(ls "$1");
+	lsOutput=$( ls "$1" 2> /dev/null )
 
 	if [ -n "$lsOutput" ]; then
 		echo "$1 is not empty."
@@ -432,30 +434,47 @@ if (($runSilently==1)); then
 	fi
 else
 	echo "Starting $IDFBaseName/$SpirionBaseName $0 script at $(date)";
-	if (($answerYes==0)); then
-		read -a answer -p "Preserve user prefs? (Yes/No)";
-		theAnswer=${answer[0]};
-	else
-		theAnswer='y';
-	fi
+	# if (($answerYes==0)); then
+	# 	read -a answer -p "Preserve user prefs? (Yes/No)";
+	# 	theAnswer=${answer[0]};
+	# else
+	# 	theAnswer='y';
+	# fi
 
-	case "$theAnswer" in
-		(Yes|yes|YES|Y|y)
-			UnloadAndDeleteLaunchAgents;
-			DeleteApps "$IDFAppName" "$IDFPKGBuilderName";
-			DeleteApps "$SpirionAppName" "$SpirionPKGBuilderName";
-			DeleteEverythingExceptLicensesActivationAndPrefs "$IDFUsersAppSupportFullPath" "$IDFUsersAppSupportBase";
-			DeleteEverythingExceptLicensesActivationAndPrefs "$SpirionUsersAppSupportFullPath" "$SpirionUsersAppSupportBase";
-			CleanPackageMakerDB;;
-		(No|no|NO|N|n)
-			UnloadAndDeleteLaunchAgents;
-			DeleteApps "$IDFAppName" "$IDFPKGBuilderName";
-			DeleteApps "$SpirionAppName" "$SpirionPKGBuilderName";
-			DeleteEverythingExceptLicensesActivationAndPrefs "$IDFUsersAppSupportFullPath" "$IDFUsersAppSupportBase";
-			DeleteEverythingExceptLicensesActivationAndPrefs "$SpirionUsersAppSupportFullPath" "$SpirionUsersAppSupportBase";
-			CleanPackageMakerDB;
-			DeleteLicensesActivationAndPrefs;;
-	esac;
+	# case "$theAnswer" in
+	# 	(Yes|yes|YES|Y|y)
+	# 		UnloadAndDeleteLaunchAgents;
+	# 		DeleteApps "$IDFAppName" "$IDFPKGBuilderName";
+	# 		DeleteApps "$SpirionAppName" "$SpirionPKGBuilderName";
+	# 		DeleteEverythingExceptLicensesActivationAndPrefs "$IDFUsersAppSupportFullPath" "$IDFUsersAppSupportBase";
+	# 		DeleteEverythingExceptLicensesActivationAndPrefs "$SpirionUsersAppSupportFullPath" "$SpirionUsersAppSupportBase";
+	# 		CleanPackageMakerDB;;
+	# 	(No|no|NO|N|n)
+	# 		UnloadAndDeleteLaunchAgents;
+	# 		DeleteApps "$IDFAppName" "$IDFPKGBuilderName";
+	# 		DeleteApps "$SpirionAppName" "$SpirionPKGBuilderName";
+	# 		DeleteEverythingExceptLicensesActivationAndPrefs "$IDFUsersAppSupportFullPath" "$IDFUsersAppSupportBase";
+	# 		DeleteEverythingExceptLicensesActivationAndPrefs "$SpirionUsersAppSupportFullPath" "$SpirionUsersAppSupportBase";
+	# 		CleanPackageMakerDB;
+	# 		DeleteLicensesActivationAndPrefs;;
+	# esac;
+
+		UnloadAndDeleteLaunchAgents
+		DeleteApps "${IDFAppName}" "${IDFPKGBuilderName}"
+		DeleteApps "${SpirionAppName}" "${SpirionPKGBuilderName}"
+		DeleteEverythingExceptLicensesActivationAndPrefs "$IDFUsersAppSupportFullPath" "$IDFUsersAppSupportBase"
+		DeleteEverythingExceptLicensesActivationAndPrefs "$SpirionUsersAppSupportFullPath" "$SpirionUsersAppSupportBase"
+		CleanPackageMakerDB
+
+	if [[ $answerYes == 0 ]]; then
+		echo "Deleting the user preferences..."
+		DeleteLicensesActivationAndPrefs
+	elif [[ $answerYes == 1 ]]; then
+		echo "Preserving the user preferences..."
+	else
+		echo "*** WARNING:  Did not specify whether to preserve the user preferences... ***"
+		echo "Preserving the user preferences..."
+	fi
 
 	echo "Completed $IDFBaseName/$SpirionBaseName $0 script at $(date).";
 fi
