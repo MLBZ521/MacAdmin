@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_AvastStatus.sh
 # By:  Zack Thompson / Created:  2/6/2018
-# Version:  1.3.0 / Updated:  12/13/2018 / By:  ZT
+# Version:  1.4.0 / Updated:  6/28/2019 / By:  ZT
 #
 # Description:  This script gets the configuration of Avast.
 #
@@ -151,15 +151,20 @@ searchType3() {
 ##################################################
 # Bits staged, collect the information...
 
-searchType1 "${mailShield[@]}"
-searchType1 "${webShield[@]}"
-searchType1 "${fileShield[@]}"
-searchType2 "${virusDefUpdates[@]}"
-searchType2 "${programUpdates[@]}"
-searchType2 "${betaUpdates[@]}"
-searchType3 "${licenseID[@]}"
-searchType3 "${licenseType[@]}"
-searchType2 "${definitionStatus[@]}"
+if [[ -d "/Library/Application Support/Avast/" ]]; then
+	searchType1 "${mailShield[@]}"
+	searchType1 "${webShield[@]}"
+	searchType1 "${fileShield[@]}"
+	searchType2 "${virusDefUpdates[@]}"
+	searchType2 "${programUpdates[@]}"
+	searchType2 "${betaUpdates[@]}"
+	searchType3 "${licenseID[@]}"
+	searchType3 "${licenseType[@]}"
+	searchType2 "${definitionStatus[@]}"
+else
+	echo "<result>Not Installed</result>"
+	exit 0
+fi
 
 ##################################################
 # Check if each "error" collection variable is collected anything
