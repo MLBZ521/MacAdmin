@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  uninstall_Acrobat.sh
 # By:  Zack Thompson / Created:  6/30/2017
-# Version:  1.1 / Updated:  9/7/2018 / By:  ZT
+# Version:  1.2.0 / Updated:  8/8/2019 / By:  ZT
 #
-# Description:  This script uninstalls Acrobat DC versions.
+# Description:  This script uninstalls Acrobat DC/Pro versions.
 #
 ###################################################################################################
 
@@ -32,10 +32,14 @@ for arg in $args; do
 		"2018" | "v18" )
 			toRemove+=("18")
 		;;
+		"2019" | "v19" )
+			toRemove+=("18")
+		;;
 		"All" )
 			toRemove+=("12")
 			toRemove+=("17")
 			toRemove+=("18")
+			toRemove+=("19")
 		;;
 	esac
 done
@@ -67,7 +71,7 @@ else
 				"12" )
 					exitOutput=$("${appPath}/Contents/Helpers/Acrobat Uninstaller.app/Contents/MacOS/RemoverTool" "${appPath}/Contents/Helpers/Acrobat Uninstaller.app/Contents/MacOS/RemoverTool" "${appPath}")
 				;;
-				"17" | "18" )
+				"17" | "18" | "19" )
 					exitOutput=$("${appPath}/Contents/Helpers/Acrobat Uninstaller.app/Contents/Library/LaunchServices/com.adobe.Acrobat.RemoverTool" "${appPath}")
 				;;
 			esac
