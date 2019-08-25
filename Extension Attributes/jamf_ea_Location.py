@@ -40,7 +40,7 @@ def runUtility(command):
 
 
 def webLookup(url):
-    """A helper function that performs a GET to the Jamf API.  Attempts to first use the python urllib2 library, but if that fails, falls back to the system curl.
+    """A helper function that performs a GET to the provided url.  Attempts to first use the python urllib2 library, but if that fails, falls back to the system curl.
     Args:
         url:  a URL to query
     Returns:
