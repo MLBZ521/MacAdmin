@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.0.0 / Updated:  8/22/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  8/24/2019 / By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -34,15 +34,6 @@ try:
 except ImportError:
     from plistlib import writePlist as custom_plist_Writer  # For Python 2
     from plistlib import readPlist as custom_plist_Reader  # For Python 2
-
-
-# Script information
-__script__ = 'jamf_CollectDiagnostics.py'
-__author__ = 'Zack Thompson'
-__maintainer__ = __author__
-__version__ = '1.0.0'
-__date__ = '2019-08-22'
-__github__ = 'https://github.com/mlbz521/macOS.Jamf'
 
 
 # Jamf Funcation to obfuscate credentials.
@@ -158,6 +149,7 @@ def apiGET(**parameters):
         headers = {'Accept': 'application/json', 'Authorization': 'Basic ' + parameters.get('jps_credentials')}
         request = urllib.Request(url, headers=headers)
         response = urllib.urlopen(request)
+        statusCode = response.code
         json_response = json.loads(response.read())
 
     except Exception:
@@ -166,11 +158,12 @@ def apiGET(**parameters):
         if parameters.get('verbose'):
             print('Trying curl...')
         # Build the command.
-        curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request GET'.format(jps_credentials=parameters.get('jps_credentials'), url=url)
+        curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --write-out "statusCode:%{{http_code}}" --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request GET'.format(jps_credentials=parameters.get('jps_credentials'), url=url)
         response = runUtility(curl_cmd)
-        json_response = json.loads(response)
+        json_content, statusCode = response.split('statusCode:')
+        json_response = json.loads(json_content)
 
-    return json_response
+    return statusCode, json_response
 
 
 def apiPOST(**parameters):
@@ -199,7 +192,8 @@ def apiPOST(**parameters):
     # headers = {'Authorization': 'Basic ' + parameters.get('jps_credentials'), "Content-type" : "application/zip", 'Content-Length': parameters.get('archive_size')}
     # request = urllib.Request(url, open(parameters.get('file_to_upload'), "rb"), headers=headers)
     # response = urllib.urlopen(request)
-    # # json_response = json.loads(response.read())
+    # statusCode = response.code
+    # content = response.read()
 
     # except Exception:
         # If urllib fails, resort to using curl.
@@ -207,10 +201,11 @@ def apiPOST(**parameters):
     if parameters.get('verbose'):
         print('Trying curl...')
     # Build the command.
-    curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request POST --form name=@{file_to_upload}'.format(jps_credentials=parameters.get('jps_credentials'), url=url, file_to_upload=parameters.get('file_to_upload'))
+    curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --write-out "statusCode:%{{http_code}}" --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request POST --form name=@{file_to_upload}'.format(jps_credentials=parameters.get('jps_credentials'), url=url, file_to_upload=parameters.get('file_to_upload'))
     response = runUtility(curl_cmd)
+    content, statusCode = response.split('statusCode:')
 
-    return response
+    return statusCode, content
 
 
 def main():
@@ -241,7 +236,7 @@ def main():
             upload_items = args.directory
         elif args.defaults:
             upload_items = ['/var/log/jamf.log', '/var/log/install.log', '/var/log/system.log']
-        
+
         if args.quiet:
             verbose = False
         else:
@@ -310,18 +305,27 @@ def main():
         sys.exit(2)
 
     # Query the API to get the computer ID
-    api_return = apiGET(jps_url=jps_url, jps_credentials=jps_credentials, endpoint='/computers/udid/{uuid}'.format(uuid=hw_UUID), verbose=verbose)
-    computer_id = api_return.get('computer').get('general').get('id')
-    if verbose:
-        print('Computer ID:  {}'.format(computer_id))
+    status_code, json_data = apiGET(jps_url=jps_url, jps_credentials=jps_credentials, endpoint='/computers/udid/{uuid}'.format(uuid=hw_UUID), verbose=verbose)
+
+    if int(status_code) == 200:
+        computer_id = json_data.get('computer').get('general').get('id')
+        if verbose:
+            print('Computer ID:  {}'.format(computer_id))
+    else:
+        print('ERROR:  Failed to retrieve devices\' computer ID!')
+        sys.exit(5)
 
     # Upload file via the API
-    api_return = apiPOST(jps_url=jps_url, jps_credentials=jps_credentials, endpoint='/fileuploads/computers/id/{id}'.format(id=computer_id), file_to_upload='{}.zip'.format(archive_file), archive_size=archive_size, verbose=verbose)
-    if api_return:  
-        if verbose:  
-            print('Response:  {}'.format(api_return))
+    status_code, content = apiPOST(jps_url=jps_url, jps_credentials=jps_credentials, endpoint='/fileuploads/computers/id/{id}'.format(id=computer_id), file_to_upload='{}.zip'.format(archive_file), archive_size=archive_size, verbose=verbose)
 
-    print('Upload complete!')
+    if int(status_code) == 204:
+        if content:
+            if verbose:
+                print('Response:  {}'.format(content))
+        print('Upload complete!')
+    else:
+        print('ERROR:  Failed to upload file to the JPS!')
+        sys.exit(6)
 
 if __name__ == "__main__":
     main()
