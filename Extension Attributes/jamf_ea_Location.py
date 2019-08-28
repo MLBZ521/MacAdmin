@@ -5,8 +5,7 @@
 # By:  Zack Thompson / Created:  8/24/2019
 # Version:  1.0.0 / Updated:  8/24/2019 / By:  ZT
 #
-# Description:  This script allows you to upload a compressed zip of specified files to a
-#               computers' inventory record.
+# Description:  A Jamf Pro Extension Attribute to get the physical location of a device.
 #
 ###################################################################################################
 """
