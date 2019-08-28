@@ -5,7 +5,7 @@
 # By:  Zack Thompson / Created:  8/24/2019
 # Version:  1.0.0 / Updated:  8/24/2019 / By:  ZT
 #
-# Description:  A Jamf Pro Extension Attribute to get the boot time of a device.
+# Description:  A Jamf Pro Extension Attribute to get the up time of a device.
 #
 ###################################################################################################
 """

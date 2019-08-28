@@ -13,6 +13,6 @@ bootTime=$( /usr/sbin/sysctl kern.boottime | /usr/bin/awk '{print $5}' | /usr/bi
 
 bootTimeFormatted=$( /bin/date -jf %s $bootTime +%F\ %T )
 
-echo "<result>$bootTimeFormatted</result>"
+echo "<result>${bootTimeFormatted}</result>"
 
 exit 0
