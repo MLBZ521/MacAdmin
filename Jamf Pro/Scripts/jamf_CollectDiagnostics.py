@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.1.0 / Updated:  8/24/2019 / By:  ZT
+# Version:  1.2.0 / Updated:  8/27/2019 / By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -220,7 +220,7 @@ def main():
     parser.add_argument('--api-username', '-u', help='Provide the encrypted string for the API Username', required=True)
     parser.add_argument('--api-password', '-p', help='Provide the encrypted string for the API Password', required=True)
     collection.add_argument('--defaults', default=True, help='Collects the default files.', required=False)
-    collection.add_argument('--file', '-f', type=str, nargs='+', help='Specify specific file or files to collect.', required=False)
+    collection.add_argument('--file', '-f', type=str, nargs=1, help='Specify specific file to collect.', required=False)
     collection.add_argument('--directory', '-d', metavar='/path/to/directory/', type=str, help='Specify a specific directory to collect.', required=False)
     parser.add_argument('--quiet', '-q', action='store_true', help='Do not print verbose messages.', required=False)
 
@@ -231,11 +231,12 @@ def main():
 
     if len(sys.argv) > 1:
         if args.file:
-            upload_items = args.file
+            upload_items = []
+            upload_items.append((args.file[0]).strip())
         elif args.directory:
-            upload_items = args.directory
+            upload_items = (args.directory).strip()
         elif args.defaults:
-            upload_items = ['/var/log/jamf.log', '/var/log/install.log', '/var/log/system.log']
+            upload_items = ['/private/var/log/jamf.log', '/private/var/log/install.log', '/private/var/log/system.log']
 
         if args.quiet:
             verbose = False
