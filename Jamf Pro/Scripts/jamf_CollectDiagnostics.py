@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.2.0 / Updated:  8/27/2019 / By:  ZT
+# Version:  1.3.0 / Updated:  9/13/2019 / By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -13,12 +13,14 @@
 
 import argparse
 import base64
+import csv
 import datetime
 from Foundation import NSBundle
 import json
 import objc
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import zipfile
@@ -94,6 +96,37 @@ def plistReader(plistFile, verbose):
         sys.exit(3)
 
     return plist_Contents
+
+
+# Modified from:  https://stackoverflow.com/a/36211470
+def dbTableWriter(database, table):
+    """A helper function read the contents of a database table and write to a csv.
+    Args:
+        database:  A database that can be opened with sqlite
+        table:  A table in the database to select
+    Returns:
+        file:  Returns the abspath of the file.
+    """
+
+    file_name = '/private/tmp/{}.csv'.format(table)
+
+    # Setup database connection
+    db_connect = sqlite3.connect(database)
+    database = db_connect.cursor()
+
+    # Execute query
+    database.execute("select * from {}".format(table))
+
+    # Write to file
+    with open(file_name,'w') as table_csv:
+        csv_out = csv.writer(table_csv)
+        # Write header
+        csv_out.writerow([description[0] for description in database.description])
+        # write data
+        for result in database:
+            csv_out.writerow(result)
+
+    return os.path.abspath(file_name)
 
 
 # Credit to (Mikey Mike/Froger/Pudquick/etc) for this logic:  https://gist.github.com/pudquick/c7dd1262bd81a32663f0
@@ -237,6 +270,12 @@ def main():
             upload_items = (args.directory).strip()
         elif args.defaults:
             upload_items = ['/private/var/log/jamf.log', '/private/var/log/install.log', '/private/var/log/system.log']
+            # Setup databases that we want to collect info from
+            db_kext = {}
+            database_items = []
+            db_kext['database'] = '/var/db/SystemPolicyConfiguration/KextPolicy'
+            db_kext['tables'] = [ 'kext_policy_mdm', 'kext_policy' ]
+            database_items.append(db_kext)
 
         if args.quiet:
             verbose = False
@@ -277,6 +316,8 @@ def main():
 
     if verbose:
         print('Requested files:  {}'.format(upload_items))
+        if database_items:
+            print('Requested databases:  {}'.format(database_items))
 
     if args.directory:
         if os.path.exists(upload_items):
@@ -294,6 +335,18 @@ def main():
                 zip_file.write(os.path.abspath(upload_item), compress_type=zipfile.ZIP_DEFLATED)
             else:
                 print('WARNING:  Unable to locate the specified file!')
+        for database_item in database_items:
+            if os.path.exists(database_item['database']):
+                if verbose:
+                    print('Archiving tables from database:  {}'.format(os.path.abspath(database_item['database'])))
+                for table in database_item['tables']:
+                    if verbose:
+                        print('Creating csv and archiving table:  {}'.format(table))
+                    file_name = dbTableWriter(database_item['database'], table)
+                    zip_file.write(os.path.abspath(file_name), compress_type=zipfile.ZIP_DEFLATED)
+            else:
+                print('WARNING:  Unable to locate the specified database!')
+
         zip_file.close()
 
     archive_size = os.path.getsize('{}.zip'.format(archive_file))
