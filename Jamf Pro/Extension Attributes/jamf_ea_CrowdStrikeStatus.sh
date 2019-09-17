@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.6.0 / Updated:  9/13/2019 / By:  ZT
+# Version:  1.7.0 / Updated:  9/16/2019 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -28,15 +28,24 @@ osMinorPatch=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $
 returnResult=""
 
 ##################################################
+# Functions
+
+checkLastConnection() {
+    # Check if the last connected date is older than seven days.
+    [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$( echo "${1}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g' )" +"%s" ) -lt $( /bin/date -j -v-"${2}"d +"%s" ) ]]
+}
+
+##################################################
 # Bits staged, collect the information...
 
 # Check if Crowd Strike is installed.
 if [[ -e "/Library/CS/falconctl" ]]; then
 
-    # Get the Crowd Strike version
+    # Get the Crowd Strike version.
     csVersion=$( /usr/sbin/sysctl -n cs.version | /usr/bin/awk -F '.' '{print $1"."$2}' )
+    csVersionExitCode=$?
 
-    if [[ $? == "0" ]]; then
+    if [[ $csVersionExitCode == "0" ]]; then
 
         # Get the customer ID and compare.
         csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
@@ -53,17 +62,45 @@ if [[ -e "/Library/CS/falconctl" ]]; then
                 returnResult+=" Disconnected State;"
             fi
         else
-            csCloudConnectionState=$( /Library/CS/falconctl stats | awk -F "State:" '{print $2}' | xargs )
+            # Get the current stats.
+            falconctlStats=$( /Library/CS/falconctl stats )
 
-            if [[ $csCloudConnectionState != "connected" ]]; then
-                lastConnected=$( /Library/CS/falconctl stats | awk -F "Last Established At:" '{print $2}' | xargs )
+            # Get the connection established dates.
+            established=$( echo "${falconctlStats}" | /usr/bin/awk -F "[^Last] Established At:" '{print $2}' | /usr/bin/xargs )
+            lastEstablished=$( echo "${falconctlStats}" | /usr/bin/awk -F "Last Established At:" '{print $2}' | /usr/bin/xargs )
 
-                # Check if the last connected date is older than seven days.
-                if [[ $(date -j -f "%b %d %Y %H:%M:%S" "$(echo "${lastConnected}" | sed 's/,//g; s/ at//g; s/ PM//g')" +"%s" ) -ge $(date -j -v-"$($lastConnectedVariance)"d +"%s") ]]; then
-                    returnResult+="Last Connected:  ${lastConnected};"
+            # Compare if both were available.
+            if [[ -n "${established}" && -n "${lastEstablished}" ]]; then
+
+                # Check which is more recent.
+                if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${established}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) -ge $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${lastEstablished}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) ]]; then
+                    testConnectionDate="${established}"
                 else
-                    returnResult+=" Disconnected State;"
+                    testConnectionDate="${lastEstablished}"
                 fi
+
+                # Check if the more recent date is older than seven days
+                if [[ $( checkLastConnection "${testConnectionDate}" $lastConnectedVariance ) ]]; then
+                    returnResult+="Last Connected:  ${testConnectionDate};"
+                fi
+
+            elif [[ -n "${established}" ]]; then
+
+                # If only the Established date was available, check if it is older than seven days.
+                if [[ $( checkLastConnection "${established}" $lastConnectedVariance ) ]]; then
+                    echo "Last Connected:  ${established};"
+                fi
+
+            elif [[ -n "${lastEstablished}" ]]; then
+
+                # If only the Last Established date was available, check if it is older than seven days.
+                if [[ $( checkLastConnection "${lastEstablished}" $lastConnectedVariance ) ]]; then
+                    returnResult+="Last Connected:  ${lastEstablished};"
+                fi
+
+            else
+                # If no connection date was available, return disconnected
+                returnResult+=" Disconnected State;"
             fi
         fi
 
@@ -90,19 +127,18 @@ if [[ -e "/Library/CS/falconctl" ]]; then
                 mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
                 user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
                 mdm_cs_platform=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446' and bundle_id='com.crowdstrike.platform';" )
-                user_cs_platform=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.platform';" )                
+                user_cs_platform=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.platform';" )
 
                 # Combine the results -- not to concerned which how they're enabled as long as they _are_ enabled.
-                cs_sensor=$((mdm_cs_sensor + user_cs_sensor))
-                cs_platform=$((mdm_cs_platform + user_cs_platform))
+                cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
+                cs_platform=$(( mdm_cs_platform + user_cs_platform ))
 
                 if [[ $(/usr/bin/bc <<< "${csVersion} < 4.23") -eq 1 ]]; then
                     if [[ "${cs_sensor}" -ge "1" && "${cs_platform}" -ge "1" ]]; then
                         returnResult+="KEXTs not enabled;"
                     fi
                 else
-                    if [[  "${cs_sensor}" -lt "${expectedKEXTs}" ]]; then
-                    # if [[  "${cs_sensor}" -lt "5" ]]; then
+                    if [[ "${cs_sensor}" -lt "${expectedKEXTs}" ]]; then
                         returnResult+="KEXT not enabled;"
                     fi
                 fi
