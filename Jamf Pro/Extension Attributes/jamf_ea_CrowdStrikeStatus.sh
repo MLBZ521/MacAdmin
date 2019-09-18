@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.7.0 / Updated:  9/16/2019 / By:  ZT
+# Version:  1.8.0 / Updated:  9/16/2019 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -42,10 +42,11 @@ checkLastConnection() {
 if [[ -e "/Library/CS/falconctl" ]]; then
 
     # Get the Crowd Strike version.
-    csVersion=$( /usr/sbin/sysctl -n cs.version | /usr/bin/awk -F '.' '{print $1"."$2}' )
+    getCSVersion=$( /usr/sbin/sysctl -n cs.version )
     csVersionExitCode=$?
 
     if [[ $csVersionExitCode == "0" ]]; then
+        csVersion=$( echo "${getCSVersion}" | /usr/bin/awk -F '.' '{print $1"."$2}' )
 
         # Get the customer ID and compare.
         csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
