@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.6.0 / Updated:  1/12/2019 / By:  ZT
+# Version:  1.7.0 / Updated:  1/27/2020 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -53,15 +53,17 @@ shopt -u nocasematch
 echo "Licensing Mechanism:  ${licenseMechanism}"
 
 ##################################################
-# Define Functions
+# Define Licensing Details
 
-function LicenseInfo {
 	if [[ $licenseType == "Academic" ]]; then
 		licenseManager="server.company.com"
 		commuterDays="7"
 
 		# Determine License Code
 		case "${versionSPSS}" in
+			"26" )
+				licenseCode="2612345678910"
+			;;
 			"25" )
 				licenseCode="2512345678910"
 			;;
@@ -78,6 +80,9 @@ function LicenseInfo {
 
 		# Determine License Code
 		case "${versionSPSS}" in
+			"26" )
+				licenseCode="2612345678911"
+			;;
 			"25" )
 				licenseCode="2512345678911"
 			;;
@@ -89,12 +94,11 @@ function LicenseInfo {
 			;;
 		esac
 	fi
-}
 
 ##################################################
 # Bits staged, license software...
 
-# Find all install SPSS versions.
+# Find all installed SPSS versions.
 appPaths=$( /usr/bin/find -E /Applications -iregex ".*[/](SPSS) ?(Statistics) ?([0-9]{2})?[.]app" -type d -prune )
 
 # Verify that a SPSS version was found.
@@ -108,18 +112,22 @@ else
 
 		##################################################
 		# Define Variables
-		# Get the SPSS version
-		versionSPSS=$( /usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}' )
+
 		# Get the App Bundle name
 		appName=$( echo "${appPath}" | /usr/bin/awk -F "/" '{print $NF}' )
 		# Get only the install path
 		installPath=$( echo "${appPath}" | /usr/bin/awk -F "/${appName}" '{print $1}' )
-		# Set the location of bin folder
-		licensePath="${appPath}/Contents/bin"
+		# Set the location of SPSS.app Contents folder
+		spssContents="${appPath}/Contents"
+		# Set the location of SPSS.app bin folder
+		spssBin="${spssContents}/bin"
+		# Get the SPSS version
+		versionSPSS=$( /usr/bin/defaults read "${spssContents}/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}' )
 		# Set the Network License file path
-		networkLicense="${licensePath}/spssprod.inf"
+		networkLicense="${spssBin}/spssprod.inf"
 		# Set the Local License Location file path
-		localLicense="${licensePath}/lservrc"
+		localLicense="${spssBin}/lservrc"
+
 		##################################################
 
 		# Setting permissions to resolve issues seen in:  https://www-01.ibm.com/support/docview.wss?uid=swg21966637
@@ -128,9 +136,6 @@ else
 
 		if [[ $licenseMechanism == "Network" ]]; then
 			echo "Configuring the License Manager Server for version:  ${versionSPSS}"
-
-			# Function LicenseInfo
-			LicenseInfo
 
 			# Inject the License Manager Server Name and number of days allowed to check out a license.
 			/usr/bin/sed -i '' 's/DaemonHost=.*/'"DaemonHost=${licenseManager}"'/' "${networkLicense}"
@@ -144,11 +149,25 @@ else
 		elif [[ $licenseMechanism == "Local" ]]; then
 			echo "Apply License Code for version:  ${versionSPSS}"
 
-			# Function LicenseInfo
-			LicenseInfo
+			spssJRE="${spssContents}/JRE/bin/java"
+			javaProp="-Djava.version=1.5 -Dis.headless=true -Djava.awt.headless=true"
+			spssActivator="${spssBin}/licenseactivator.jar"
+
+			if [[ -e "${spssJRE}" ]]; then
+				javaBinary="${spssJRE}"
+			else
+				javaBinary=java
+			fi
+
+			# Setup LC_ALL locale
+			if [[ "${LC_ALL}" = "" ]]; then
+				LC_ALL=en_US
+			fi
+
+			export LC_ALL
 
 			# Apply License Code
-			exitStatus=$( cd "${licensePath}" && "${licensePath}"/licenseactivator "${licenseCode}" )
+ 			exitStatus="${spssJRE}" "${javaProp}" -jar "${spssActivator}" "SILENTMODE" "CODES=${licenseCode}"
 
 			if [[ $exitStatus == *"Authorization succeeded"* ]]; then
 				echo "License Code applied successfully!"
