@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  uninstall_Avast.sh
 # By:  Zack Thompson / Created:  8/16/2019
-# Version:  1.0.0 / Updated:  8/16/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  9/14/2019 / By:  ZT
 #
-# Description:  Uninstalls Avast
+# Description:  Uninstalls Avast using the built in uninstall script.
 #
 ###################################################################################################
 
@@ -28,11 +28,15 @@ if [[ -d "${appPath}" ]]; then
 	
 	# Run the built-in uninstall process
 	case $appVersion in
-		"12" )
+		"11" | "12" )
 			"/Library/Application Support/Avast/components/uninstall/com.avast.uninstall.app/Contents/Resources/uninstall.sh"
 		;;
-		"13" )
-			"${appPath}/Contents/Backend/utils/com.avast.uninstall.app/Contents/Resources/uninstall.sh"
+		"13" | "14" )
+			if [[ -e "${appPath}/Contents/Backend/utils/com.avast.uninstall.app/Contents/Resources/uninstall.sh" ]]; then
+				"${appPath}/Contents/Backend/utils/com.avast.uninstall.app/Contents/Resources/uninstall.sh"
+			elif [[ -e "${appPath}/Contents/Backend/hub/uninstall.sh" ]]; then
+				"${appPath}/Contents/Backend/hub/uninstall.sh"
+			fi
 		;;
 		* )
 			echo "ERROR:  Unable to uninstall this version!"
