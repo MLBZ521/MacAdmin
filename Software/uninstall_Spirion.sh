@@ -3,19 +3,19 @@
 ###################################################################################################
 # Script Name:  uninstall_Spirion.sh
 # By:  Zack Thompson / Created:  6/3/2019
-# Version:  1.1.0 / Updated:  6/26/2019 / By:  ZT
+# Version:  1.2.0 / Updated:  1/24/2020 / By:  ZT
 #
 # Description:  This script uninstalls Spirion and Identity Finder.
 #
 # Note:  This is a customzied version of the uninstall script provided by Spirion to be run from 
-#					a management solution, such as Jamf Pro.
+#        a management solution, such as Jamf Pro.
 #
 ###################################################################################################
 
-# On uninstall ask if user prefs should be preserved or not. If not, then blow away
-# license/activation info/all plists/etc  if preserve, then just unload launch agent 
-# and blow away everything except any identityfinder.lic, activation dat file, and user 
-# prefs/plist.
+# On uninstall ask if user prefs should be preserved or not
+#    If not, then blow away license/activation info/all plists/etc
+#    If preserve, then just unload launch agent and blow away everything except 
+#    any identityfinder.lic, activation dat file, and user prefs/plist.
 
 # UninstallIDF.sh Version 20161017
 
@@ -37,7 +37,8 @@ case "${4}" in
 	;;
 esac
 
-currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
+currentUser=$( /usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+
 
 UsersSharedPathBase='/Users/Shared/.identityfinder';
 UsersSharedPathApp="$UsersSharedPathBase/Application";
@@ -92,43 +93,43 @@ RemoveFileOrDirectory () {
 	/bin/rm -Rf "$1"
   rmresult=$?;
   if (($runSilently==0)); then
-    if [ $rmresult -eq 0 ]; then
-      if [ -e "$1" ]; then
-        echo "$1 delete FAILED, try with the password option, -p and enter the admin password.";
-      else
-        echo "$1 REMOVED.";
-      fi
-    else
-      echo "mv $1 FAILED with error $?, try with the password option, -p and enter the admin password.";
-    fi
+	if [ $rmresult -eq 0 ]; then
+	  if [ -e "$1" ]; then
+		echo "$1 delete FAILED, try with the password option, -p and enter the admin password.";
+	  else
+		echo "$1 REMOVED.";
+	  fi
+	else
+	  echo "mv $1 FAILED with error $?, try with the password option, -p and enter the admin password.";
+	fi
   fi
 }
 
 PrintHelp () {
-    echo "NAME";
-    echo "    UninstallIDF -- uninstall $IDFBaseName and/or $SpirionBaseName.";
-    echo "SYNOPSIS";
-    echo "    UninstallIDF [options]"; 
-    echo "COPYRIGHT"
-    echo "    UninstallIDF Copyright (C) 2017 $SpirionBaseName, LLC.";
-    echo "DESCRIPTION"
-    echo "    Run this script to uninstall the $IDFBaseName or $SpirionBaseName applications,";
-    echo "    launch agents and daemon, data files, preferences files, licenses,";
-    echo "    and activation files, optionally running silently and auto-answering";
-    echo "    Yes or No to uninstall level.";
-    echo "";
-    echo "    Answer Yes to the \"Preserve user prefs? (Yes/No)\" prompt to unload";
-    echo "    and delete the launch agent, launch daemon, and applications.";
-    echo "";
-    echo "    Answer No to the \"Preserve user prefs? (Yes/No)\" prompt to unload and";
-    echo "    delete the launch agent, launch daemon, applications, and";
-    echo "    all licenses, activation files, and preferences files.";
-    echo "OPTIONS";
-    echo "    -s Run silently.";
-    echo "    -y Answer Yes to \"Preserve user prefs? (Yes/No)\" prompt.";
-    echo "    -n Answer No to \"Preserve user prefs? (Yes/No)\" prompt.";
-    echo "    -p Ask for administrator password to remove system resources.";
-    echo "    -h Prints this help message.";
+	echo "NAME";
+	echo "    UninstallIDF -- uninstall $IDFBaseName and/or $SpirionBaseName.";
+	echo "SYNOPSIS";
+	echo "    UninstallIDF [options]"; 
+	echo "COPYRIGHT"
+	echo "    UninstallIDF Copyright (C) 2017 $SpirionBaseName, LLC.";
+	echo "DESCRIPTION"
+	echo "    Run this script to uninstall the $IDFBaseName or $SpirionBaseName applications,";
+	echo "    launch agents and daemon, data files, preferences files, licenses,";
+	echo "    and activation files, optionally running silently and auto-answering";
+	echo "    Yes or No to uninstall level.";
+	echo "";
+	echo "    Answer Yes to the \"Preserve user prefs? (Yes/No)\" prompt to unload";
+	echo "    and delete the launch agent, launch daemon, and applications.";
+	echo "";
+	echo "    Answer No to the \"Preserve user prefs? (Yes/No)\" prompt to unload and";
+	echo "    delete the launch agent, launch daemon, applications, and";
+	echo "    all licenses, activation files, and preferences files.";
+	echo "OPTIONS";
+	echo "    -s Run silently.";
+	echo "    -y Answer Yes to \"Preserve user prefs? (Yes/No)\" prompt.";
+	echo "    -n Answer No to \"Preserve user prefs? (Yes/No)\" prompt.";
+	echo "    -p Ask for administrator password to remove system resources.";
+	echo "    -h Prints this help message.";
 }
 
 UnloadAndDeleteLaunchDaemon () {
@@ -231,10 +232,11 @@ DeleteApps () {
 		exit 1
 	fi
 
-#	This find command takes a very long time, but might be useful.
-#	echo "Finding and removing all ${IDFAppName}s in $HOME...";
-#	find / -type d -name "$IDFAppName" -print -exec rm -Rf {} \; ;
+#   This find command takes a very long time, but might be useful.
+#   echo "Finding and removing all ${IDFAppName}s in $HOME...";
+#   find / -type d -name "$IDFAppName" -print -exec rm -Rf {} \; ;
 
+    # Look in the usual places
 	if (($runSilently==0)); then
 		echo "Finding and removing /Applications/$1...";
 	fi
@@ -256,6 +258,11 @@ DeleteApps () {
 	else
 		RemoveFileOrDirectory "/Applications/$2";
 	fi
+
+    # Look in unusual locations
+    echo "Finding and removing all ${1}s in '/Users/${currentUser}'..";
+    /usr/bin/find "/Users/${currentUser}" -type d -name "${1}" -prune -exec sh -c 'echo "Found app locaiton: {}\c"; if $( /bin/rm -fR "{}" ); then echo ".....REMOVED"; fi' \; 2>&1 | /usr/bin/grep -v "Operation not permitted" ;
+
 }
 
 DeleteUsersShared () {
@@ -384,12 +391,12 @@ CleanPackageMakerDB () {
 		fi
 		# $sudoStr pkgutil --force --forget "$IDFPackageName" > /dev/null 2> /dev/null;
 		/usr/sbin/pkgutil --force --forget "$IDFPackageName" > /dev/null 2> /dev/null;
-    if [ -d "$ReceiptsPath/$IDFReceiptName" ]; then
-      RemoveFileOrDirectory "$ReceiptsPath/$IDFReceiptName";
-    else
-      if (($runSilently==0)); then
-        echo "$ReceiptsPath/$IDFReceiptName not found.";
-      fi
+	if [ -d "$ReceiptsPath/$IDFReceiptName" ]; then
+	  RemoveFileOrDirectory "$ReceiptsPath/$IDFReceiptName";
+	else
+	  if (($runSilently==0)); then
+		echo "$ReceiptsPath/$IDFReceiptName not found.";
+	  fi
 		fi
 	else
 		if (($runSilently==0)); then
