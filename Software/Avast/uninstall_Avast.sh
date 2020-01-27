@@ -23,10 +23,10 @@ echo "Searching for existing Avast instances..."
 
 appPaths=$( /usr/bin/find -E / -iregex ".*[/]Avast[.]app" -type d -prune 2>&1 | /usr/bin/grep -v "Operation not permitted" )
 
-# Verify Avast exists in the expected location
-if [[ -d "${appPath}" ]]; then
-
 while IFS="\n" read -r appPath; do
+
+	# Verify Avast exists in the expected location
+	if [[ -d "${appPath}" ]]; then
 
 		appVersion=$( /usr/bin/defaults read "${appPath}/Contents/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F '.' '{print $1}' )
 
@@ -61,12 +61,12 @@ while IFS="\n" read -r appPath; do
 			exit="2"
 		fi
 
-	done < <(echo "${appPaths}")
+	else
+		echo "ERROR:  Unable to locate Avast at the expected location!"
+		exit="1"
+	fi
 
-else
-	echo "ERROR:  Unable to locate Avast at the expected location!"
-	exit="1"
-fi
+done < <(echo "${appPaths}")
 
 echo "*****  Uninstall Avast process:  COMPLETE  *****"
 exit $exit
