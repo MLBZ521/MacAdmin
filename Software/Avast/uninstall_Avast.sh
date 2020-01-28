@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  uninstall_Avast.sh
 # By:  Zack Thompson / Created:  8/16/2019
-# Version:  1.2.0 / Updated:  1/24/2020 / By:  ZT
+# Version:  1.3.0 / Updated:  1/24/2020 / By:  ZT
 #
 # Description:  Uninstalls Avast using the built in uninstall script.
 #
@@ -13,17 +13,18 @@ echo "*****  Uninstall Avast process:  START  *****"
 
 ##################################################
 # Define Variables
-exit="0"
 jamfBin='/usr/local/jamf/bin/jamf'
+currentUser=$( /usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
 
 ##################################################
 # Bits staged...
 
 echo "Searching for existing Avast instances..."
 
-appPaths=$( /usr/bin/find -E / -iregex ".*[/]Avast[.]app" -type d -prune 2>&1 | /usr/bin/grep -v "Operation not permitted" )
+appPaths=$( /usr/bin/find -E /Applications "/Users/${currentUser}" -iregex ".*[/]Avast[.]app" -type d -prune 2>&1 | /usr/bin/grep -v "Operation not permitted" )
 
 while IFS="\n" read -r appPath; do
+	echo "Checking path:  ${appPath}"
 
 	# Verify Avast exists in the expected location
 	if [[ -d "${appPath}" ]]; then
@@ -46,27 +47,31 @@ while IFS="\n" read -r appPath; do
 			;;
 			* )
 				echo "ERROR:  Unable to uninstall this version!"
-				echo "*****  Uninstall Avast process:  FAILED  *****"
-				exit 3
+				continue
 			;;
 		esac
 
 		if [[ $? = 0 ]]; then
 			echo " -> Success"
-
-			# If Avast was uninstalled successfully, then run a recon
-			"${jamfBin}" recon
+			successfulExit="0"
 		else
 			echo " -> Failed"
-			exit="2"
+			exit="1"
 		fi
 
 	else
-		echo "ERROR:  Unable to locate Avast at the expected location!"
-		exit="1"
+		echo " -> Not an uninstallable Avast package"
+		exit="2"
 	fi
 
 done < <(echo "${appPaths}")
 
-echo "*****  Uninstall Avast process:  COMPLETE  *****"
-exit $exit
+if [[ "${successfulExit}" != "" ]]; then
+	echo "*****  Uninstall Avast process:  COMPLETE  *****"
+	# If Avast was uninstalled successfully, then run a recon
+	"${jamfBin}" recon
+	exit 0
+else
+	echo "*****  Uninstall Avast process:  FAILED  *****"
+	exit $exit
+fi
