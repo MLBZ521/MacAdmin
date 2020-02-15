@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  1.7.0 / Updated:  1/27/2020 / By:  ZT
+# Version:  1.8.0 / Updated:  2/14/2020 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -55,6 +55,7 @@ echo "Licensing Mechanism:  ${licenseMechanism}"
 ##################################################
 # Define Licensing Details
 
+LicenseInfo() {
 	if [[ $licenseType == "Academic" ]]; then
 		licenseManager="server.company.com"
 		commuterDays="7"
@@ -94,18 +95,20 @@ echo "Licensing Mechanism:  ${licenseMechanism}"
 			;;
 		esac
 	fi
+}
 
 ##################################################
 # Bits staged, license software...
 
-# Find all installed SPSS versions.
+# Find all installed versions of SPSS.
 appPaths=$( /usr/bin/find -E /Applications -iregex ".*[/](SPSS) ?(Statistics) ?([0-9]{2})?[.]app" -type d -prune )
 
-# Verify that a SPSS version was found.
+# Verify at least one version of SPSS was found.
 if [[ -z "${appPaths}" ]]; then
 	echo "A version of SPSS was not found in the expected location!"
 	echo "*****  License SPSS process:  FAILED  *****"
 	exit 3
+
 else
 	# If the machine has multiple SPSS Applications, loop through them...
 	while IFS="\n" read -r appPath; do
@@ -125,8 +128,11 @@ else
 		versionSPSS=$( /usr/bin/defaults read "${spssContents}/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}' )
 		# Set the Network License file path
 		networkLicense="${spssBin}/spssprod.inf"
-		# Set the Local License Location file path
+		# Set the Local License file path
 		localLicense="${spssBin}/lservrc"
+
+		# Function LicenseInfo
+		LicenseInfo
 
 		##################################################
 
@@ -153,6 +159,7 @@ else
 			javaProp="-Djava.version=1.5 -Dis.headless=true -Djava.awt.headless=true"
 			spssActivator="${spssBin}/licenseactivator.jar"
 
+			# Preferably use the bundled JRE.
 			if [[ -e "${spssJRE}" ]]; then
 				javaBinary="${spssJRE}"
 			else
@@ -164,10 +171,8 @@ else
 				LC_ALL=en_US
 			fi
 
-			export LC_ALL
-
 			# Apply License Code
- 			exitStatus="${spssJRE}" "${javaProp}" -jar "${spssActivator}" "SILENTMODE" "CODES=${licenseCode}"
+ 			exitStatus=$( cd "${spssBin}" && "${javaBinary}" "${javaProp}" -jar "${spssActivator}" "SILENTMODE" "CODES=${licenseCode}" )
 
 			if [[ $exitStatus == *"Authorization succeeded"* ]]; then
 				echo "License Code applied successfully!"
