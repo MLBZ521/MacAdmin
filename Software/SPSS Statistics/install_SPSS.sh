@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_SPSS.sh
 # By:  Zack Thompson / Created:  11/1/2017
-# Version:  1.5.0 / Updated:  1/12/2019 / By:  ZT
+# Version:  1.5.1 / Updated:  1/27/2020 / By:  ZT
 #
 # Description:  This script silently installs SPSS.
 #
@@ -26,10 +26,10 @@ majorVersion=$( echo $version | /usr/bin/awk -F "." '{print $1}' )
 # Bits staged...
 
 echo "Checking for a JDK..."
-if [[ ! -d $( /usr/bin/find "/Library/Java/JavaVirtualMachines" -iname "*.jdk" -type d ) ]]; then
+if [[ ! -n $( /usr/bin/find "/Library/Java/JavaVirtualMachines" -iname "*.jdk" -type d ) ]]; then
 	# Install prerequisite:  Java JDK
 	echo "Installing prerequisite Java JDK from Jamf..."
-	/usr/local/bin/jamf policy -id 721 -forceNoRecon
+	/usr/local/bin/jamf policy -event "Amazon_Corretto_JDK" -forceNoRecon
 else
 	echo "JDK exists...continuing..."
 fi
