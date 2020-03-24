@@ -3,12 +3,13 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.5.3 / Updated:  4/30/2019 / By:  ZT
+# Version:  1.7.0 / Updated:  3/23/2020 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
-#	System Requirements can be found here:  
-#		Mojave - https://support.apple.com/en-us/HT201475
+#	System Requirements can be found here:
+#		Catalina - https://support.apple.com/en-us/HT201475
+#		Mojave - https://support.apple.com/en-us/HT210190
 #			* MacPro5,1's = https://support.apple.com/en-us/HT208898
 #		High Sierra - https://support.apple.com/en-us/HT208969
 #		Sierra - https://support.apple.com/kb/sp742
@@ -20,135 +21,178 @@
 # Define Variables
 
 # Setting the minimum RAM and free disk space required for compatibility.
-	minimumRAM=2
-	minimumFreeSpace=20
+	minimumRAMMojaveOlder=2
+	minimumRAMCatalina=4
+	minimumFreeSpace=20 # This isn't completely accurate, but a minimum to start with.
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
-	requiredRAM=$(($minimumRAM * $convertToGigabytes))
+	requiredRAMMojaveOlder=$(($minimumRAMMojaveOlder * $convertToGigabytes))
+	requiredRAMCatalina=$(($minimumRAMCatalina * $convertToGigabytes))
 	requiredFreeSpace=$(($minimumFreeSpace * $convertToGigabytes))
+# Get the OS Version
+	osVersion=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $2"."$3}' )
+# Get the Model Type and Major Version
+	modelType=$( /usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^a-zA-Z]//g' )
+	modelMajorVersion=$( /usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^0-9,]//g' | /usr/bin/awk -F ',' '{print $1}' )
+# Get RAM Info
+	systemRAM=$( /usr/sbin/sysctl -n hw.memsize )
+	RAMUpgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs )
+# Get free space on the boot disk
+	systemFreeSpace=$( /usr/sbin/diskutil info / | /usr/bin/awk -F '[()]' '/Free Space|Available Space/ {print $2}' | /usr/bin/cut -d " " -f1 )
 
 ##################################################
 # Setup Functions
 
 modelCheck() {
-	if [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
-		echo "<result>Mojave</result>"
+
+	if [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+		echo "Catalina"
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+		echo "Mojave"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
-		echo "<result>High Sierra</result>"
+		echo "High Sierra"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 7.5") -eq 1 ]]; then
-		echo "<result>Sierra / OS Limitation</result>"  # (Current OS Limitation, 10.13 Compatible)
-	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
-		echo "<result>El Capitan</result>"
+		echo "Sierra / OS Limitation"  # (Current OS Limitation, 10.13 Compatible)
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
+		echo "El Capitan"
 	else
-		echo "<result>Model or Current OS Not Supported</result>"
+		echo "<result>Current OS Not Supported</result>"
+		exit 0
 	fi
+
 }
 
-# Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to my simplistic logic in this script.
+# Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to the original "simplistic" logic in this script.
 macProModelCheck() {
-	# Check if the Graphics Card supports Metal
-		supportsMetal=$(/usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs)
-	# Check if FileVault is enabled
-		fvStatus=$(/usr/bin/fdesetup status | /usr/bin/awk -F 'FileVault is ' '{print $2}' | /usr/bin/xargs)
 
-	macProResult="<result>"
-
-	if [[ $modelMajorVersion -eq 6 ]]; then
+	if [[ $modelMajorVersion -ge $4 ]]; then
 		# For MacPro 6,1 (2013/Trash Cans), these should be supported no matter the existing state, since they wouldn't be compatible with any OS that is old, nor have incompatible hardware.
-		echo "<result>Mojave</result>"
+		echo "Catalina"
 
-	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
-		# Function macProRequirements
-		macProRequirements 
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 13.6") -eq 1 ]]; then
+		# Supports Mojave, but required Metal Capabable Graphics Cards and FileVault must be disabled.
+		macProResult="Mojave"
 
-	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} <= 13.6") -eq 1 ]]; then		
-		macProResult+="High Sierra / OS Limitation,"
+		# Check if the Graphics Card supports Metal
+		if [[ $( /usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs ) != *"Supported"* ]]; then
+			macProResult+=" / GFX unsupported"
+		fi
 
-		# Function macProRequirements
-		macProRequirements
+		# Check if FileVault is enabled
+		if [[ $( /usr/bin/fdesetup status | /usr/bin/awk -F 'FileVault is ' '{print $2}' | /usr/bin/xargs ) != "Off." ]]; then
+			macProResult+=" / FV Enabled"
+		fi
 
-		macProResult=$(echo "${macProResult}" | /usr/bin/sed "s/,$//")
-		echo "${macProResult}</result>"
+		echo "${macProResult}"
+
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} <= 13.6") -eq 1 ]]; then
+		# Supports Mojave or newer, but requires a stepped upgrade path .
+
+		echo "High Sierra / OS Limitation"
 
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osVersion} >= 7.5") -eq 1 ]]; then
-		echo "<result>Sierra / OS Limitation</result>"  # (Current OS Limitation, 10.13 Compatible)
-	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
-		echo "<result>El Capitan</result>"
-	else
-		echo "<result>Model or Current OS Not Supported</result>"
+		echo "Sierra / OS Limitation"  # (Current OS Limitation, 10.13 Compatible)
+
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
+		echo "El Capitan"
+
 	fi
 }
-
-# Check the requirements for Mac Pros
-macProRequirements() {
-	if [[ $supportsMetal != *"Supported"* ]]; then
-		macProResult+="GFX unsupported,"
-	fi
-
-	if [[ $fvStatus != "Off." ]]; then
-		macProResult+="FV Enabled"
-	fi
-
-	if [[ $macProResult == "<result>" ]]; then
-		macProResult+="Mojave</result>"
-	fi
-}
-
-##################################################
-# Get machine info
-
-# Get the OS Version
-	osVersion=$(/usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $2"."$3}')
-# Get the Model Type and Major Version
-	modelType=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^a-zA-Z]//g')
-	modelMajorVersion=$(/usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^0-9,]//g' | /usr/bin/awk -F ',' '{print $1}')
-# Get RAM
-	systemRAM=$(/usr/sbin/sysctl -n hw.memsize)
-# Get free space on the boot disk
-	systemFreeSpace=$(/usr/sbin/diskutil info / | /usr/bin/awk -F '[()]' '/Free Space|Available Space/ {print $2}' | /usr/bin/cut -d " " -f1)
 
 ##################################################
 # Check for compatibility...
 
-if [[ $systemRAM -ge $requiredRAM && $systemFreeSpace -ge $requiredFreeSpace ]]; then
+# Each number passed to the below functions is the major model version for the model type.
+# The first parameter is for El Capitan, the second is for High Sierra, the third is for Mojave, and the forth is for Catalina.
+case $modelType in
+	"iMac" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 7 10 13 13 )
+	;;
+	"MacBook" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 5 6 8 8 )
+	;;
+	"MacBookPro" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 3 6 9 9 )
+	;;
+	"MacBookAir" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 2 3 5 5 )
+	;;
+	"Macmini" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 3 4 6 6 )
+	;;
+	"MacPro" )
+		# Function modelCheck
+		latestOSSupport=$( macProModelCheck 3 5 5 6 )
+	;;
+	"iMacPro" )
+		# Function modelCheck
+		latestOSSupport=$( modelCheck 1 1 1 1 )
+	;;
+	* )
+		echo "<result>Model No Longer Supported</result>"
+		exit 0
+	;;
+esac
 
-	# First parameter is for Mojave, the second parameter is for High Sierra, and the third for El Capitan, to check compatible HW models.
-	case $modelType in
-		"iMac" )
-			# Function modelCheck
-			modelCheck 13 10 7
-		;;
-		"MacBook" )
-			# Function modelCheck
-			modelCheck 8 6 5
-		;;
-		"MacBookPro" )
-			# Function modelCheck
-			modelCheck 9 6 3
-		;;
-		"MacBookAir" )
-			# Function modelCheck
-			modelCheck 5 3 2
-		;;
-		"Macmini" )
-			# Function modelCheck
-			modelCheck 6 4 3
-		;;
-		"MacPro" )
-			# Function modelCheck
-			macProModelCheck 5 5 3
-		;;
-		"iMacPro" )
-			# Function modelCheck
-			modelCheck 1 1
-		;;
-		* )
-			echo "<result>Unknown Model</result>"
-		;;
-	esac
+finalResult="<result>${latestOSSupport}"
+
+# RAM validation check
+if [[ "${latestOSSupport}" == "Catalina" ]]; then
+	# Based on model, device supports Catalina
+
+	if [[ $systemRAM -lt $requiredRAMCatalina ]]; then
+		# Based on RAM, device does not have enough to support Catalina
+
+		if [[ "${RAMUpgradeable}" == "No" ]]; then
+			# Device is not upgradable, so can never suppport Catalina
+
+			if [[ $systemRAM -ge $requiredRAMMojaveOlder ]]; then
+				# Device has enough RAM to support Mojave
+				latestOSSupport="Mojave"
+			else
+				# Device does not have enough RAM to support any upgrade!?
+				echo "<result>Not Upgrableable</result>"
+				exit 0
+			fi
+
+		else
+			# Device does not have enough RAM to upgrade currently, but RAM capacity can be increased.
+			finalResult+="Insufficient RAM"
+		fi
+
+	fi
 
 else
-	echo "<result>Insufficient Resources</result>"
+	# Based on model, device supports Mojave or older
+
+	if [[ $systemRAM -lt $requiredRAMMojaveOlder ]]; then
+		# Based on RAM, device does not have enough to upgrade
+
+		if [[ "${RAMUpgradeable}" == "No" ]]; then
+			# Device does not have enough RAM to support any upgrade!?
+			echo "<result>Not Upgrableable</result>"
+			exit 0
+
+		else
+			# Device does not have enough RAM to upgrade currently, but RAM capacity can be increased.
+			finalResult+=" / Insufficient RAM"
+
+		fi
+
+	fi
+
 fi
+
+# Check if the available free space is sufficient
+if [[ $systemFreeSpace -lt $requiredFreeSpace ]]; then
+	finalResult+=" / Insufficient Storage"
+fi
+
+echo "${finalResult}</result>"
 
 exit 0
