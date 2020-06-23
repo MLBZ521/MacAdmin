@@ -45,7 +45,9 @@
 
 modelCheck() {
 
-	if [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+	if [[ $modelMajorVersion -ge $5 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
+		echo "Big Sur"
+	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
 		echo "Catalina"
 	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osVersion} >= 8") -eq 1 ]]; then
 		echo "Mojave"
@@ -107,31 +109,31 @@ macProModelCheck() {
 case $modelType in
 	"iMac" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 7 10 13 13 )
+		latestOSSupport=$( modelCheck 7 10 13 13 15 )
 	;;
 	"MacBook" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 5 6 8 8 )
+		latestOSSupport=$( modelCheck 5 6 8 8 8 )
 	;;
 	"MacBookPro" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 3 6 9 9 )
+		latestOSSupport=$( modelCheck 3 6 9 9 11 )
 	;;
 	"MacBookAir" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 2 3 5 5 )
+		latestOSSupport=$( modelCheck 2 3 5 5 6 )
 	;;
 	"Macmini" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 3 4 6 6 )
+		latestOSSupport=$( modelCheck 3 4 6 6 7 )
 	;;
 	"MacPro" )
 		# Function modelCheck
-		latestOSSupport=$( macProModelCheck 3 5 5 6 )
+		latestOSSupport=$( macProModelCheck 3 5 5 6 6 )
 	;;
 	"iMacPro" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 1 1 1 1 )
+		latestOSSupport=$( modelCheck 1 1 1 1 1 )
 	;;
 	* )
 		echo "<result>Model No Longer Supported</result>"
