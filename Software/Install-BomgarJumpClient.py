@@ -3,7 +3,7 @@
 
 Script Name:  Install-BomgarJumpClient.py
 By:  Zack Thompson / Created:  3/2/2020
-Version:  1.2.0 / Updated:  6/18/2020 / By:  ZT
+Version:  1.2.1 / Updated:  6/23/2020 / By:  ZT
 
 Description:  Installs a Bomgar Jump Client with the passed parameters
 
@@ -19,6 +19,7 @@ import subprocess
 import sys
 import urllib
 from Cocoa import NSBundle
+from SystemConfiguration import SCDynamicStoreCopyConsoleUser
 from xml.etree import ElementTree
 
 def runUtility(command):
@@ -162,7 +163,7 @@ def main():
     parser.add_argument('--key', '-k', help='Sets the Jump Client Key.', required=True)
     parser.add_argument('--group', '-g', help='Sets the Jump Client Group.  You must pass the Jump Group "code_name".', required=False)
     parser.add_argument('--tag', '-t', help='Sets the Jump Client Tag.', required=False)
-    parser.add_argument('--name', '-n', help='Sets the Jump Client Name.  default value:  <Full Name>, <Username>', required=False)
+    parser.add_argument('--name', '-a', help='Sets the Jump Client Name.  default value:  <Full Name>, <Username>', required=False)
     parser.add_argument('--comments', '-c', help='Sets the Jump Client Comments.  default value:  <Friendly Model Name>, <Serial Number>', required=False)
     parser.add_argument('--site', '-s', default="bomgar.company.org", help='Associates the Jump Client with the public portal which has the given hostname as a site address.  default value:  bomgar.company.org', required=False)
     parser.add_argument('--policy-present', '-p', help='Policy that controls the permission policy during a support session if the customer is present at the console.  You must pass the Policy\'s "code_name".', required=False)
@@ -193,16 +194,23 @@ def main():
         jumpName = "--jc-name '{}'".format(args.name)
     else:
         # Get the Console User
-        console_user_cmd = "/usr/sbin/scutil <<< \"show State:/Users/ConsoleUser\" | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }'"
-        console_user = runUtility(console_user_cmd)
+        username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]
+        console_user = [username,""][username in [u"loginwindow", None, u""]]
 
         # Verify that a console user was present
         if console_user:
             # Get the Console Users' Full Name
-            full_name_cmd = "/usr/bin/dscl . -read \"/Users/${console_user}\" dsAttrTypeStandard:RealName | /usr/bin/awk -F 'RealName:' '{print $1}' | /usr/bin/xargs".format(console_user=console_user)
-            full_name = runUtility(full_name_cmd)
+            full_name_cmd = "/usr/bin/dscl . -read \"/Users/{console_user}\" dsAttrTypeStandard:RealName".format(console_user=console_user)
+            full_name_results = runUtility(full_name_cmd)
 
-            jumpName = "--jc-name '{full_name} ({console_user})'".format(full_name=full_name, console_user=console_user)
+            if full_name_results['success']:
+                full_name = re.sub("RealName:\s+", "", full_name_results['stdout'])
+
+                jumpName = "--jc-name '{full_name} ({console_user})'".format(full_name=full_name, console_user=console_user)
+
+            else:
+                # In case something goes wrong with dscl, set to none
+                jumpName = ""
 
         else:
             # If a console user was not present, set to none
