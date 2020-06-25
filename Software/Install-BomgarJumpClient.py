@@ -3,7 +3,7 @@
 
 Script Name:  Install-BomgarJumpClient.py
 By:  Zack Thompson / Created:  3/2/2020
-Version:  1.2.1 / Updated:  6/23/2020 / By:  ZT
+Version:  1.3.0 / Updated:  6/24/2020 / By:  ZT
 
 Description:  Installs a Bomgar Jump Client with the passed parameters
 
@@ -287,11 +287,10 @@ def main():
 
             if not results['success']:
                 print("ERROR:  failed to install Bomgar Jump Client")
-                print(results['stderr'])
+                print("Results:  {}".format(results['stderr']))
                 sys.exit(2)
 
-            print("Results:  {}".format(results['stdout']))
-            print("Results:  {}".format(results['stderr']))
+            # print("Results:  {}".format(results['stdout']))
         else:
             print("ERROR:  Bomgar Jump Client installer was not found at the expected location!")
             print('*****  install_Bomgar process:  FAILED  *****')
@@ -305,7 +304,7 @@ def main():
         results = runUtility(unmount_cmd)
 
         if not results['success']:
-            print("ERROR:  failed to mount:  {}".format(pathname))
+            print("ERROR:  failed to mount:  {}".format(mount_point))
             print(results['stdout'])
             print(results['stderr'])
             sys.exit(2)
