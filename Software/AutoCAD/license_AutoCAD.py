@@ -1,10 +1,14 @@
-#!/bin/python
+#!/usr/bin/python
 ###################################################################################################
 # Script Name:  license_AutoCAD.py
 # By:  Zack Thompson / Created:  8/21/2020
 # Version:  1.0.0 / Updated:  8/21/2020 / By:  ZT
 #
 # Description:  This script applies the license for AutoCAD 2020 and newer.
+#
+# Reference:  
+#   https://knowledge.autodesk.com/support/autocad/learn/caas/sfdcarticles/sfdcarticles/Use-Installer-Helper.html
+#   https://knowledge.autodesk.com/customer-service/download-install/activate/find-serial-number-product-key/product-key-look
 #
 ###################################################################################################
 
