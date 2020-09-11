@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.8.0 / Updated:  9/16/2019 / By:  ZT
+# Version:  1.9.0 / Updated:  12/16/2019 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -105,8 +105,11 @@ if [[ -e "/Library/CS/falconctl" ]]; then
             fi
         fi
 
+        # Get the status of SIP, if SIP is disabled, we don't need to check if the KEXTs are enabled.
+        sipStatus=$( /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{printf $2}' | /usr/bin/awk -F '.' '{printf $1}' )
+
         # Check if the OS version is 10.13.2 or newer, if it is, check if the KEXTs are enabled.
-        if [[ $(/usr/bin/bc <<< "${osMinorPatch} >= 13.2") -eq 1 ]]; then
+        if [[ $(/usr/bin/bc <<< "${osMinorPatch} >= 13.2") -eq 1 && "${sipStatus}" == "enabled" ]]; then
 
             # Get how many KEXTs are loaded.
             kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
