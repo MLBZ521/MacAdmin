@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.9.0 / Updated:  12/16/2019 / By:  ZT
+# Version:  1.10.0 / Updated:  9/11/2020 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -35,6 +35,28 @@ checkLastConnection() {
     [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$( echo "${1}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g' )" +"%s" ) -lt $( /bin/date -j -v-"${2}"d +"%s" ) ]]
 }
 
+
+# Get the customer ID and compare.
+checkCustomerID() {
+
+    if [[ $( /usr/bin/bc <<< "${csVersion} < 5.36" ) -eq 1 ]]; then
+
+        csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
+
+    else
+
+        csCustomerID=$( echo "${falconctlStats}" | /usr/bin/awk -F "customerID:" '{print $2}' | /usr/bin/xargs )
+
+    fi
+
+    if [[ "${csCustomerID}" != "${customerID}" ]]; then
+
+        returnResult+="Invalid Customer ID;"
+
+    fi
+
+}
+
 ##################################################
 # Bits staged, collect the information...
 
@@ -48,23 +70,28 @@ if [[ -e "/Library/CS/falconctl" ]]; then
     if [[ $csVersionExitCode == "0" ]]; then
         csVersion=$( echo "${getCSVersion}" | /usr/bin/awk -F '.' '{print $1"."$2}' )
 
-        # Get the customer ID and compare.
-        csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
-
-        if [[ "${csCustomerID}" != "${customerID}" ]]; then
-            returnResult+="Invalid Customer ID;"
-        fi
-
         # Get the connection state and compare; version dependant.
         if [[ $( /usr/bin/bc <<< "${csVersion} <= 4.16" ) -eq 1 ]]; then
+
+            # Function
+            checkCustomerID
+
             csCloudConnectionState=$( /usr/sbin/sysctl -n cs.comms.cloud_connection_state 2>&1 )
 
             if [[ "${csCloudConnectionState}" != "${cloudConnectionState}" ]]; then
+
                 returnResult+=" Disconnected State;"
+
             fi
+
         else
             # Get the current stats.
-            falconctlStats=$( /Library/CS/falconctl stats )
+            falconctlStats=$( sudo /Library/CS/falconctl stats agent_info Communications )
+            # Will eventually move to the --plist format, once it's fully supported
+            # falconctlStats=$( sudo /Library/CS/falconctl stats agent_info Communications --plist )
+
+            # Function
+            checkCustomerID
 
             # Get the connection established dates.
             established=$( echo "${falconctlStats}" | /usr/bin/awk -F "[^Last] Established At:" '{print $2}' | /usr/bin/xargs )
