@@ -1,4 +1,4 @@
-jamf.Reporting
+Reporting
 ======
 
 A collection of workflows, scripts, SQL queries, and notes for reporting on a Jamf environment.

@@ -1,4 +1,4 @@
-macOS.Desktop
+System Configs
 ======
 
 In this repository are various scripts that I have written to maintain the macOS Operating System from a client perspective.

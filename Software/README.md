@@ -1,4 +1,4 @@
-macOS.Software
+Software
 ======
 
 In this repository are various scripts that I have written to maintain macOS Software.
