@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.10.0 / Updated:  9/11/2020 / By:  ZT
+# Version:  1.11.0 / Updated:  9/14/2020 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -154,13 +154,13 @@ if [[ -e "/Library/CS/falconctl" ]]; then
             # Compare loaded KEXTs verus expected KEXTs
             if [[ "${kextsLoaded}" -eq "${expectedKEXTs}" ]]; then
 
-                # Check if the kernel extensions are enabled (where approved by MDM or by a user).
+                # Check if the kernel extensions are enabled (whether approved by MDM or by a user).
                 mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
                 user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
                 mdm_cs_platform=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446' and bundle_id='com.crowdstrike.platform';" )
                 user_cs_platform=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.platform';" )
 
-                # Combine the results -- not to concerned which how they're enabled as long as they _are_ enabled.
+                # Combine the results -- not to concerned how they're enabled as long as they _are_ enabled.
                 cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
                 cs_platform=$(( mdm_cs_platform + user_cs_platform ))
 
@@ -177,6 +177,24 @@ if [[ -e "/Library/CS/falconctl" ]]; then
             else
                 returnResult+="KEXT${kextPlural} not loaded;"
             fi
+        fi
+
+        # Check if Full Disk Access is enabled.
+        if [[ $(/usr/bin/bc <<< "${osMinorPatch} >= 14") -eq 1 ]]; then
+
+            # Check if FDA is enabled (whether by MDM or by a user).
+            mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :/Library/CS/falcond:kTCCServiceSystemPolicyAllFiles:Allowed" /Library/Application\ Support/com.apple.TCC/MDMOverrides.plist 2>/dev/null )
+            user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
+
+            # Combine the results -- not to concerned how it's enabled as long as it _is_ enabled.
+            fda_enabled=$(( mdm_fda_enabled + user_fda_enabled ))
+
+            if [[ $fda_enabled == "0" ]]; then
+
+                returnResult+="FDA not enabled;"
+
+            fi
+
         fi
 
         # Return the EA Value.
