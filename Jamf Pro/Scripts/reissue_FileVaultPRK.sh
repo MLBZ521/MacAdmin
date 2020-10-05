@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  reissue_FileVaultPRK.sh
 # By:  Zack Thompson / Created:  12/19/2017
-# Version:  1.2 / Updated:  8/6/2017 / By:  ZT
+# Version:  1.2.1 / Updated:  10/5/2020 / By:  ZT
 #
 # Description:  This script creates a new FileVault Personal Recovery Key by passing a valid Unlock Key via JSS Parameter to the Script.
 #		- A valid Unlock Key can be any of:  a password for a FileVault enabled user account or current Personal Recovery Key
@@ -82,7 +82,7 @@ XML
 			# This Inventory/Recon should Escrow the key and the next Recon should validate it.
 			/usr/local/bin/jamf recon 2&1>>/dev/null
 		else
-			echo "WARNING:  The PRK Data file does not appear to be been updated.  Reissue attempt may have failed."
+			echo "WARNING:  The PRK Data file does not appear to have been updated.  Reissue attempt may have failed."
 			exitValue=3
 		fi
 	fi
