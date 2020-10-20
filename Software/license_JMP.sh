@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_JMP.sh
 # By:  Zack Thompson / Created:  3/3/2017
-# Version:  3.0 / Updated:  4/13/2018 / By:  ZT
+# Version:  3.1.0 / Updated:  10/19/2020 / By:  ZT
 #
 # Description:  This script applies the license for JMP applications.
 #
@@ -15,10 +15,10 @@ echo "*****  License JMP process:  START  *****"
 # Define Variables
 
 # Get the current user
-	currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
+	currentUser=$( echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/&&!/loginwindow/{print $3}' )
 
 # Find all installed JMP versions.
-	appPaths=$(/usr/bin/find /Applications -iname "JMP*.app" -maxdepth 1 -type d)
+	appPaths=$( /usr/bin/find /Applications -iname "JMP*.app" -maxdepth 1 -type d )
 
 ##################################################
 # Define Functions
