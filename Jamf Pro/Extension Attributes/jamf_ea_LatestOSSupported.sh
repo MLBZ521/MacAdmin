@@ -30,7 +30,12 @@
 	requiredRAMCatalina=$(($minimumRAMCatalina * $convertToGigabytes))
 	requiredFreeSpace=$(($minimumFreeSpace * $convertToGigabytes))
 # Get the OS Version
-	osVersion=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $2"."$3}' )
+	installedMajor=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $1}' )
+	if [[ $installedMajor = '11' ]]; then
+		osVersion=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $1"."$2}' )
+	else
+    		osVersion=$( /usr/bin/sw_vers -productVersion | /usr/bin/awk -F '.' '{print $2"."$3}' )
+	fi
 # Get the Model Type and Major Version
 	modelType=$( /usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^a-zA-Z]//g' )
 	modelMajorVersion=$( /usr/sbin/sysctl -n hw.model | /usr/bin/sed 's/[^0-9,]//g' | /usr/bin/awk -F ',' '{print $1}' )
@@ -58,7 +63,7 @@ modelCheck() {
 	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osVersion} >= 6.8") -eq 1  ]]; then
 		echo "El Capitan"
 	else
-		echo "<result>Current OS Not Supported</result>"
+		echo "Current OS Not Supported"
 		exit 0
 	fi
 
