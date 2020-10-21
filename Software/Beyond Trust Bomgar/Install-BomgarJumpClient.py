@@ -3,7 +3,7 @@
 
 Script Name:  Install-BomgarJumpClient.py
 By:  Zack Thompson / Created:  3/2/2020
-Version:  1.3.0 / Updated:  6/24/2020 / By:  ZT
+Version:  1.4.0 / Updated:  10/20/2020 / By:  ZT
 
 Description:  Installs a Bomgar Jump Client with the passed parameters
 
@@ -206,7 +206,13 @@ def main():
             if full_name_results['success']:
                 full_name = re.sub("RealName:\s+", "", full_name_results['stdout'])
 
-                jumpName = "--jc-name '{full_name} ({console_user})'".format(full_name=full_name, console_user=console_user)
+                if "Setup User (_mbsetupuser)" != "{full_name} ({console_user})".format(full_name=full_name, console_user=console_user):
+
+                    jumpName = "--jc-name '{full_name} ({console_user})'".format(full_name=full_name, console_user=console_user)
+
+                else:
+
+                    jumpName = ""
 
             else:
                 # In case something goes wrong with dscl, set to none
