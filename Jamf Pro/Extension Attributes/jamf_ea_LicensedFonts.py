@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LicensedFonts.py
 # By:  Zack Thompson / Created:  1/12/2019
-# Version:  1.0.1 / Updated:  3/12/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  10/21/2020 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check if any Licensed Fonts are installed.
 #
@@ -35,15 +35,21 @@ def check(dir):
     Returns:
         count:  an [int] of files matching the string
     """
-    # Get all the files in the directory.
-    files = os.listdir(dir)
+
     count = 0 
 
-    # Loop over the files.
-    for file in files:
-        # Check the file via regex and ignore case.
-        if re.search(r'(Name_or_Prefix_of_Font_Here)', file, flags=re.IGNORECASE):  # Substitute "Name_or_Prefix_of_Font_Here" with the font you're looking for.
-            count += 1
+    try:
+        # Get all the files in the directory.
+        files = os.listdir(dir)
+
+        # Loop over the files.
+        for file in files:
+            # Check the file via regex and ignore case.
+            if re.search(r'(Name_or_Prefix_of_Font_Here)', file, flags=re.IGNORECASE):  # Substitute "Name_or_Prefix_of_Font_Here" with the font you're looking for.
+                count += 1
+    except:
+        pass
+
     return count
 
 def main():
