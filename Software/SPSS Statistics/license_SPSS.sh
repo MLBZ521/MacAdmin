@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  2.0.0 / Updated:  9/1/2020 / By:  ZT
+# Version:  2.1.0 / Updated:  10/29/2020 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -166,7 +166,7 @@ if [[ -z "${appPaths}" ]]; then
 else
 
 	# If the machine has multiple SPSS Applications, loop through them...
-	while IFS="\n" read -r appPath; do
+	while IFS=$'\n' read -r appPath; do
 
 		##################################################
 		# Define Variables
@@ -181,10 +181,6 @@ else
 		spssBin="${spssContents}/bin"
 		# Get the SPSS version
 		versionSPSS=$( /usr/bin/defaults read "${spssContents}/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}' )
-		# Set the Network License file path
-		networkLicense="${spssBin}/spssprod.inf"
-		# Set the Local License file path
-		localLicense="${spssBin}/lservrc"
 
 		# Function LicenseInfo
 		LicenseInfo
@@ -195,15 +191,25 @@ else
         echo "Setting permissions on SPSS ${versionSPSS} files..."
         /usr/sbin/chown -R root:admin "${installPath}"
 
-               if [[ $licenseMechanism == "Network" ]]; then
+        if [[ $licenseMechanism == "Network" ]]; then
             echo "Configuring the License Manager Server for version:  ${versionSPSS}"
 
 			if [[ "${versionSPSS}" == "27" ]]; then
+
+				# Set the Network License file path
+				networkLicense="${installPath}/Resources/Activation/commutelicense.ini"
+				# Set the Local License file path
+				localLicense="${installPath}/Resources/Activation/lservrc"
 
 				# Apply new licensing method; this information is stored in a different file, but instead of directly injecting it...  Let's follow the expect process this time.
 				"${installPath}/Resources/Activation/licenseactivator" LSHOST="${licenseManager}" COMMUTE_MAX_LIFE="${commuterDays}"
 
 			else
+
+				# Set the Network License file path
+				networkLicense="${spssBin}/spssprod.inf"
+				# Set the Local License file path
+				localLicense="${spssBin}/lservrc"
 
 				# Inject the License Manager Server Name and number of days allowed to check out a license.
 				/usr/bin/sed -i '' 's/DaemonHost=.*/'"DaemonHost=${licenseManager}"'/' "${networkLicense}"
@@ -211,11 +217,12 @@ else
 
 			fi
 
-			# If the local license file exists, remove it.
+			# If the local license file exists, disable it.
 			if [[ -e "${localLicense}" ]]; then
 
-				echo "Local License file exists; deleting..."
-				/bin/rm -rf "${localLicense}"
+				echo "Disabling Local License file..."
+				dateStamp=$( /bin/date +%Y-%m-%d_%H.%M.%S )
+				/bin/mv "${localLicense}" "${localLicense}_${dateStamp}"
 
 			fi
 
@@ -224,50 +231,105 @@ else
 
             echo "Apply License Code for version:  ${versionSPSS}"
 
-            spssJRE="${spssContents}/JRE/bin/java"
-            javaProp="-Djava.version=1.5 -Dis.headless=true -Djava.awt.headless=true"
-            spssActivator="${spssBin}/licenseactivator.jar"
+    		if [[ $( /usr/bin/bc <<< "${versionSPSS} >= 27" ) -eq 1 ]]; then
 
-            # Preferably use the bundled JRE.
-            if [[ -e "${spssJRE}" ]]; then
-                javaBinary="${spssJRE}"
-            else
-                javaBinary=java
-            fi
+				# Set the Network License file path
+				networkLicense="${installPath}/Resources/Activation/commutelicense.ini"
+				# Set the Local License file path
+				localLicense="${installPath}/Resources/Activation/lservrc"
 
-            # Setup LC_ALL locale
-            if [[ "${LC_ALL}" = "" ]]; then
-                LC_ALL=en_US
-            fi
+				# If a current local license file exists, back it up.
+				if [[ -e "${localLicense}" ]]; then
 
-            # Apply License Code
-            exitStatus=$( cd "${spssBin}" && "${javaBinary}" "${javaProp}" -jar "${spssActivator}" "SILENTMODE" "CODES=${licenseCode}" )
+					echo "Disabling Local License file..."
+					dateStamp=$( /bin/date +%Y-%m-%d_%H.%M.%S )
+					/bin/mv "${localLicense}" "${localLicense}_${dateStamp}"
 
-            if [[ $exitStatus == *"Authorization succeeded"* ]]; then
-                echo "License Code applied successfully!"
+				fi
 
-                # If the network license file exists, remove the License Manager server name.
-                if [[ -e "${networkLicense}" ]]; then
-                    echo "Removing Network License Manager info..."
-                    /usr/bin/sed -i '' 's/DaemonHost=.*/DaemonHost=/' "${networkLicense}"
-                fi
+				# Apply new licensing method
+				exitStatus=$( "${installPath}/Resources/Activation/licenseactivator" --code "${licenseCode}" )
 
-                # Setting permissions to resolve issues as it relates to (this step is not described, but helps to resolve):  https://www-01.ibm.com/support/docview.wss?uid=swg21966637
-                echo "Setting permissions on the SPSS ${versionSPSS} license file..."
-                /bin/chmod 644 "${localLicense}"
+				checkLicense=$( "${installPath}/Resources/Activation/showlic" -d "${installPath}/Resources/Activation" -np )
 
-                echo "SPSS v${versionSPSS} has been activated!"
+				if [[ $checkLicense == *"No licenses found for IBM SPSS Statistics ${versionSPSS}"* ]]; then
 
-            else
+					echo "ERROR:  Failed to apply License Code"
+					echo "ERROR Contents:  ${exitStatus}"
+					exitCode=6
 
-                echo "ERROR:  Failed to apply License Code"
-                echo "ERROR Contents:  ${exitStatus}"
-                exitCode=5
+				else
 
-            fi
+					echo "License Code applied successfully!"
+
+					# If the network license file exists, remove the License Manager server name.
+					if [[ -e "${networkLicense}" ]]; then
+						echo "Removing Network License Manager info..."
+						/usr/bin/sed -i '' 's/DaemonHost=.*/DaemonHost=/' "${networkLicense}"
+					fi
+
+					# Setting permissions to resolve issues as it relates to (this step is not described, but helps to resolve):  https://www-01.ibm.com/support/docview.wss?uid=swg21966637
+					echo "Setting permissions on the SPSS ${versionSPSS} license file..."
+					/bin/chmod 644 "${localLicense}"
+
+					echo "SPSS v${versionSPSS} has been activated!"
+
+				fi
+
+			else
+
+				# Set the Network License file path
+				networkLicense="${spssBin}/spssprod.inf"
+				# Set the Local License file path
+				localLicense="${spssBin}/lservrc"
+
+				spssJRE="${spssContents}/JRE/bin/java"
+				javaProp="-Djava.version=1.5 -Dis.headless=true -Djava.awt.headless=true"
+				spssActivator="${spssBin}/licenseactivator.jar"
+
+				# Preferably use the bundled JRE.
+				if [[ -e "${spssJRE}" ]]; then
+					javaBinary="${spssJRE}"
+				else
+					javaBinary=java
+				fi
+
+				# Setup LC_ALL locale
+				if [[ "${LC_ALL}" = "" ]]; then
+					LC_ALL=en_US
+				fi
+
+				# Apply License Code
+				exitStatus=$( cd "${spssBin}" && "${javaBinary}" "${javaProp}" -jar "${spssActivator}" "SILENTMODE" "CODES=${licenseCode}" )
+
+				if [[ $exitStatus == *"Authorization succeeded"* ]]; then
+					echo "License Code applied successfully!"
+
+					# If the network license file exists, remove the License Manager server name.
+					if [[ -e "${networkLicense}" ]]; then
+						echo "Removing Network License Manager info..."
+						/usr/bin/sed -i '' 's/DaemonHost=.*/DaemonHost=/' "${networkLicense}"
+					fi
+
+					# Setting permissions to resolve issues as it relates to (this step is not described, but helps to resolve):  https://www-01.ibm.com/support/docview.wss?uid=swg21966637
+					echo "Setting permissions on the SPSS ${versionSPSS} license file..."
+					/bin/chmod 644 "${localLicense}"
+
+					echo "SPSS v${versionSPSS} has been activated!"
+
+				else
+
+					echo "ERROR:  Failed to apply License Code"
+					echo "ERROR Contents:  ${exitStatus}"
+					exitCode=5
+
+				fi
+
+			fi
 
 		else
 
+            echo "ERROR:  Local administrative licenses are not supported"
 			exitCode=4
 
 		fi
