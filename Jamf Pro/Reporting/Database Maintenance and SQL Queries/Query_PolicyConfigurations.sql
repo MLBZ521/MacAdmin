@@ -126,6 +126,7 @@ group by policy_history.policy_id order by Count(*) asc;
 
 
 ###  NOT WORKING ###
+# Site Inventory Policies
 select policy_history.policy_id, policies.name, sites.site_name, count(*)
 from policy_history
 join policies on policies.policy_id = policy_history.policy_id
@@ -140,6 +141,26 @@ and
     (policies.policy_id = site_objects.object_id
         and site_objects.object_type = "3")
 group by policy_history.policy_id order by Count(*) asc;
+
+
+# v2 of above
+
+SELECT policy_history.policy_id, policies.name, count(*)
+FROM policy_history
+join policies on policies.policy_id = policy_history.policy_id
+join site_objects on site_objects.object_id = policies.policy_id
+join sites on sites.site_id = site_objects.site_id
+WHERE
+policy_history.completed_epoch>unix_timestamp(date_sub(now(), interval 1 day))*1000 
+and 
+policy_history.policy_id IN (
+	SELECT policies.policy_id FROM policies WHERE update_inventory = 1
+)
+and (
+	policies.policy_id = site_objects.object_id
+	and site_objects.object_type = "3"
+)
+GROUP BY policy_history.policy_id ORDER BY Count(*) asc;
 
 
 ##################################################
