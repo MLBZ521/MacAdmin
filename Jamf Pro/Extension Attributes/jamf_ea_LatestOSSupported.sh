@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.8.0 / Updated:  10/21/2020 / By:  ZT
+# Version:  1.8.1 / Updated:  11/9/2020 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -73,7 +73,7 @@ modelCheck() {
 # Apple just had to make one iMac model (14,4) support Big Sur...
 iMacModelCheck() {
 
-	if [[ $modelMajorVersion -ge $5 && $modelMinorVersion -ge 4 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	if [[ ( $modelMajorVersion -gt $5 || $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Big Sur"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
@@ -179,7 +179,7 @@ if [[ "${latestOSSupport}" == "Catalina" ]]; then
 		# Based on RAM, device does not have enough to support Catalina
 
 		if [[ "${RAMUpgradeable}" == "No" ]]; then
-			# Device is not upgradable, so can never suppport Catalina
+			# Device is not upgradable, so can never support Catalina
 
 			if [[ $systemRAM -ge $requiredRAMMojaveOlder ]]; then
 				# Device has enough RAM to support Mojave
