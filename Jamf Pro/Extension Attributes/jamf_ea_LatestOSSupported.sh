@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.8.1 / Updated:  11/9/2020 / By:  ZT
+# Version:  1.9.0 / Updated:  11/10/2020 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -25,11 +25,13 @@
 	minimumRAMMojaveOlder=2
 	minimumRAMCatalina=4
 	minimumFreeSpace=20 # This isn't completely accurate, but a minimum to start with.
+	minimumFreeSpaceBigSur=35 # Assumed based on Beta's
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
 	requiredRAMMojaveOlder=$(($minimumRAMMojaveOlder * $convertToGigabytes))
 	requiredRAMCatalina=$(($minimumRAMCatalina * $convertToGigabytes))
 	requiredFreeSpace=$(($minimumFreeSpace * $convertToGigabytes))
+	requiredFreeSpaceBigSur=$(($minimumFreeSpaceBigSur * $convertToGigabytes))
 # Get the OS Version
 	osVersion=$( /usr/bin/sw_vers -productVersion )
 	osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
@@ -219,8 +221,16 @@ else
 fi
 
 # Check if the available free space is sufficient
-if [[ $systemFreeSpace -lt $requiredFreeSpace ]]; then
+if [[ "${latestOSSupport}" == "Big Sur" ]]; then
+
+	if [[ $systemFreeSpace -lt $requiredFreeSpaceBigSur ]]; then
+		finalResult+=" / Insufficient Storage"
+
+	fi
+
+elif [[ $systemFreeSpace -lt $requiredFreeSpace ]]; then
 	finalResult+=" / Insufficient Storage"
+
 fi
 
 echo "${finalResult}</result>"
