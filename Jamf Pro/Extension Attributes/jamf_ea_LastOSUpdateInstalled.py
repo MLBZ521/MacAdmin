@@ -2,7 +2,7 @@
 """
 Script Name:  jamf_ea_LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.2.0 / Updated:  10/21/2020 / By:  ZT
+Version:  1.3.0 / Updated:  11/12/2020 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 """
@@ -29,7 +29,7 @@ def main():
 
     # Define the updates that we're concerned with
     patternProcessNames = re.compile("(?:macOS Installer)|(?:OS X Installer)|(?:softwareupdated)")
-    patternDisplayName = re.compile("(?:macOS .+ Beta)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
+    patternDisplayName = re.compile("(?:macOS .+ Beta)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
     patternPackageIdentifiers = re.compile("(?:com\.apple\.pkg\.macOSBrain)|(?:com\.apple\.pkg\.InstallAssistantMAS)")
 
     # Verify file exists
@@ -42,9 +42,9 @@ def main():
         for update in reversed(plist_Contents):
             if patternProcessNames.search(update["processName"]):
                 if patternDisplayName.search(update["displayName"]):
-                    for package in update["packageIdentifiers"]:
-                        if patternPackageIdentifiers.search(package):
-                            continue
+                    # for package in update["packageIdentifiers"]:
+                    #     if patternPackageIdentifiers.search(package):
+                    #         continue
 
                     lastUpdate = ''
                     lastUpdate = lastUpdate + str(update["displayName"]).lstrip('Install ')
