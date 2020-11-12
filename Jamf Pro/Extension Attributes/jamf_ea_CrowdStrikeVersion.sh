@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeVersion.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.1.1 / Updated:  1/31/2019 / By:  ZT
+# Version:  1.2.0 / Updated:  11/10/2020 / By:  ZT
 #
 # Description:  This script gets the version of Crowd Strike, if installed.
 #
@@ -11,21 +11,63 @@
 
 echo "Checking if Crowd Strike is installed..."
 
-if [[ -e "/Library/CS/falconctl" ]]; then
+##################################################
+# Possible falconctl binary locations
 
-	# Querty for the version string
-	echo "Checking the Crowd Strike Version..."
-	csVersion=$( /usr/sbin/sysctl -n cs.version 2>&1 )
+falconctl_AppLocation="/Applications/Falcon.app/Contents/Resources/falconctl"
+falconctl_OldLocation="/Library/CS/falconctl"
 
-	# Check if the command was successful
-	if [[ $? == "0" ]]; then
-		echo "<result>${csVersion}</result>"
-	else
+##################################################
+# Functions
+
+getFalconctlVersion() {
+
+    csAgentInfo=$( "${1}" stats agent_info --plist )
+
+	/usr/libexec/PlistBuddy -c "Print :agent_info:version" /dev/stdin <<< "$( echo ${csAgentInfo} )"
+
+}
+
+##################################################
+# Bits staged, collect the information...
+
+if  [[ -e "${falconctl_AppLocation}" && -e "${falconctl_OldLocation}" ]]; then
+
+    # Multiple versions installed
+    echo "<result>ERROR:  Multiple CS Versions installed</result>"
+    exit 0
+
+elif  [[ -e "${falconctl_AppLocation}" ]]; then
+
+    csVersion=$( getFalconctlVersion "${falconctl_AppLocation}" )
+
+elif  [[ -e "${falconctl_OldLocation}" ]]; then
+
+    csVersion=$( getFalconctlVersion "${falconctl_OldLocation}" )
+
+else
+
+    echo "<result>Not Installed</result>"
+    exit 0
+
+fi
+
+if [[ -z "${csVersion}" ]]; then
+
+	# Get the Crowd Strike version from sysctl for versions prior to v5.36.
+	csVersion=$( /usr/sbin/sysctl -n cs.version )
+	csVersionExitCode=$?
+
+	if [[ $csVersionExitCode -ne 0 ]]; then
+
 		echo "<result>Not Running</result>"
+
 	fi
 
 else
-	echo "<result>Not Installed</result>"
+
+	echo "<result>${csVersion}</result>"
+
 fi
 
 exit 0
