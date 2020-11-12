@@ -3,13 +3,13 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.9.0 / Updated:  11/10/2020 / By:  ZT
+# Version:  1.10.0 / Updated:  11/12/2020 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
 #	System Requirements can be found here:
-#		Big Sur - https://www.apple.com/macos/big-sur-preview/
-#		Catalina - https://support.apple.com/en-us/HT201475
+#		Big Sur - https://support.apple.com/en-us/HT211238
+#		Catalina - https://support.apple.com/en-us/HT210222
 #		Mojave - https://support.apple.com/en-us/HT210190
 #			* MacPro5,1's = https://support.apple.com/en-us/HT208898
 #		High Sierra - https://support.apple.com/en-us/HT208969
@@ -23,15 +23,15 @@
 
 # Setting the minimum RAM and free disk space required for compatibility.
 	minimumRAMMojaveOlder=2
-	minimumRAMCatalina=4
-	minimumFreeSpace=20 # This isn't completely accurate, but a minimum to start with.
-	minimumFreeSpaceBigSur=35 # Assumed based on Beta's
+	minimumRAMCatalinaPlus=4
+	minimumFreeSpace=20 # This isn't the technical specification for pervious versions, just a suggestion
+	minimumFreeSpaceBigSur=35.5 # For 10.12 or newer
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
 	requiredRAMMojaveOlder=$(($minimumRAMMojaveOlder * $convertToGigabytes))
-	requiredRAMCatalina=$(($minimumRAMCatalina * $convertToGigabytes))
+	requiredRAMCatalinaPlus=$(($minimumRAMCatalinaPlus * $convertToGigabytes))
 	requiredFreeSpace=$(($minimumFreeSpace * $convertToGigabytes))
-	requiredFreeSpaceBigSur=$(($minimumFreeSpaceBigSur * $convertToGigabytes))
+	requiredFreeSpaceBigSur=$( /usr/bin/bc <<< "${minimumFreeSpaceBigSur} * ${convertToGigabytes}" )
 # Get the OS Version
 	osVersion=$( /usr/bin/sw_vers -productVersion )
 	osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
@@ -174,14 +174,14 @@ esac
 finalResult="<result>${latestOSSupport}"
 
 # RAM validation check
-if [[ "${latestOSSupport}" == "Catalina" ]]; then
-	# Based on model, device supports Catalina
+if [[ "${latestOSSupport}" == "Catalina" || "${latestOSSupport}" == "Big Sur" ]]; then
+	# Based on model, device supports Catalina or newer
 
-	if [[ $systemRAM -lt $requiredRAMCatalina ]]; then
-		# Based on RAM, device does not have enough to support Catalina
+	if [[ $systemRAM -lt $requiredRAMCatalinaPlus ]]; then
+		# Based on RAM, device does not have enough to support Catalina or newer
 
 		if [[ "${RAMUpgradeable}" == "No" ]]; then
-			# Device is not upgradable, so can never support Catalina
+			# Device is not upgradable, so can never support Catalina or newer
 
 			if [[ $systemRAM -ge $requiredRAMMojaveOlder ]]; then
 				# Device has enough RAM to support Mojave
@@ -223,12 +223,12 @@ fi
 # Check if the available free space is sufficient
 if [[ "${latestOSSupport}" == "Big Sur" ]]; then
 
-	if [[ $systemFreeSpace -lt $requiredFreeSpaceBigSur ]]; then
+	if [[  $( /usr/bin/bc <<< "${systemFreeSpace} <= ${requiredFreeSpaceBigSur}" ) -eq 1 ]]; then
 		finalResult+=" / Insufficient Storage"
 
 	fi
 
-elif [[ $systemFreeSpace -lt $requiredFreeSpace ]]; then
+elif [[  $( /usr/bin/bc <<< "${systemFreeSpace} <= ${requiredFreeSpace}" ) -eq 1 ]]; then
 	finalResult+=" / Insufficient Storage"
 
 fi
