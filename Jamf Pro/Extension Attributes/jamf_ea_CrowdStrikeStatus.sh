@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.0.0 / Updated:  11/10/2020 / By:  ZT
+# Version:  2.1.0 / Updated:  11/12/2020 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -278,7 +278,7 @@ if [[ "${sipStatus}" == "enabled" ]]; then
             returnResult+=" KEXT not loaded;"
 
             # Check if the kernel extension is enabled (whether approved by MDM or by a user).
-            mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
+            mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446';" )
             user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
 
             if [[ -n "${mdm_cs_sensor}" || -n "${user_cs_sensor}" ]]; then
