@@ -2,7 +2,7 @@
 """
 Script Name:  jamf_ea_LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.3.0 / Updated:  11/12/2020 / By:  ZT
+Version:  1.3.1 / Updated:  11/13/2020 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 """
@@ -11,13 +11,7 @@ import os
 import re
 from datetime import datetime
 from dateutil import tz
-
-try:
-    from plistlib import dump as custom_plist_Writer  # For Python 3
-    from plistlib import load as custom_plist_Reader  # For Python 3
-except ImportError:
-    from plistlib import writePlist as custom_plist_Writer  # For Python 2
-    from plistlib import readPlist as custom_plist_Reader  # For Python 2
+import plistlib
 
 def main():
 
@@ -36,25 +30,33 @@ def main():
     if os.path.exists(install_history):
 
         # Load the InstallHistory.plist
-        plist_Contents = custom_plist_Reader(install_history)
+        plist_Contents = plistlib.readPlist(install_history)
 
         # Loop through the history...
         for update in reversed(plist_Contents):
             if patternProcessNames.search(update["processName"]):
                 if patternDisplayName.search(update["displayName"]):
-                    # for package in update["packageIdentifiers"]:
-                    #     if patternPackageIdentifiers.search(package):
-                    #         continue
+
+                    try:
+                        for package in update["packageIdentifiers"]:
+                            if patternPackageIdentifiers.search(package):
+                                continue
+
+                    except:
+                        pass
 
                     lastUpdate = ''
                     lastUpdate = lastUpdate + str(update["displayName"]).lstrip('Install ')
+
                     if update["displayVersion"] and update["displayVersion"] != " ":
                         lastUpdate = lastUpdate + ' ' + update["displayVersion"]
+
                     if update["date"]:
                         timeStamp = update["date"]
                         timeStamp = timeStamp.replace(tzinfo=from_zone)
                         timeStamp = timeStamp.astimezone(to_zone)
                         lastUpdate = lastUpdate + ' @ ' + str(timeStamp)
+
                     break
 
         if lastUpdate:
