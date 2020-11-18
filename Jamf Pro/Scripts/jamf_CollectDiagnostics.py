@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.3.0 / Updated:  9/13/2019 / By:  ZT
+# Version:  1.3.1 / Updated:  3/23/2020 By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -269,7 +269,8 @@ def main():
         elif args.directory:
             upload_items = (args.directory).strip()
         elif args.defaults:
-            upload_items = ['/private/var/log/jamf.log', '/private/var/log/install.log', '/private/var/log/system.log']
+            upload_items = ['/private/var/log/jamf.log', '/private/var/log/install.log', '/private/var/log/system.log', '/private/var/log/jamf_RecoveryAgent.log', '/private/var/log/jamf_ReliableEnrollment.log', '/private/var/log/32bitApps_inventory.log' ]
+
             # Setup databases that we want to collect info from
             db_kext = {}
             database_items = []
@@ -345,7 +346,7 @@ def main():
                     file_name = dbTableWriter(database_item['database'], table)
                     zip_file.write(os.path.abspath(file_name), compress_type=zipfile.ZIP_DEFLATED)
             else:
-                print('WARNING:  Unable to locate the specified database!')
+                print('WARNING:  Unable to locate the specified file!')
 
         zip_file.close()
 
