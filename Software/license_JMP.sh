@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_JMP.sh
 # By:  Zack Thompson / Created:  3/3/2017
-# Version:  3.1.0 / Updated:  10/19/2020 / By:  ZT
+# Version:  3.2.0 / Updated:  11/10/2020 / By:  ZT
 #
 # Description:  This script applies the license for JMP applications.
 #
@@ -104,6 +104,36 @@ Organization=
 Password1=
 Department="
 		;;
+		*"JMP 15.app"* )
+			licenseContents="Platform=Macintosh
+Product=JMP
+Release=15.0.x
+LType=SiteLicense
+EMode=Full
+SiteID=
+MaxNUsers=
+Starts=
+Expires=
+Administrator= 
+Organization=
+Password1=
+Department="
+		;;
+		*"JMP Pro 15.app"* )
+			licenseContents="Platform=Macintosh
+Product=JMPPRO
+Release=15.0.x
+LType=SiteLicense
+EMode=Full
+SiteID=
+MaxNUsers=
+Starts=
+Expires=
+Administrator= 
+Organization=
+Password1=
+Department="
+		;;
 		* )
 			echo "A unexpected version was found!"
 			echo "*****  License JMP process:  FAILED  *****"
@@ -122,7 +152,7 @@ if [[ -z "${appPaths}" ]]; then
 	exit 3
 else
 	# If the machine has multiple JMP Applications, loop through them...
-	while IFS="\n" read -r appPath; do
+	while IFS=$'\n' read -r appPath; do
 
 		# Get the App Bundle name
 		appName=$(echo "${appPath}" | /usr/bin/awk -F "/" '{print $NF}')
