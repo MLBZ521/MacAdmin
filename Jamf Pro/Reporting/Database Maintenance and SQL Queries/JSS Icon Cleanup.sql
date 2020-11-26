@@ -17,7 +17,7 @@ SELECT COUNT(*) FROM icons;
 
 -- Count the number of icons where the contents contain "%<!DOCTYPE%"
 -- My environment had a lot of these for some reason; they resulted in "broken" images GUI
-select count(*) from icons where contents LIKE "%<!DOCTYPE%" ;
+select count(*) from icons where contents LIKE "%<!DOCTYPE%";
 
 -- Get all icons that are assigned to deleted Mobile Device VPP Apps
 select distinct count(*) from icons
@@ -68,7 +68,7 @@ UNION ALL
 UNION ALL
     SELECT branding_image_id AS id
     FROM self_service
-    )
+    );
 
 -- Count the number of unused icon_id's that are from VPP Apps
 SELECT COUNT(*) FROM icons WHERE icons.icon_id NOT IN
@@ -219,7 +219,7 @@ delete from icons where icon_id in (
     or icon_id between 2314 and 2501
     or icon_id between 2505 and 2579
     or icon_id between 3385 and 4186
-    or icon_id between 6776 and 13500 )
+    or icon_id between 6776 and 13500 );
 
 -- Delete the icons where the contents contain "%<!DOCTYPE%"
 delete from icons where contents LIKE "%<!DOCTYPE%";
