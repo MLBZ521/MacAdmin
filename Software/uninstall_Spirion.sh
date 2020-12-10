@@ -3,11 +3,11 @@
 ###################################################################################################
 # Script Name:  uninstall_Spirion.sh
 # By:  Zack Thompson / Created:  6/3/2019
-# Version:  1.2.0 / Updated:  1/24/2020 / By:  ZT
+# Version:  1.3.0 / Updated:  12/9/2020 / By:  ZT
 #
 # Description:  This script uninstalls Spirion and Identity Finder.
 #
-# Note:  This is a customzied version of the uninstall script provided by Spirion to be run from 
+# Note:  This is a customized version of the uninstall script provided by Spirion to be run from 
 #        a management solution, such as Jamf Pro.
 #
 ###################################################################################################
@@ -214,7 +214,8 @@ UnloadAndDeleteLaunchAgents () {
 	RemoveFileOrDirectory "/Users/${currentUser}/Library/LaunchAgents/$IDFReverseDomainRoot.*";
 	fi
 
-	if (($askForPassword==1)); then
+	# if (($askForPassword==1)); then
+	if (($askForPassword==0)); then
 		UnloadAndDeleteLaunchDaemon;
 	fi
 }
