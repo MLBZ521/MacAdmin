@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Apple_RepairPrograms.py
 # By:  Zack Thompson / Created:  8/24/2019
-# Version:  1.0.0 / Updated:  8/24/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  2/12/2021 / By:  ZT
 #
 # Description:  This script looks up provided devices and checks if they're eligible for a recall program.
 #
@@ -102,20 +102,32 @@ def available_exchange_programs(model):
         # https://support.apple.com/13inch-macbookpro-battery-replacement
         program_number.append("032018")
 
+    if model == "iPhone 11":
+        # iPhone 11 Display Module Replacement Program for Touch Issues
+        # https://support.apple.com/iphone-11-display-module-replacement-program
+        program_number.append("122020")
+
     if model == "iPhone 8":
         # iPhone 8 Logic Board Replacement Program
         # https://support.apple.com/iphone-8-logic-board-replacement-program
         program_number.append("082018")
 
-    if model == "iPhone 6S":
-        # iPhone 6s Program for Unexpected Shutdown Issues
-        # https://support.apple.com/iphone6s-unexpectedshutdown
-        program_number.append("112016")
+    if model == "iPhone 6S" or model == "iPhone 6 Plus":
+        # iPhone 6s and iPhone 6s Plus Service Program for No Power Issues
+        # https://support.apple.com/iphone-6s-6s-plus-no-power-issues-program
+        program_number.append("102019")
 
-    if model == "iPhone 6 Plus":
-        # iSight Camera Replacement Program for iPhone 6 Plus
-        # https://support.apple.com/iphone6plus-isightcamera
-        program_number.append("082015")
+# Discontinued programs
+
+    # if model == "iPhone 6S":
+    #     # iPhone 6s Program for Unexpected Shutdown Issues
+    #     # https://support.apple.com/iphone6s-unexpectedshutdown
+    #     program_number.append("112016")
+
+    # if model == "iPhone 6 Plus":
+    #     # iSight Camera Replacement Program for iPhone 6 Plus
+    #     # https://support.apple.com/iphone6plus-isightcamera
+    #     program_number.append("082015")
 
     return program_number
 
