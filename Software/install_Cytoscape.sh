@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_Cytoscape.sh
 # By:  Zack Thompson / Created:  9/1/2020
-# Version:  1.0.0 / Updated:  9/1/2020 / By:  ZT
+# Version:  1.1.0 / Updated:  2/17/2021 / By:  ZT
 #
 # Description:  This script installs Cytoscape silently.
 #
@@ -16,6 +16,10 @@ if [[ $3 != "/" ]]; then
 	echo "*****  Install Cytoscape process:  FAILED  *****"
 	exit 1
 fi
+
+# Remove previous versions
+echo "Deleting previous versions of Cytoscape (if present)..."
+/usr/bin/find "/Applications" -name "Cytoscape*" -type d -maxdepth 1 -exec rm -rfv {} \;
 
 # Set working directory
 pkgDir=$(/usr/bin/dirname "${0}")
