@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.1.0 / Updated:  11/12/2020 / By:  ZT
+# Version:  2.2.0 / Updated:  2/26/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -137,8 +137,14 @@ if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 && $( /usr/bin/bc
 
 fi
 
+
 # Check CS Version
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.36" ) -eq 1 ]]; then
+if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.34" ) -eq 1 ]]; then
+
+    echo "<result>Sensor Version Not Supported</result>"
+    exit 0
+
+elif [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.36" ) -eq 1 ]]; then
 
     # Get the customer ID to compare.
     csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
