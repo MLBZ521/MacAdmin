@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  2.1.0 / Updated:  10/29/2020 / By:  ZT
+# Version:  2.2.0 / Updated:  3/5/2021 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -191,6 +191,15 @@ else
         echo "Setting permissions on SPSS ${versionSPSS} files..."
         /usr/sbin/chown -R root:admin "${installPath}"
 
+		# Reset the Lock Code
+		# Adapted from known issue:  https://www.ibm.com/support/pages/troubleshooting-common-licensing-problems-authorized-user-spss-product-statistics-modeler-amos
+		if [[ -e "${spssBin}/echoid.dat" ]]; then
+
+			echo "Resetting the lock code..."
+			/usr/bin/sed -i '' 's/0x010/0x004/' "${spssBin}/echoid.dat"
+
+		fi
+
         if [[ $licenseMechanism == "Network" ]]; then
             echo "Configuring the License Manager Server for version:  ${versionSPSS}"
 
@@ -241,7 +250,7 @@ else
 				# If a current local license file exists, back it up.
 				if [[ -e "${localLicense}" ]]; then
 
-					echo "Disabling Local License file..."
+					echo "Backing up previous Local License file..."
 					dateStamp=$( /bin/date +%Y-%m-%d_%H.%M.%S )
 					/bin/mv "${localLicense}" "${localLicense}_${dateStamp}"
 
@@ -264,7 +273,7 @@ else
 
 					# If the network license file exists, remove the License Manager server name.
 					if [[ -e "${networkLicense}" ]]; then
-						echo "Removing Network License Manager info..."
+						echo "Preemptively removing Network License Manager info due to local license being used..."
 						/usr/bin/sed -i '' 's/DaemonHost=.*/DaemonHost=/' "${networkLicense}"
 					fi
 
