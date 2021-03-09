@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.0.0 / Updated:  3/2/2021 / By:  ZT
+# Version:  1.1.0 / Updated:  3/8/2021 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -23,27 +23,27 @@ Beta Group"
 # Example:  Use Configuration Profile Variables to configure a custom plist
 configured_plist_domain="/Library/Managed Preferences/edu.asu.AboutMac.plist"
 
+# Used if hard coding a sensor group tag
+selected_group=${4}
+
+# Action options are:
+#   "Self Service" - use if you want to allow users to select their sensor group
+#   "Reset" - use if you want to force reset the Sensor Version Test Group
+action="${5}"
+
 # Possible falconctl binary locations
 falconctl_app_location="/Applications/Falcon.app/Contents/Resources/falconctl"
 falconctl_old_location="/Library/CS/falconctl"
 
-# Only accepted action is "Self Service" and is only used if you want 
-# to allow users to select their sensor group.
-action="${5}"
-
-# Used if hard coding a sensor group tag
-selected_group=${4}
+# Get OS Version Details
+osVersion=$( /usr/bin/sw_vers -productVersion )
+osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
+osMinorPatchVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $2"."$3}' )
 
 ##################################################
 # Functions
 
-get_sensor_version() {
-
-    csAgentInfo=$( "${1}" stats agent_info --plist )
-    /usr/libexec/PlistBuddy -c "Print :agent_info:version" /dev/stdin <<< "$( echo ${csAgentInfo} )" | /usr/bin/awk -F '.' '{print $1"."$2}'
-
-}
-
+# Function to handle exit checks
 exit_check() {
 
     if [[ $1 != 0 ]]; then
@@ -55,30 +55,61 @@ exit_check() {
 
 }
 
+# Reusable display dialog box helper
+osascript_dialog_helper() {
+
+    if [[ "${action}" == "Self Service" ]]; then
+
+        /usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'display dialog "'"${1}"'" buttons {"OK"} with icon POSIX file "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns"' -e 'end tell' &
+
+    fi
+
+}
+
 ##################################################
 # Bits staged...
+
+# Check is both an action and a sensor group were passed...
+if [[ -n "${action}" && -n "${selected_group}" ]]; then
+
+    exit_check 1 "ERROR:  Providing both an Action and preselected Sensor Group is not supported"
+
+fi
 
 # Check which location exists
 if  [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
 
+    osascript_dialog_helper "CrowdStrike Falcon not in a healthy state."
     exit_check 2 "ERROR:  Multiple versions installed"
 
 elif  [[ -e "${falconctl_app_location}" ]]; then
-
-    cs_version=$( get_sensor_version "${falconctl_app_location}" )
 
     falconctl="${falconctl_app_location}"
 
 elif  [[ -e "${falconctl_old_location}" ]]; then
 
-    cs_version=$( get_sensor_version "${falconctl_old_location}" )
     falconctl="${falconctl_old_location}"
 
 else
 
+    osascript_dialog_helper "CrowdStrike Falcon not installed!"
     exit_check 3 "ERROR:  CrowdStrike Falcon is not installed"
 
 fi
+
+# Only supporting 10.15 or newer to test newer versions of the Falcon Sensor
+if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} < 15" ) -eq 1 ]]; then
+
+    osascript_dialog_helper "Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
+    exit_check 4 "WARNING:  Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
+
+fi
+
+# Get the CS Agent Info which contains the version
+cs_agent_info=$( "${falconctl}" stats agent_info --plist 2 > /dev/null )
+
+# Get the version string
+cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2 > /dev/null /dev/stdin <<< "$( echo ${cs_agent_info} )" | /usr/bin/awk -F '.' '{print $1"."$2}' )
 
 if [[ -z "${cs_version}" ]]; then
 
@@ -93,7 +124,8 @@ if [[ -z "${cs_version}" ]]; then
 
     else
 
-        exit_check 4 "ERROR:  Unable to determine the installed sensor version"
+        osascript_dialog_helper "CrowdStrike Falcon not in a healthy state."
+        exit_check 5 "ERROR:  CrowdStike Falcon is not able to run or not in a healthy state; unable to determine the installed sensor version"
 
     fi
 
@@ -102,14 +134,15 @@ fi
 # Check CS Version
 if [[ $( /usr/bin/bc <<< "${cs_version} < 5.30" ) -eq 1 ]]; then
 
-    exit_check 5 "Sensor version does not support tagging"
+    osascript_dialog_helper "Running an outdated version of CrowdStrike Falcon is not supported."
+    exit_check 6 "ERROR:  Sensor version does not support tagging"
 
 fi
 
 # Check if the plist exists; this is how we'll inform the device which Site it is in
 if [[ ! -e "${configured_plist_domain}" ]]; then
 
-    exit_check 1 "WARNING:  preference domain not configured"
+    exit_check 7 "WARNING:  preference domain not configured"
 
 else
 
@@ -117,67 +150,79 @@ else
 
 fi
 
+# Check the current tags, before applying
+current_tags=$( "${falconctl}" grouping-tags get | /usr/bin/awk -F 'Grouping tags: ' '{print $2}' )
+
 # Turn on case-insensitive pattern matching
 shopt -s nocasematch
 
-# If script is offered via Self Service...
-if [[ "${action}" == "Self Service" ]]; then
+# Check which action was passed...
+if [[ "${action}" == "Reset" ]]; then
+
+    # sensor_tags="ent/${site_tag}"
+    echo "Resetting sensor version group tag..."
+
+elif [[ "${action}" == "Self Service" ]]; then
 
     # Prompt user for actions to take
     prompt_for_choice="tell application (path to frontmost application as text) to choose from list every paragraph of \"${available_groups}\" with multiple selections allowed with title \"Falcon Sensor Group\" with prompt \"Choose which testing group to join:\" OK button name \"Select\" cancel button name \"Cancel\""
     selected_group=$( /usr/bin/osascript -e "${prompt_for_choice}" )
 
+elif [[ -n "${action}" ]]; then
+
+    exit_check 8 "ERROR:  Unknown action specified"
+
 fi
 
-# Test the sensor group tag based on the provided or selected group
-if [[ "${selected_group}" == "false" ]]; then
+# Combine the sensor tags
+if [[ -z "${selected_group}" && -z "${action}" ]]; then
 
-    echo "NOTICE:  User canceled the prompt"
-    echo -e "\n*****  CrowdStrike Sensor Tag Process:  CANCELED  *****"
-    exit 0
-
-elif [[ "${selected_group}" == *"Production"* ]]; then
-
-    sensor_group_tag=""
-
-elif [[ "${selected_group}" == *"Test"* ]]; then
-
-    sensor_group_tag="sensor/test"
-
-elif [[ "${selected_group}" == *"Beta"* ]]; then
-
-    sensor_group_tag="sensor/beta"
+    # Potentially re-setting the `site_tag`; in this case, re-use the current `sensor_version_group_tag`
+    current_sensor_version_group_tag=$( echo "${current_tags}" | /usr/bin/awk -F 'sensor/' '{print $2}' )
+    sensor_tags="ent/${site_tag},sensor/${current_sensor_version_group_tag}"
 
 else
 
-    exit_check 10 "ERROR:  Passed sensor group is not supported"
+    # Check the sensor group tag based on the provided or selected group
+    if [[ "${selected_group}" == "false" ]]; then
+
+        echo "NOTICE:  User canceled the prompt"
+        echo -e "\n*****  CrowdStrike Sensor Tag Process:  CANCELED  *****"
+        exit 0
+
+    elif [[ "${selected_group}" == *"Production"* ]]; then
+
+        sensor_version_group_tag=""
+
+    elif [[ "${selected_group}" == *"Test"* ]]; then
+
+        sensor_version_group_tag=",sensor/test"
+
+    elif [[ "${selected_group}" == *"Beta"* ]]; then
+
+        sensor_version_group_tag=",sensor/beta"
+
+    elif [[ -n "${selected_group}" ]]; then
+
+        exit_check 9 "ERROR:  Passed sensor version group is not supported"
+
+    fi
+
+    sensor_tags="ent/${site_tag}${sensor_version_group_tag}"
 
 fi
 
 # Turn off case-insensitive pattern matching
 shopt -u nocasematch
 
-# Combine the sensor tags
-if [[ -z "${sensor_group_tag}" ]]; then
-
-    sensor_tags="ent/${site_tag}"
-
-else
-
-    sensor_tags="ent/${site_tag},${sensor_group_tag}"
-
-fi
-
-# Check the current tags, before applying
-current_tags=$( "${falconctl}" grouping-tags get | /usr/bin/awk -F 'Grouping tags: ' '{print $2}' )
-
+# Apply tags if different
 if [[ "${current_tags}" == "${sensor_tags}" ]]; then
 
     echo "NOTICE:  Sensors tags are current, no change required."
 
 else
 
-echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags}"
+    echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags}"
 
     echo "Applying sensor tags..."
     exit_status=$( "${falconctl}" grouping-tags set "${sensor_tags}" )
@@ -185,7 +230,8 @@ echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags
 
     if [[ $exit_code -ne 0 ]]; then
 
-        exit_check 6 "ERROR:  Failed to set the sensor tags! \nError Output:  ${exit_status}"
+        osascript_dialog_helper "Failed to apply the test group, please contact your Deskside support group for assistance."
+        exit_check 10 "ERROR:  Failed to set the sensor tags! \nError Output:  ${exit_status}"
 
     fi
 
@@ -195,7 +241,8 @@ echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags
 
     if [[ $unload_exit_code -ne 0 ]]; then
 
-        exit_check 7 "ERROR:  Failed to unload the sensor! \nError Output:  ${unload_exit_status}"
+        osascript_dialog_helper "Failed to apply the test group, please contact your Deskside support group for assistance."
+        exit_check 11 "ERROR:  Failed to unload the sensor! \nError Output:  ${unload_exit_status}"
 
     fi
 
@@ -204,7 +251,8 @@ echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags
 
     if [[ $load_exit_code -ne 0 ]]; then
 
-        exit_check 8 "ERROR:  Failed to load the sensor! \nError Output:  ${load_exit_status}"
+        osascript_dialog_helper "Failed to apply the test group, please contact your Deskside support group for assistance."
+        exit_check 12 "ERROR:  Failed to load the sensor! \nError Output:  ${load_exit_status}"
 
     fi
 
