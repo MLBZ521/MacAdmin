@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.1.0 / Updated:  3/8/2021 / By:  ZT
+# Version:  1.2.0 / Updated:  3/9/2021 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -40,6 +40,9 @@ osVersion=$( /usr/bin/sw_vers -productVersion )
 osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
 osMinorPatchVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $2"."$3}' )
 
+# Turn on case-insensitive pattern matching
+shopt -s nocasematch
+
 ##################################################
 # Functions
 
@@ -74,6 +77,18 @@ if [[ -n "${action}" && -n "${selected_group}" ]]; then
 
     exit_check 1 "ERROR:  Providing both an Action and preselected Sensor Group is not supported"
 
+
+# Check if Self Service or a sensor group was passed...
+elif [[ "${action}" == "Self Service" || -n "${selected_group}" ]]; then
+
+    # Only supporting 10.15 or newer to test newer versions of the Falcon Sensor
+    if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} < 15" ) -eq 1 ]]; then
+
+        osascript_dialog_helper "Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
+        exit_check 4 "WARNING:  Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
+
+    fi
+
 fi
 
 # Check which location exists
@@ -97,19 +112,11 @@ else
 
 fi
 
-# Only supporting 10.15 or newer to test newer versions of the Falcon Sensor
-if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} < 15" ) -eq 1 ]]; then
-
-    osascript_dialog_helper "Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
-    exit_check 4 "WARNING:  Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
-
-fi
-
 # Get the CS Agent Info which contains the version
-cs_agent_info=$( "${falconctl}" stats agent_info --plist 2 > /dev/null )
+cs_agent_info=$( "${falconctl}" stats agent_info --plist 2> /dev/null )
 
 # Get the version string
-cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2 > /dev/null /dev/stdin <<< "$( echo ${cs_agent_info} )" | /usr/bin/awk -F '.' '{print $1"."$2}' )
+cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2> /dev/null /dev/stdin <<< "$( echo ${cs_agent_info} )" | /usr/bin/awk -F '.' '{print $1"."$2}' )
 
 if [[ -z "${cs_version}" ]]; then
 
@@ -153,9 +160,6 @@ fi
 # Check the current tags, before applying
 current_tags=$( "${falconctl}" grouping-tags get | /usr/bin/awk -F 'Grouping tags: ' '{print $2}' )
 
-# Turn on case-insensitive pattern matching
-shopt -s nocasematch
-
 # Check which action was passed...
 if [[ "${action}" == "Reset" ]]; then
 
@@ -179,7 +183,16 @@ if [[ -z "${selected_group}" && -z "${action}" ]]; then
 
     # Potentially re-setting the `site_tag`; in this case, re-use the current `sensor_version_group_tag`
     current_sensor_version_group_tag=$( echo "${current_tags}" | /usr/bin/awk -F 'sensor/' '{print $2}' )
-    sensor_tags="ent/${site_tag},sensor/${current_sensor_version_group_tag}"
+
+    if [[ -n "${current_sensor_version_group_tag}" ]]; then
+    
+        sensor_tags="ent/${site_tag},sensor/${current_sensor_version_group_tag}"
+
+    else
+
+        sensor_tags="ent/${site_tag}"
+
+    fi
 
 else
 
@@ -225,7 +238,7 @@ else
     echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags}"
 
     echo "Applying sensor tags..."
-    exit_status=$( "${falconctl}" grouping-tags set "${sensor_tags}" )
+    exit_status=$( "${falconctl}" grouping-tags set "${sensor_tags}" 2>&1 )
     exit_code=$?
 
     if [[ $exit_code -ne 0 ]]; then
@@ -236,17 +249,29 @@ else
     fi
 
     echo "Reloading sensor..."
-    unload_exit_status=$( "${falconctl}" unload )
+    unload_exit_status=$( "${falconctl}" unload 2>&1 )
     unload_exit_code=$?
 
     if [[ $unload_exit_code -ne 0 ]]; then
 
-        osascript_dialog_helper "Failed to apply the test group, please contact your Deskside support group for assistance."
-        exit_check 11 "ERROR:  Failed to unload the sensor! \nError Output:  ${unload_exit_status}"
+        if [[ "${unload_exit_status}" == "Error: A maintenance token is required to unload. Specify one with -t." ]]; then
+
+            osascript_dialog_helper "A reboot is required to complete the change."
+            echo "NOTICE:  Sensor Group Tag will not be updated until a reboot"
+            echo -e "\n*****  CrowdStrike Sensor Tag Process:  COMPLETE  *****"
+            exit 0
+
+
+        else
+
+            osascript_dialog_helper "Failed to apply the test group, please contact your Deskside support group for assistance."
+            exit_check 11 "ERROR:  Failed to unload the sensor! \nError Output:  ${unload_exit_status}"
+
+        fi
 
     fi
 
-    load_exit_status=$( "${falconctl}" load )
+    load_exit_status=$( "${falconctl}" load 2>&1 )
     load_exit_code=$?
 
     if [[ $load_exit_code -ne 0 ]]; then
