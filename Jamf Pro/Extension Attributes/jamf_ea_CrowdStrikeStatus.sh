@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.2.0 / Updated:  2/26/2021 / By:  ZT
+# Version:  2.3.0 / Updated:  3/1/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -120,6 +120,18 @@ else
     echo "<result>Not Installed</result>"
     exit 0
 
+fi
+
+# Check the Locale; this will affect the output of falconclt stats
+lib_locale=$( /usr/bin/defaults read "/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
+root_locale=$( /usr/bin/defaults read "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
+
+if [[ "${lib_locale}" != "en_US" ]]; then
+    /usr/bin/defaults write "/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
+fi
+
+if [[ "${root_locale}" != "en_US" ]]; then
+    /usr/bin/defaults write "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
 fi
 
 # Check CS Version
