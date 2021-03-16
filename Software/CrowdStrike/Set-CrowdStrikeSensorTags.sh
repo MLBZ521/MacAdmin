@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.2.0 / Updated:  3/9/2021 / By:  ZT
+# Version:  1.3.0 / Updated:  3/10/2021 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -14,21 +14,23 @@ echo -e "*****  CrowdStrike Sensor Tag Process:  START  *****\n"
 ##################################################
 # Define Variables
 
+# Instance
+instance="ent/"
+
+# This plist domain will contain which Site the device is assigned to
+# Example:  Use Configuration Profile Variables to configure a custom plist
+configured_plist_domain="/Library/Managed Preferences/com.company.AboutMac.plist"
+
 # Define the available groups
 available_groups="Production Group
 Test Group
 Beta Group"
-
-# This plist domain will contain which Site the device is assigned to
-# Example:  Use Configuration Profile Variables to configure a custom plist
-configured_plist_domain="/Library/Managed Preferences/edu.asu.AboutMac.plist"
 
 # Used if hard coding a sensor group tag
 selected_group=${4}
 
 # Action options are:
 #   "Self Service" - use if you want to allow users to select their sensor group
-#   "Reset" - use if you want to force reset the Sensor Version Test Group
 action="${5}"
 
 # Possible falconctl binary locations
@@ -36,9 +38,9 @@ falconctl_app_location="/Applications/Falcon.app/Contents/Resources/falconctl"
 falconctl_old_location="/Library/CS/falconctl"
 
 # Get OS Version Details
-osVersion=$( /usr/bin/sw_vers -productVersion )
-osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
-osMinorPatchVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $2"."$3}' )
+os_version=$( /usr/bin/sw_vers -productVersion )
+os_major_version=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $1}' )
+os_minor_patch_version=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $2"."$3}' )
 
 # Turn on case-insensitive pattern matching
 shopt -s nocasematch
@@ -63,7 +65,14 @@ osascript_dialog_helper() {
 
     if [[ "${action}" == "Self Service" ]]; then
 
-        /usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'display dialog "'"${1}"'" buttons {"OK"} with icon POSIX file "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns"' -e 'end tell' &
+        osascript << EndOfScript
+        tell application "System Events" 
+            activate
+            display dialog "${1}" ¬
+            buttons {"OK"} ¬
+            with icon POSIX file "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns"
+        end tell
+EndOfScript
 
     fi
 
@@ -82,7 +91,7 @@ if [[ -n "${action}" && -n "${selected_group}" ]]; then
 elif [[ "${action}" == "Self Service" || -n "${selected_group}" ]]; then
 
     # Only supporting 10.15 or newer to test newer versions of the Falcon Sensor
-    if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} < 15" ) -eq 1 ]]; then
+    if [[ $( /usr/bin/bc <<< "${os_major_version} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${os_minor_patch_version} < 15" ) -eq 1 ]]; then
 
         osascript_dialog_helper "Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
         exit_check 4 "WARNING:  Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
@@ -132,7 +141,7 @@ if [[ -z "${cs_version}" ]]; then
     else
 
         osascript_dialog_helper "CrowdStrike Falcon not in a healthy state."
-        exit_check 5 "ERROR:  CrowdStike Falcon is not able to run or not in a healthy state; unable to determine the installed sensor version"
+        exit_check 5 "ERROR:  CrowdStrike Falcon is not able to run or not in a healthy state; unable to determine the installed sensor version"
 
     fi
 
@@ -149,7 +158,7 @@ fi
 # Check if the plist exists; this is how we'll inform the device which Site it is in
 if [[ ! -e "${configured_plist_domain}" ]]; then
 
-    exit_check 7 "WARNING:  preference domain not configured"
+    exit_check 7 "ERROR:  Preference domain not configured"
 
 else
 
@@ -157,20 +166,24 @@ else
 
 fi
 
-# Check the current tags, before applying
+# Get the current tags
 current_tags=$( "${falconctl}" grouping-tags get | /usr/bin/awk -F 'Grouping tags: ' '{print $2}' )
 
-# Check which action was passed...
-if [[ "${action}" == "Reset" ]]; then
-
-    # sensor_tags="ent/${site_tag}"
-    echo "Resetting sensor version group tag..."
-
-elif [[ "${action}" == "Self Service" ]]; then
+if [[ "${action}" == "Self Service" ]]; then
 
     # Prompt user for actions to take
-    prompt_for_choice="tell application (path to frontmost application as text) to choose from list every paragraph of \"${available_groups}\" with multiple selections allowed with title \"Falcon Sensor Group\" with prompt \"Choose which testing group to join:\" OK button name \"Select\" cancel button name \"Cancel\""
-    selected_group=$( /usr/bin/osascript -e "${prompt_for_choice}" )
+    selected_group=$( osascript << EndOfScript
+        tell application "System Events" 
+            activate
+            choose from list every paragraph of "${available_groups}" ¬
+            with multiple selections allowed ¬
+            with title "Falcon Sensor Group" ¬
+            with prompt "Choose which testing group to join:" ¬
+            OK button name "Select" ¬
+            cancel button name "Cancel"
+        end tell
+EndOfScript
+)
 
 elif [[ -n "${action}" ]]; then
 
@@ -186,11 +199,11 @@ if [[ -z "${selected_group}" && -z "${action}" ]]; then
 
     if [[ -n "${current_sensor_version_group_tag}" ]]; then
     
-        sensor_tags="ent/${site_tag},sensor/${current_sensor_version_group_tag}"
+        sensor_tags="${instance}${site_tag},sensor/${current_sensor_version_group_tag}"
 
     else
 
-        sensor_tags="ent/${site_tag}"
+        sensor_tags="${instance}${site_tag}"
 
     fi
 
@@ -221,12 +234,21 @@ else
 
     fi
 
-    sensor_tags="ent/${site_tag}${sensor_version_group_tag}"
+    sensor_tags="${instance}${site_tag}${sensor_version_group_tag}"
 
 fi
 
 # Turn off case-insensitive pattern matching
 shopt -u nocasematch
+
+# Add a tag to track that the device is running Mojave, so the sensor doesn't auto upgrade after a 
+# Big Sur upgrade; this is to allow time for the required Config Profiles to be installed
+# Leave tagged if perviously tagged -- this script will not handle removing this tag.
+if [[ "${current_tags}" =~ "mojave_hold" || ( $( /usr/bin/bc <<< "${os_major_version} == 10" ) -eq 1 && "${os_minor_patch_version}" =~ "14"* ) ]]; then
+
+    sensor_tags+=",mojave_hold"
+
+fi
 
 # Apply tags if different
 if [[ "${current_tags}" == "${sensor_tags}" ]]; then
