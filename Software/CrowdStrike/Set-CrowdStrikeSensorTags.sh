@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.3.0 / Updated:  3/10/2021 / By:  ZT
+# Version:  1.4.0 / Updated:  3/16/2021 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -91,7 +91,7 @@ if [[ -n "${action}" && -n "${selected_group}" ]]; then
 elif [[ "${action}" == "Self Service" || -n "${selected_group}" ]]; then
 
     # Only supporting 10.15 or newer to test newer versions of the Falcon Sensor
-    if [[ $( /usr/bin/bc <<< "${os_major_version} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${os_minor_patch_version} < 15" ) -eq 1 ]]; then
+    if [[ "${os_major_version}" == 10 && $( /usr/bin/bc <<< "${os_minor_patch_version} < 15" ) -eq 1 ]]; then
 
         osascript_dialog_helper "Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
         exit_check 4 "WARNING:  Testing new versions of CrowdStrike Falcon is only supported on macOS 10.15 Catalina or newer."
@@ -125,7 +125,7 @@ fi
 cs_agent_info=$( "${falconctl}" stats agent_info --plist 2> /dev/null )
 
 # Get the version string
-cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2> /dev/null /dev/stdin <<< "$( echo ${cs_agent_info} )" | /usr/bin/awk -F '.' '{print $1"."$2}' )
+cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2> /dev/null /dev/stdin <<< "${cs_agent_info}" | /usr/bin/awk -F '.' '{print $1"."$2}' )
 
 if [[ -z "${cs_version}" ]]; then
 
@@ -244,7 +244,7 @@ shopt -u nocasematch
 # Add a tag to track that the device is running Mojave, so the sensor doesn't auto upgrade after a 
 # Big Sur upgrade; this is to allow time for the required Config Profiles to be installed
 # Leave tagged if perviously tagged -- this script will not handle removing this tag.
-if [[ "${current_tags}" =~ "mojave_hold" || ( $( /usr/bin/bc <<< "${os_major_version} == 10" ) -eq 1 && "${os_minor_patch_version}" =~ "14"* ) ]]; then
+if [[ "${current_tags[*]}" == *"mojave_hold"* || ( "${os_major_version}" == 10 && "${os_minor_patch_version}" =~ 14\.+ ) ]]; then
 
     sensor_tags+=",mojave_hold"
 
