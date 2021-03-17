@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.3.0 / Updated:  3/1/2021 / By:  ZT
+# Version:  2.4.0 / Updated:  3/16/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -14,6 +14,17 @@ echo "Checking the Crowd Strike configuration..."
 
 ##################################################
 ## Set variables for your environment
+
+# Set path to a Python3 framework
+python_path="/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3"
+
+# Set whether you want to remediate the Network Filter State
+# Only force enables if running macOS 11.3 or newer
+# Supported actions:
+#   true - if network filter state is disabled, enable it
+#   false - do not change network filter state, only report on it
+remediate_network_filter="true"
+
 # Set whether CrowdStrike Firmware Analysis is enabled in your environment ( true | false ).
 csFirmwareAnalysisEnable="false"
 
@@ -57,8 +68,8 @@ checkLastConnection() {
 # Bits staged, collect the information...
 
 # Possible falconctl binary locations
-falconctl_AppLocation="/Applications/Falcon.app/Contents/Resources/falconctl"
-falconctl_OldLocation="/Library/CS/falconctl"
+falconctl_app_location="/Applications/Falcon.app/Contents/Resources/falconctl"
+falconctl_old_location="/Library/CS/falconctl"
 
 # Get OS Version Details
 osVersion=$( /usr/bin/sw_vers -productVersion )
@@ -70,50 +81,23 @@ returnResult=""
 
 if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 12" ) -eq 1 ]]; then
 
-    # macOS 10.12 or older -- technically 10.12 still communicates, but should be cut off on 12/9/2020 -- I'm calling it early here.
+    # macOS 10.12 or older
     echo "<result>OS Version Not Supported</result>"
     exit 0
 
-elif  [[ -e "${falconctl_AppLocation}" && -e "${falconctl_OldLocation}" ]]; then
+elif  [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
 
     # Multiple versions installed
     echo "<result>ERROR:  Multiple CS Versions installed</result>"
     exit 0
 
-elif  [[ -e "${falconctl_AppLocation}" ]]; then
+elif  [[ -e "${falconctl_app_location}" ]]; then
 
-    # Get falconctl stats
-    falconctlStats=$( getFalconctlStats "${falconctl_AppLocation}" )
+    falconctl="${falconctl_app_location}"
 
-    # Get the CS Major.Minor Version string
-    csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
+elif  [[ -e "${falconctl_old_location}" ]]; then
 
-elif  [[ -e "${falconctl_OldLocation}" ]]; then
-
-    # Get falconctl stats
-    falconctlStats=$( getFalconctlStats "${falconctl_OldLocation}" )
-
-    # Get the CS Major.Minor Version string
-    csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
-
-    if [[ -z "${csMajorMinorVersion}" ]]; then
-
-        # Get the Crowd Strike version from sysctl for versions prior to v5.36.
-        getCSVersion=$( /usr/sbin/sysctl -n cs.version )
-        csVersionExitCode=$?
-
-        if [[ $csVersionExitCode -eq 0 ]]; then
-
-            # Get the CS Major.Minor Version string
-            csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${getCSVersion}" )
-
-        else
-
-            returnResult+="Not Running;"
-
-        fi
-
-    fi
+    falconctl="${falconctl_old_location}"
 
 else
 
@@ -122,7 +106,34 @@ else
 
 fi
 
-# Check the Locale; this will affect the output of falconclt stats
+# Get falconctl stats
+falconctlStats=$( getFalconctlStats "${falconctl}" )
+
+# Get the CS Major.Minor Version string
+csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
+
+
+if [[ -z "${csMajorMinorVersion}" ]]; then
+
+    # Get the Crowd Strike version from sysctl for versions prior to v5.36.
+    getCSVersion=$( /usr/sbin/sysctl -n cs.version )
+    csVersionExitCode=$?
+
+    if [[ $csVersionExitCode -eq 0 ]]; then
+
+        # Get the CS Major.Minor Version string
+        csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${getCSVersion}" )
+        falconctl="${falconctl_old_location}"
+
+    else
+
+        returnResult+="Not Running;"
+
+    fi
+
+fi
+
+# Check the Locale; this will affect the output of falconctl stats
 lib_locale=$( /usr/bin/defaults read "/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
 root_locale=$( /usr/bin/defaults read "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
 
@@ -219,6 +230,48 @@ elif [[ -n "${connectionState}" ]]; then
 
     # If no connection date was available, return state
     returnResult+=" Connection State: ${connectionState};"
+
+fi
+
+# Only check if running 6.12 or newer; this is when the filter was enabled
+if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.11" ) -eq 1 ]]; then
+
+    # Get Network Filter State
+    # shellcheck disable=SC2016
+    filter_state=$( "${python_path}" -c 'import plistlib
+with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plist:
+    plist_contents = plistlib.load(plist)
+
+object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
+print(plist_contents.get("$objects")[object_index]["Enabled"])')
+
+    if [[ "${filter_state}" == "False" ]]; then
+
+        if [[ "${remediate_network_filter}" == "true" ]]; then
+
+            # Only force enable the network filter if running macOS 11.3 or newer
+            if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 3" ) -eq 1  ]]; then
+
+                "${falconctl}" enable-filter
+                cs_filter_exit_code=$?
+
+                if [[ $cs_filter_exit_code -ne 0 ]]; then
+
+                    # Return that we are unable to enable the network filter
+                    returnResult+=" Unable to enable network filter;"
+
+                fi
+
+            fi
+
+        else
+
+            # Return that the network filter is disabled
+            returnResult+=" Network filter disabled;"
+
+        fi
+
+    fi
 
 fi
 
