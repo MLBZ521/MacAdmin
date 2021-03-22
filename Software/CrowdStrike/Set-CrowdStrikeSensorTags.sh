@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.4.0 / Updated:  3/16/2021 / By:  ZT
+# Version:  1.5.0 / Updated:  3/22/2021 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -122,12 +122,17 @@ else
 fi
 
 # Get the CS Agent Info which contains the version
-cs_agent_info=$( "${falconctl}" stats agent_info --plist 2> /dev/null )
+# Will eventually move to the --plist format, but it's supported on 5.34 (aka High Sierra)
+# cs_agent_info=$( "${falconctl}" stats agent_info --plist 2> /dev/null )
+cs_agent_info=$( "${falconctl}" stats agent_info 2> /dev/null )
 
 # Get the version string
-cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" 2> /dev/null /dev/stdin <<< "${cs_agent_info}" | /usr/bin/awk -F '.' '{print $1"."$2}' )
+# cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" /dev/stdin <<< "${cs_agent_info}" 2> /dev/null | /usr/bin/awk -F '.' '{print $1"."$2}' )
+cs_version=$( echo "${cs_agent_info}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs | /usr/bin/awk -F '.' '{print $1"."$2}' )
+# plistBuddyExitCode=$?
 
-if [[ -z "${cs_version}" ]]; then
+# if [[ $plistBuddyExitCode -ne 0 ]]; then
+if [[ -z $cs_version ]]; then
 
     # Get the Crowd Strike version from sysctl for versions prior to v5.36.
     get_cs_version=$( /usr/sbin/sysctl -n cs.version )
