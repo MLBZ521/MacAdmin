@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.4.0 / Updated:  3/16/2021 / By:  ZT
+# Version:  2.4.1 / Updated:  3/29/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -16,7 +16,8 @@ echo "Checking the Crowd Strike configuration..."
 ## Set variables for your environment
 
 # Set path to a Python3 framework
-python_path="/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3"
+# If left blank, default shell will be used
+python_path=""
 
 # Set whether you want to remediate the Network Filter State
 # Only force enables if running macOS 11.3 or newer
@@ -238,12 +239,16 @@ if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.11" ) -eq 1 ]]; then
 
     # Get Network Filter State
     # shellcheck disable=SC2016
-    filter_state=$( "${python_path}" -c 'import plistlib
+    if [[ "${python_path}" ]]; then
+        filter_state=$( "${python_path}" -c 'import plistlib
 with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plist:
     plist_contents = plistlib.load(plist)
 
 object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
 print(plist_contents.get("$objects")[object_index]["Enabled"])')
+    else
+        filter_state=$(defaults read /Library/Preferences/com.apple.networkextension |awk '/com.crowdstrike.falcon.App/,/identifier/' |grep Enabled |sed "s/[^0-9]//g")
+    fi
 
     if [[ "${filter_state}" == "False" ]]; then
 
