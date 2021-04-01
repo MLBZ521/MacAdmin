@@ -3,10 +3,10 @@
 ###################################################################################################
 # Script Name:  Manage-AndroidSDKCMDLineTools.sh
 # By:  Zack Thompson / Created:  2/19/2021
-# Version:  1.1.0 / Updated:  3/29/2021 / By:  ZT
+# Version:  1.2.0 / Updated:  3/31/2021 / By:  ZT
 #
 # Description:  This script allows you to perform the initial configuration of the Android Studio 
-#   Environment to use a custom SDK location which enables easier remote management of the SDK.
+#   Environment using a custom SDK location which enables easier remote management of the SDK.
 #   Also supports updating and installing SDK components.
 #
 # Note:  The initial configuration logic assumes that Android Studio (GUI) has not been launched.
@@ -22,13 +22,14 @@ echo "*****  Manage AndroidSDKCMDLineTools process:  START  *****"
 # Action options are:
 #   setup:  perform initial setup before or after installing the CLI Tools
 #   update:  perform actions to update currently installed components
-action="${4}"
+action=$( echo "${4}" | /usr/bin/awk '{print tolower($0)}' )
 
 shared_location="${5}" # default:  "/Users/Shared/Android"
 sdk_components_to_install="${6}"
-gui_enable_auto_update_checks="${7}" # options are:  "true" (default) or "false"
-gui_update_channel="${8}" # "release" (aka stable; default)
+gui_enable_auto_update_checks=$( echo "${7}" | /usr/bin/awk '{print tolower($0)}' ) # options are:  "true" (default) or "false"
+gui_update_channel=$( echo "${8}" | /usr/bin/awk '{print tolower($0)}' ) # "release" (aka stable; default)
 launch_agent_label="${9}"
+default_launch_agent_label="com.github.mlbz521.AndroidStudioEnvironmentVariables"
 launch_agent_location="/Library/LaunchAgents/${launch_agent_label}.plist"
 
 ##################################################
@@ -44,6 +45,8 @@ console_user=$( /usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/
 
 # Get the Console Users' UniqueID
 console_uid=$( /usr/bin/id -u "${console_user}" )
+
+exit_code=0
 
 ##################################################
 # Functions
@@ -75,7 +78,20 @@ EOF
 # Install the passed SDK Components
 install_components() {
 
-    "${shared_location}/sdk/cmdline-tools/latest/bin/sdkmanager" --install "${1}"
+    echo "Installing SDK components..."
+    echo "  -> ${1}"
+
+    # shellcheck disable=SC2086
+    install_exit_status=$( "${shared_location}/sdk/cmdline-tools/latest/bin/sdkmanager" --install $1 )
+    install_exit_check=$?
+
+    if [[ $install_exit_check != 0 ]]; then
+
+        echo "ERROR:  Encountered error while installing components:"
+        echo "${install_exit_status}"
+        exit_code=1
+
+    fi
 
 }
 
@@ -98,14 +114,8 @@ if [[ -z "${shared_location}" ]]; then
 
 fi
 
-# Turn on case-insensitive pattern matching
-shopt -s nocasematch
-
 # Perform initial setup before or after installing the CLI Tools
 if [[ "${action}" == "setup" ]]; then
-
-    # Turn off case-insensitive pattern matching
-    shopt -u nocasematch
 
     # Set defaults if not passed 
     if [[ -z "${gui_enable_auto_update_checks}" ]]; then
@@ -120,8 +130,16 @@ if [[ "${action}" == "setup" ]]; then
 
     fi
 
-    if [[ ! -d "${shared_location}" ]]; then
+    if [[ -z "${launch_agent_label}" ]]; then
 
+        launch_agent_label="${default_launch_agent_label}"
+        launch_agent_location="/Library/LaunchAgents/${launch_agent_label}.plist"
+
+    fi
+
+    if [[ ! -d "${shared_location}" ]]; then
+        
+        # shellcheck disable=SC2174
         /bin/mkdir -p -m 775 "${shared_location}"
 
     fi
@@ -148,6 +166,7 @@ EOF
 
     if [[ ! -d "${shared_location}/config/options" ]]; then
 
+        # shellcheck disable=SC2174
         /bin/mkdir -p -m 775 "${shared_location}/config/options"
         /usr/sbin/chown root:staff "${shared_location}/config/options"
         /bin/chmod 775 "${shared_location}/config"
@@ -224,9 +243,9 @@ EOF
             # macOS 11+ or macOS 10.11+
             if [[ $( /usr/bin/bc <<< "${os_major_version} >= 11" ) -eq 1 || ( "${os_major_version}" == 10 && $( /usr/bin/bc <<< "${os_minor_patch_version} >= 11" ) -eq 1 ) ]]; then
 
-                exit_code=$( /bin/launchctl print gui/"${console_uid}"/"${launch_agent_label}" > /dev/null 2>&1; echo $? )
+                launchctl_exit_code=$( /bin/launchctl print gui/"${console_uid}"/"${launch_agent_label}" > /dev/null 2>&1; echo $? )
 
-                if [[ $exit_code == 0 ]]; then
+                if [[ $launchctl_exit_code == 0 ]]; then
                     echo "Stopping agent:  ${launch_agent_location}"
                     /bin/launchctl bootout gui/"${console_uid}"/"${launch_agent_label}"
 
@@ -239,9 +258,9 @@ EOF
             # macOS 10.x - macOS 10.10
             elif [[ "${os_major_version}" == 10 && $( /usr/bin/bc <<< "${os_minor_patch_version} <= 10" ) -eq 1 ]]; then
 
-                exit_code=$( /bin/launchctl asuser "${console_uid}" /bin/launchctl list "${launch_agent_label}" > /dev/null 2>&1; echo $? )
+                launchctl_exit_code=$( /bin/launchctl asuser "${console_uid}" /bin/launchctl list "${launch_agent_label}" > /dev/null 2>&1; echo $? )
 
-                if [[ $exit_code == 0 ]]; then
+                if [[ $launchctl_exit_code == 0 ]]; then
                     echo "Stopping agent:  ${launch_agent_location}"
                     /bin/launchctl asuser "${console_uid}" /bin/launchctl unload "${launch_agent_location}"
 
@@ -265,14 +284,8 @@ EOF
 
     fi
 
-# Turn on case-insensitive pattern matching
-shopt -s nocasematch
-
 # Perform update actions
 elif [[ "${action}" == "update" ]]; then
-
-    # Turn off case-insensitive pattern matching
-    shopt -u nocasematch
 
     # If supplied, configure the update settings
     if [[ -n "${gui_enable_auto_update_checks}" && -n "${gui_update_channel}" ]]; then
@@ -291,13 +304,30 @@ elif [[ "${action}" == "update" ]]; then
     fi
 
     # Update installed components
-    "${shared_location}/sdk/cmdline-tools/latest/bin/sdkmanager" --update
+    echo "Updating SDK components..."
+    update_exit_status=$( "${shared_location}/sdk/cmdline-tools/latest/bin/sdkmanager" --update )
+    update_exit_check=$?
+
+    if [[ $update_exit_check != 0 ]]; then
+
+        echo "ERROR:  Encountered error while updating components:"
+        echo "${update_exit_status}"
+        exit_code=1
+
+    fi
 
 else
 
     echo "ERROR:  An unknown \`action\` was provided:  ${action}"
     echo "*****  Manage AndroidSDKCMDLineTools process:  FAILED  *****"
-    exit 1
+    exit 2
+
+fi
+
+if [[ $exit_code != 0 ]]; then
+
+    echo "*****  Manage AndroidSDKCMDLineTools process:  FAILED  *****"
+    exit 3
 
 fi
 
