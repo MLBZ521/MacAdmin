@@ -2,7 +2,7 @@
 """
 Script Name:  Get-LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.4.0 / Updated:  3/14/2021 / By:  ZT
+Version:  1.5.0 / Updated:  5/6/2021 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 
@@ -41,148 +41,176 @@ def utc_to_local(utc_dt):
     return utc_dt.replace(tzinfo=timezone.utc).astimezone(tz=None)
 
 
+def update_journal():
+    # For macOS Big Sur and newer
+    update_journal_plist = "/private/var/db/softwareupdate/journal.plist"
+    global last_update
+    global local_time_stamp
+
+    # Verify file exists
+    if os.path.exists(update_journal_plist):
+
+        # Open the journal
+        with open(update_journal_plist, "rb") as update_journal_path:
+
+            # Load the journal.plist
+            plist_Contents = plistlib.load(update_journal_path)
+
+            # Loop through the history...
+            for update in reversed(plist_Contents):
+
+                if update.get("__isSoftwareUpdate") and update.get("__isMobileSoftwareUpdate"):
+
+                    # If the title includes the version, don"t repeat the version string
+                    if re.search(update.get("version"), update.get("title")):
+
+                        local_time_stamp = utc_to_local(update.get("installDate"))
+                        last_update = "{} @ {}".format(update.get("title"), str(local_time_stamp))
+
+                    else:
+
+                        local_time_stamp = utc_to_local(update.get("installDate"))
+                        last_update = "{} @ {} {}".format(
+                            update.get("title"), update.get("version"), str(local_time_stamp))
+
+                break
+
+    else:
+        print("Missing journal.plist")
+
+    return last_update, local_time_stamp
+
+
+def intstall_history():
+    # For macOS Catalina and older
+    install_history_plist = "/Library/Receipts/InstallHistory.plist"
+    global last_update
+    global local_time_stamp
+
+    # Verify file exists
+    if os.path.exists(install_history_plist):
+
+        # Define the updates that we're concerned with
+        pattern_process_names = re.compile(
+            "(?:installer)|(?:macOS Installer)|(?:OS X Installer)|(?:softwareupdated)")
+        pattern_display_names = re.compile(
+            "(?:macOS .+ Beta)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
+        pattern_package_identifiers = re.compile(
+            "(?:com\.apple\.pkg\.macOSBrain)|(?:com\.apple\.pkg\.InstallAssistantMAS)")
+        pattern_package_identifiers_ignore = re.compile(
+            "(?:com\.apple\.pkg\.InstallAssistant\.Seed.*)")
+
+        # Open the journal
+        with open(install_history_plist, "rb") as install_history_path:
+
+            # Load the InstallHistory.plist
+            plist_Contents = plistlib.load(install_history_path)
+
+        # Loop through the history...
+        for update in reversed(plist_Contents):
+
+            if ( pattern_process_names.search(update.get("processName")) and 
+                 pattern_display_names.search(update.get("displayName")) ):
+
+                try:
+                    for package in update.get("packageIdentifiers"):
+
+                        if pattern_package_identifiers.search(package):
+                            # print("Wanted package")
+                            continue
+
+                        elif pattern_package_identifiers_ignore.search(package):
+                            # print("Unwanted package")
+                            break
+
+                        else:
+                            # print("Some other unwanted package")
+                            break
+
+                except:
+                    pass
+
+                display_name = str(update.get("displayName")).lstrip("Install ")
+
+                # If the display name includes the version, don't repeat the version string
+                if ( not update.get("displayVersion") 
+                     and update.get("displayVersion") != " "
+                     and re.search(update.get("displayVersion"), display_name) ):
+
+                        last_update = display_name
+
+                else:
+                    last_update = "{} {}".format(display_name, update.get("displayVersion"))
+
+                if update.get("date"):
+                    local_time_stamp = utc_to_local(update.get("date"))
+                    last_update = "{} @ {}".format(last_update, str(local_time_stamp))
+
+                break
+
+    else:
+        print("Missing InstallHistory.plist")
+
+    return last_update, local_time_stamp
+
+
 def main():
 
     # Define Variables
-    install_history = '/Library/Receipts/InstallHistory.plist'
-    update_journal = '/private/var/db/softwareupdate/journal.plist'
-    local_inventory = '/opt/ManagedFrameworks/Inventory.plist'
     os_version = platform.mac_ver()[0]
 
     if parse_version(os_version) >= parse_version("10.16"):
-        # For macOS Big Sur and newer
 
-        # Verify file exists
-        if os.path.exists(update_journal):
+        last_update, local_time_stamp = update_journal()
 
-            # Open the journal
-            with open(update_journal, 'rb') as update_journal_path:
+        if not last_update:
 
-                # Load the journal.plist
-                plist_Contents = plistlib.load(update_journal_path)
-
-                # Loop through the history...
-                for update in reversed(plist_Contents):
-
-                    if update.get('__isSoftwareUpdate') and update.get('__isMobileSoftwareUpdate'):
-
-                        # If the title includes the version, don't repeat the version string
-                        if re.search(update.get('version'), update.get('title')):
-
-                            local_time_stamp = utc_to_local(update.get('installDate'))
-                            last_update = update.get('title') + ' @ ' + str(local_time_stamp)
-
-                        else:
-
-                            local_time_stamp = utc_to_local(update.get('installDate'))
-                            last_update = update.get('title') + ' @ ' + update.get('version') + ' ' + str(local_time_stamp)
-
-                    break
-
-        else:
-            print("Missing journal.plist")
+            last_update, local_time_stamp = intstall_history()
 
     else:
-        # For macOS Catalina and older
+        
+        last_update, local_time_stamp = intstall_history()
 
-        # Define the updates that we're concerned with
-        pattern_process_names = re.compile("(?:installer)|(?:macOS Installer)|(?:OS X Installer)|(?:softwareupdated)")
-        pattern_display_names = re.compile("(?:macOS .+ Beta)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
-        pattern_package_identifiers = re.compile("(?:com\.apple\.pkg\.macOSBrain)|(?:com\.apple\.pkg\.InstallAssistantMAS)")
-        pattern_package_identifiers_ignore = re.compile("(?:com\.apple\.pkg\.InstallAssistant\.Seed.*)")
 
-        # Verify file exists
-        if os.path.exists(install_history):
+    if last_update:
 
-            # Open the journal
-            with open(install_history, 'rb') as install_history_path:
+        local_inventory = "/opt/ManagedFrameworks/Inventory.plist"
+        current_time = utc_to_local(datetime.now())
 
-                # Load the InstallHistory.plist
-                plist_Contents = plistlib.load(install_history_path)
-
-                # Loop through the history...
-                for update in reversed(plist_Contents):
-
-                    if pattern_process_names.search(update.get("processName")) and pattern_display_names.search(update.get("displayName")):
-
-                        try:
-                            for package in update.get("packageIdentifiers"):
-
-                                if pattern_package_identifiers.search(package):
-                                    # print("Wanted package")
-                                    continue
-
-                                elif pattern_package_identifiers_ignore.search(package):
-                                    # print("Unwanted package")
-                                    break
-
-                                else:
-                                    # print("Some other unwanted package")
-                                    break
-
-                        except:
-                            pass
-
-                        display_name = str(update.get("displayName")).lstrip('Install ')
-
-                        if update.get("displayVersion") and update.get("displayVersion") != " ":
-
-                            # If the display name includes the version, don't repeat the version string
-                            if re.search(update.get('displayVersion'), display_name):
-                                last_update = display_name
-
-                            else:
-                                last_update = "{} {}".format(display_name, update.get("displayVersion"))
-
-                        else:
-                            last_update = display_name
-
-                        if update.get("date"):
-                            local_time_stamp = utc_to_local(update.get('date'))
-                            last_update = "{} @ {}".format(last_update, str(local_time_stamp))
-
-                        break
+        if current_time - timedelta(hours=24) <= local_time_stamp:
+            within_24hours = True
 
         else:
-            print("Missing InstallHistory.plist")
+            within_24hours = False
 
-    try:
+        # Check if local inventory exists
+        if os.path.exists(local_inventory):
 
-        if last_update:
+            # Open the local inventory
+            with open(local_inventory, "rb") as local_inventory_path:
 
-            current_time = utc_to_local(datetime.now())
+                # Load the InstallHistory.plist
+                plist_Contents = plistlib.load(local_inventory_path)
 
-            if current_time - timedelta(hours=24) <= local_time_stamp:
-                within_24hours = True
+        else:
+            plist_Contents = {}
 
-            else:
-                within_24hours = False
+        # Update the values
+        plist_Contents["last_os_update_installed"] = last_update
+        plist_Contents["last_os_update_installed_within_24hours"] = within_24hours
 
-            # Check if local inventory exists
-            if os.path.exists(local_inventory):
+        # Save the changes
+        with open(local_inventory, "wb") as local_inventory_path:
+            plistlib.dump(plist_Contents, fp=local_inventory_path)
 
-                # Open the local inventory
-                with open(local_inventory, 'rb') as local_inventory_path:
+        print("{}".format(last_update))
 
-                    # Load the InstallHistory.plist
-                    plist_Contents = plistlib.load(local_inventory_path)
+    else:
 
-            else:
-                plist_Contents = {}
-
-            # Update the values
-            plist_Contents['last_os_update_installed'] = last_update
-            plist_Contents['last_os_update_installed_within_24hours'] = within_24hours
-
-            # Save the changes
-            with open(local_inventory, 'wb') as local_inventory_path:
-                plistlib.dump(plist_Contents, fp=local_inventory_path)
-
-            print("{}".format(last_update))
-
-    except:
         print("No Updates Installed")
 
 
 if __name__ == "__main__":
+    last_update = None
+    local_time_stamp = None
     main()
