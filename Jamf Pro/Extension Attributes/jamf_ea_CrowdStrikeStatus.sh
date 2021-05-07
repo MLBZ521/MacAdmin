@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.4.1 / Updated:  3/29/2021 / By:  ZT
+# Version:  2.4.2 / Updated:  5/7/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -238,27 +238,33 @@ fi
 if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.11" ) -eq 1 ]]; then
 
     # Get Network Filter State
-    # shellcheck disable=SC2016
-    if [[ "${python_path}" ]]; then
+    if [[ -e "${python_path}" ]]; then
+
+        # shellcheck disable=SC2016
         filter_state=$( "${python_path}" -c 'import plistlib
 with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plist:
     plist_contents = plistlib.load(plist)
 
 object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
 print(plist_contents.get("$objects")[object_index]["Enabled"])')
+
     else
-        filter_state=$(defaults read /Library/Preferences/com.apple.networkextension |awk '/com.crowdstrike.falcon.App/,/identifier/' |grep Enabled |sed "s/[^0-9]//g")
+
+        filter_state=$( /usr/bin/defaults read /Library/Preferences/com.apple.networkextension | /usr/bin/awk "/com.crowdstrike.falcon.App/,/identifier/" | /usr/bin/grep "Enabled" | /usr/bin/sed "s/[^0-9]//g" )
+
     fi
 
-    if [[ "${filter_state}" == "False" ]]; then
+    if [[ "${filter_state}" == "False" || "${filter_state}" == "0" ]]; then
 
         if [[ "${remediate_network_filter}" == "true" ]]; then
 
             # Only force enable the network filter if running macOS 11.3 or newer
             if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 3" ) -eq 1  ]]; then
 
-                "${falconctl}" enable-filter
+                # shellcheck disable=SC2034
+                enable_filter_results=$( "${falconctl}" enable-filter )
                 cs_filter_exit_code=$?
+                # echo "enable_filter_results:  ${enable_filter_results}"
 
                 if [[ $cs_filter_exit_code -ne 0 ]]; then
 
