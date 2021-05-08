@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.4.2 / Updated:  5/7/2021 / By:  ZT
+# Version:  2.5.0 / Updated:  5/7/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -47,6 +47,13 @@ getFalconctlStats() {
 
 }
 
+# Get the CS:F Full Version string
+getCSFVersion(){
+
+    echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs
+
+}
+
 # Get the CS Major.Minor Version string
 getCSMajorMinorVersion(){
 
@@ -80,7 +87,7 @@ osMinorPatchVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $2"."$3
 # Hold statuses
 returnResult=""
 
-if [[ $( /usr/bin/bc <<< "${osMajorVersion} == 10" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 12" ) -eq 1 ]]; then
+if [[ "${osMajorVersion}" == "10" && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 12" ) -eq 1 ]]; then
 
     # macOS 10.12 or older
     echo "<result>OS Version Not Supported</result>"
@@ -110,6 +117,9 @@ fi
 # Get falconctl stats
 falconctlStats=$( getFalconctlStats "${falconctl}" )
 
+# Get Falcon Sensor full version string
+falconctlVersion=$( getCSFVersion "${falconctlStats}" )
+
 # Get the CS Major.Minor Version string
 csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
 
@@ -117,13 +127,13 @@ csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
 if [[ -z "${csMajorMinorVersion}" ]]; then
 
     # Get the Crowd Strike version from sysctl for versions prior to v5.36.
-    getCSVersion=$( /usr/sbin/sysctl -n cs.version )
+    falconctlVersion=$( /usr/sbin/sysctl -n cs.version )
     csVersionExitCode=$?
 
     if [[ $csVersionExitCode -eq 0 ]]; then
 
         # Get the CS Major.Minor Version string
-        csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${getCSVersion}" )
+        csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${falconctlVersion}" )
         falconctl="${falconctl_old_location}"
 
     else
@@ -235,7 +245,7 @@ elif [[ -n "${connectionState}" ]]; then
 fi
 
 # Only check if running 6.12 or newer; this is when the filter was enabled
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.11" ) -eq 1 ]]; then
+if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} > 6.11" ) -eq 1 ]]; then
 
     # Get Network Filter State
     if [[ -e "${python_path}" ]]; then
@@ -287,7 +297,7 @@ print(plist_contents.get("$objects")[object_index]["Enabled"])')
 fi
 
 # Get the status of SIP, if SIP is disabled, we don't need to check if the SysExts, KEXTs, nor FDA are enabled.
-sipStatus=$( /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{printf $2}' | /usr/bin/awk -F '.' '{printf $1}' )
+sipStatus=$( /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{print $2}' | /usr/bin/awk -F '.' '{print $1}' )
 
 if [[ "${sipStatus}" == "enabled" ]]; then
 
@@ -300,14 +310,34 @@ if [[ "${sipStatus}" == "enabled" ]]; then
 
         if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
 
-            extensionEnabled=$( /usr/bin/systemextensionsctl list | /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{printf $2}' )
+            extensions=$( /usr/bin/systemextensionsctl list | /usr/bin/grep "X9E956P446" )
+            # Multiple extension versions can show up in the list collected above, only care to check against the sensor version installed
+            compare_extension_version=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
+            # echo "falconctlVersion:  ${falconctlVersion}"
+            # echo "Compared version:  ${compare_extension_version}"
+
+            # Loop through the extensions found
+            while IFS=$'\n' read -r extension; do
+
+                extension_version=$( echo "${extension}" |  /usr/bin/awk -F '\\(|\\)' '{print $2}' )
+                # echo "extension_version:  ${extension_version}"
+
+                if [[ "${extension_version}" == "${compare_extension_version}" ]]; then
+
+                    extension_status=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
+                    # echo "extension_status:  ${extension_status}"
+                    break
+
+                fi
+
+            done < <(echo "${extensions}")
 
             # Verify Extension is Activated and Enabled
-            if [[ "${extensionEnabled}" != "activated enabled" ]]; then
+            if [[ "${extension_status}" != "activated enabled" ]]; then
 
-                if [[ -n "${extensionEnabled}" ]]; then
+                if [[ -n "${extension_status}" ]]; then
 
-                    returnResult+=" SysExt: ${extensionEnabled};"
+                    returnResult+=" SysExt: ${extension_status};"
 
                 else
 
