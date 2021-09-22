@@ -1,14 +1,17 @@
 #!/bin/bash
+# set -x
 
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.10.0 / Updated:  11/12/2020 / By:  ZT
+# Version:  1.11.0a / Updated:  9/22/2021 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
 #	System Requirements can be found here:
+#		Monterey - https://www.apple.com/macos/monterey-preview/
 #		Big Sur - https://support.apple.com/en-us/HT211238
+# 			* If you’re running Mountain Lion 10.8, you will need to upgrade to El Capitan 10.11 first.
 #		Catalina - https://support.apple.com/en-us/HT210222
 #		Mojave - https://support.apple.com/en-us/HT210190
 #			* MacPro5,1's = https://support.apple.com/en-us/HT208898
@@ -52,7 +55,9 @@
 
 modelCheck() {
 
-	if [[ $modelMajorVersion -ge $5 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		echo "Monterey"
+	elif [[ $modelMajorVersion -ge $5 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Big Sur"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
@@ -75,7 +80,9 @@ modelCheck() {
 # Apple just had to make one iMac model (14,4) support Big Sur...
 iMacModelCheck() {
 
-	if [[ ( $modelMajorVersion -gt $5 || $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	if [[ $modelMajorVersion -gt $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		echo "Monterey"
+	elif [[ ( $modelMajorVersion -gt $5 || $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Big Sur"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
@@ -100,7 +107,7 @@ macProModelCheck() {
 
 	if [[ $modelMajorVersion -ge $5 ]]; then
 		# For MacPro 6,1 (2013/Trash Cans) and newer, these should be supported no matter the existing state, since they wouldn't be compatible with any OS that is old, nor have incompatible hardware.
-		echo "Big Sur"
+		echo "Monterey"
 
 	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 13.6") -eq 1 ]]; then
 		# Supports Mojave, but required Metal Capable Graphics Cards and FileVault must be disabled.
@@ -135,35 +142,40 @@ macProModelCheck() {
 # Check for compatibility...
 
 # Each number passed to the below functions is the minimum major model version for the model type.
-# The first parameter is for El Capitan, the second is for High Sierra, the third is for Mojave, the forth is for Catalina, and the fifth is for Big Sur.
+	# The first parameter is for El Capitan, 
+	# the second is for High Sierra, 
+	# the third is for Mojave, 
+	# the forth is for Catalina, 
+	# the fifth is for Big Sur,
+	# and the sixth is for Monterey
 case $modelType in
 	"iMac" )
 		# Function iMacModelCheck
-		latestOSSupport=$( iMacModelCheck 7 10 13 13 14 )
+		latestOSSupport=$( iMacModelCheck 7 10 13 13 14 16 )
 	;;
 	"MacBook" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 5 6 8 8 8 )
+		latestOSSupport=$( modelCheck 5 6 8 8 8 9 )
 	;;
 	"MacBookPro" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 3 6 9 9 11 )
+		latestOSSupport=$( modelCheck 3 6 9 9 11 12 )
 	;;
 	"MacBookAir" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 2 3 5 5 6 )
+		latestOSSupport=$( modelCheck 2 3 5 5 6 7 )
 	;;
 	"Macmini" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 3 4 6 6 7 )
+		latestOSSupport=$( modelCheck 3 4 6 6 7 7 )
 	;;
 	"MacPro" )
 		# Function macProModelCheck
-		latestOSSupport=$( macProModelCheck 3 5 5 6 6 )
+		latestOSSupport=$( macProModelCheck 3 5 5 6 6 6 )
 	;;
 	"iMacPro" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 1 1 1 1 1 )
+		latestOSSupport=$( modelCheck 1 1 1 1 1 1 )
 	;;
 	* )
 		echo "<result>Model No Longer Supported</result>"
@@ -174,7 +186,7 @@ esac
 finalResult="<result>${latestOSSupport}"
 
 # RAM validation check
-if [[ "${latestOSSupport}" == "Catalina" || "${latestOSSupport}" == "Big Sur" ]]; then
+if [[ "${latestOSSupport}" == "Catalina" || "${latestOSSupport}" == "Big Sur" || "${latestOSSupport}" == "Monterey" ]]; then
 	# Based on model, device supports Catalina or newer
 
 	if [[ $systemRAM -lt $requiredRAMCatalinaPlus ]]; then
@@ -221,7 +233,7 @@ else
 fi
 
 # Check if the available free space is sufficient
-if [[ "${latestOSSupport}" == "Big Sur" ]]; then
+if [[ "${latestOSSupport}" == "Big Sur" || "${latestOSSupport}" == "Monterey" ]]; then
 
 	if [[  $( /usr/bin/bc <<< "${systemFreeSpace} <= ${requiredFreeSpaceBigSur}" ) -eq 1 ]]; then
 		finalResult+=" / Insufficient Storage"
