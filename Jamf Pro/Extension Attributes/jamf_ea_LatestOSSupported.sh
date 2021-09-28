@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.11.0a / Updated:  9/22/2021 / By:  ZT
+# Version:  1.11.0b / Updated:  9/28/2021 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -77,17 +77,42 @@ modelCheck() {
 
 }
 
-# Apple just had to make one iMac model (14,4) support Big Sur...
-iMacModelCheck() {
+# Apple just had to make two MacBookPro models (11,4 & 11,5) support Monterey...
+MacBookProModelCheck() {
 
-	if [[ $modelMajorVersion -gt $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Monterey"
-	elif [[ ( $modelMajorVersion -gt $5 || $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	elif [[ ( $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Big Sur"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} <= 8") -eq 1 ]]; then
-		echo "Mojave / OS Limitation"  # (Current OS Limitation, 10.15 Catalina)
+		echo "Mojave / OS Limitation"  # (Current OS Limitation, 10.15 Catalina Compatible)
+	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 8") -eq 1 ]]; then
+		echo "Mojave"
+	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 8") -eq 1 ]]; then
+		echo "High Sierra"
+	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 7.5") -eq 1 ]]; then
+		echo "Sierra / OS Limitation"  # (Current OS Limitation, 10.13 Compatible)
+	elif [[ $modelMajorVersion -ge $1 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 6.8") -eq 1  ]]; then
+		echo "El Capitan"
+	else
+		echo "Current OS Not Supported"
+	fi
+
+}
+
+# Apple just had to make one iMac model (14,4) support Big Sur...
+iMacModelCheck() {
+
+	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		echo "Monterey"
+	elif [[ ( $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		echo "Big Sur"
+	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
+		echo "Catalina"
+	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} <= 8") -eq 1 ]]; then
+		echo "Mojave / OS Limitation"  # (Current OS Limitation, 10.15 Catalina Compatible)
 	elif [[ $modelMajorVersion -ge $3 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 8") -eq 1 ]]; then
 		echo "Mojave"
 	elif [[ $modelMajorVersion -ge $2 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 8") -eq 1 ]]; then
@@ -159,7 +184,7 @@ case $modelType in
 	;;
 	"MacBookPro" )
 		# Function modelCheck
-		latestOSSupport=$( modelCheck 3 6 9 9 11 12 )
+		latestOSSupport=$( MacBookProModelCheck 3 6 9 9 11 12 )
 	;;
 	"MacBookAir" )
 		# Function modelCheck
