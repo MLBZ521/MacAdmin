@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.11.0b / Updated:  9/28/2021 / By:  ZT
+# Version:  1.11.0c / Updated:  9/30/2021 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
 #
@@ -31,9 +31,9 @@
 	minimumFreeSpaceBigSur=35.5 # For 10.12 or newer
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
-	requiredRAMMojaveOlder=$(($minimumRAMMojaveOlder * $convertToGigabytes))
-	requiredRAMCatalinaPlus=$(($minimumRAMCatalinaPlus * $convertToGigabytes))
-	requiredFreeSpace=$(($minimumFreeSpace * $convertToGigabytes))
+	requiredRAMMojaveOlder=$((minimumRAMMojaveOlder * convertToGigabytes))
+	requiredRAMCatalinaPlus=$((minimumRAMCatalinaPlus * convertToGigabytes))
+	requiredFreeSpace=$((minimumFreeSpace * convertToGigabytes))
 	requiredFreeSpaceBigSur=$( /usr/bin/bc <<< "${minimumFreeSpaceBigSur} * ${convertToGigabytes}" )
 # Get the OS Version
 	osVersion=$( /usr/bin/sw_vers -productVersion )
@@ -82,8 +82,12 @@ MacBookProModelCheck() {
 
 	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Monterey"
-	elif [[ ( $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
-		echo "Big Sur"
+	elif [[ $modelMajorVersion -eq $5 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		if [[ $modelMinorVersion -ge 4 ]]; then
+			echo "Monterey"
+		else
+			echo "Big Sur"
+		fi
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} <= 8") -eq 1 ]]; then
@@ -107,8 +111,12 @@ iMacModelCheck() {
 
 	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Monterey"
-	elif [[ ( $modelMajorVersion -eq $5 && $modelMinorVersion -ge 4 ) && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
-		echo "Big Sur"
+	elif [[ $modelMajorVersion -eq $5 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+		if [[ $modelMinorVersion -ge 4 ]]; then
+			echo "Big Sur"
+		else
+			echo "Catalina"
+		fi
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ]]; then
 		echo "Catalina"
 	elif [[ $modelMajorVersion -ge $4 && $(/usr/bin/bc <<< "${osMinorPatchVersion} <= 8") -eq 1 ]]; then
