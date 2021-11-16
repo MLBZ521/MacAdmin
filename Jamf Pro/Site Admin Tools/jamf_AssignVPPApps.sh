@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  1.0.1 / Updated:  4/2/2018 / By:  ZT
+# Version:  1.1.0 / Updated:  11/15/2021 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -16,10 +16,27 @@ echo "*****  AssignVPPApps process:  START  *****"
 	# Either hard code or prompt for credentials
 	# jamfAPIUser="APIUsername"
 	# jamfAPIPassword="APIPassword"
-	jamfAPIUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
-	jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
+	jamfAPIUser=$( osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			set userInput to the text returned of ¬
+			( display dialog "Enter your Site Admin Username:" ¬
+			default answer "" )
+		end tell
+EndOfScript
+	)
+	jamfAPIPassword=$( osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			set userInput to the text returned of ¬
+			( display dialog "Enter your Site Admin Password:" ¬
+			default answer "" ¬
+			with hidden answer )
+		end tell
+EndOfScript
+	)
 
-	jamfPS="https://newjss.company.com:8443"
+	jamfPS=$( /usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/awk -F "/$" '{print $1}' )
 	mobileApps="${jamfPS}/JSSResource/mobiledeviceapplications"
 	mobileAppsByID="${mobileApps}/id"
 	# Add -k (--insecure) to disable SSL verification
@@ -27,7 +44,18 @@ echo "*****  AssignVPPApps process:  START  *****"
 
 	# Either use CLI arguments or prompt for choice
 	if [[ "${4}" == "Jamf" ]]; then
-		action=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'set availableActions to {"Get VPP Apps", "Assign VPP Apps"}' -e 'set Action to choose from list availableActions with prompt "Select action:" default items {"Get VPP Apps"}' -e 'end tell' 2>/dev/null)
+		actions="Get VPP Apps
+		Assign VPP Apps"
+		action=$( osascript << EndOfScript
+			tell application "System Events" 
+				activate
+				choose from list every paragraph of "${actions}" ¬
+				with title "Assign VPP Apps" ¬
+				with prompt "Select action:" ¬
+				default items {"Get VPP Apps"}
+			end tell
+EndOfScript
+		)
 		ranBy="Jamf"
 	else
 		action="${1}"
@@ -56,6 +84,20 @@ Actions:
 "
 }
 
+xpath_tool() {
+
+	if [[ $( /usr/bin/sw_vers -buildVersion ) > "20A" ]]; then
+
+		/usr/bin/xpath -e "$@"
+
+	else
+
+		/usr/bin/xpath "$@"
+
+	fi
+
+}
+
 # Build a list of Mobile Device Apps from the JSS.
 getApps() {
 	echo "Requesting list of all App IDs..."
@@ -71,7 +113,7 @@ getApps() {
 	fi
 	
 	# Regex down to just the ID numbers
-	appIDs=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	appIDs=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | xpath_tool /mobile_device_applications/mobile_device_application/id 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 	
 	echo "Adding header to output file..."
 	header="App ID\tApp Name\tAuto Deploy\tRemove App\tTake Over\tApp Site\tScope to Group"
@@ -87,7 +129,7 @@ getApps() {
 		checkStatusCode $curlCode $appID
 
 		# Regex down to the info we want and output to a tab delimited file
-		echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed | /mobile_device_application/general/take_over_management' 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C /usr/bin/sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
+		echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | xpath_tool '/mobile_device_application/general/id | /mobile_device_application/general/name | /mobile_device_application/general/site/name | /mobile_device_application/general/deploy_automatically | /mobile_device_application/general/remove_app_when_mdm_profile_is_removed | /mobile_device_application/general/take_over_management' 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\t/g' | LANG=C /usr/bin/sed -e 's/\'$'\t[^\t]*$//' >> "${outFile}"
 	done
 
 	informBy "List has been saved to:  ${outFile}"
@@ -168,7 +210,13 @@ fileExists() {
 informBy() {
 	case $ranBy in
 		Jamf )
-			/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "'"${1}"'" buttons {"OK"}' > /dev/null
+			osascript << EndOfScript
+			tell application "System Events" 
+				activate
+				display dialog "${1}" ¬
+				buttons {"OK"} default button 1 ¬
+			end tell
+EndOfScript
 		;;
 		CLI )
 			echo "${1}"
@@ -206,7 +254,15 @@ case $action in
 			# Function getApps
 				getApps
 		else
-			outFile=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of (choose file name with prompt "Provide a file name and location to save the configuration file:")' -e 'end tell' 2>/dev/null)
+			outFile=$( osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					return POSIX path of ¬
+					( choose file name ¬
+					with prompt "Provide a file name and location to save the configuration file:" )
+				end tell
+EndOfScript
+			)
 			# Function fileExists
 				fileExists "${outFile}" create
 			# Function getApps
@@ -221,7 +277,15 @@ case $action in
 			# Function assignApps
 				assignApps
 		else
-			inputFile=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of(choose file with prompt "Select configuration file to process:" of type {"txt"})' -e 'end tell' 2>/dev/null)
+			inputFile=$( osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					return POSIX path of ¬
+					( choose file ¬
+					with prompt "Select configuration file to process:" of type {"txt"} )
+				end tell
+EndOfScript
+			)
 			# Function fileExists
 				fileExists "${inputFile}" trip
 			# Function assignApps
