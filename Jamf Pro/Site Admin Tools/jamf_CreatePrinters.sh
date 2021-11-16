@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.7 / Updated:  7/17/2018 / By:  ZT
+# Version:  1.8.0 / Updated:  11/15/2021 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -13,8 +13,12 @@ echo "*****  CreatePrinters process:  START  *****"
 
 ##################################################
 # Define Variables
-	jamfPS=$(/usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
+	jamfPS=$( /usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/awk -F "/$" '{print $1}' )
 	apiPrinters="${jamfPS}/JSSResource/printers/id"
+	jamfAPIUser_Salt="<Salt>"
+	jamfAPIUser_Passphrase="<Passphrase>"
+	jamfAPIPassword_Salt="<Salt>"
+	jamfAPIPassword_Passphrase="<Passphrase>"
 
 ##################################################
 # Setup Functions
@@ -37,11 +41,34 @@ DecryptString() {
 	echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
 }
 
+xpath_tool() {
+
+	if [[ $( /usr/bin/sw_vers -buildVersion ) > "20A" ]]; then
+
+		/usr/bin/xpath -e "$@"
+
+	else
+
+		/usr/bin/xpath "$@"
+
+	fi
+
+}
+
 createPrinter() {
 
 	# Set the osascript parameters and prompt User for Printer Selection.
-	promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$printerNames\" with prompt \"Choose printer to create in the JSS:\" OK button name \"Select\" cancel button name \"Cancel\""
-	selectedPrinterName=$(/usr/bin/osascript -e "$promptForChoice")
+	selectedPrinterName=$( /usr/bin/osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			choose from list every paragraph of "${printerNames}" ¬
+			with title "Select Printer" ¬
+			with prompt "Choose printer to create in the JPS:" ¬
+			OK button name "Select" ¬
+			cancel button name "Cancel"
+		end tell
+EndOfScript
+	)
 	echo "Selected Printer:  ${selectedPrinterName}"
 
 	# Handle if the user pushes the cancel button.
@@ -56,7 +83,7 @@ createPrinter() {
 	echo "Selected Printer ID:  ${printerID}"
 
 	# Get only the selected printers info.
-	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | /usr/bin/xpath "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	selectedPrinterInfo=$(/usr/bin/printf '%s\n' "$printerInfo" | /usr/bin/xmllint --format - | xpath_tool "/printers/printer[$printerID]/display_name | /printers/printer[$printerID]/cups_name | /printers/printer[$printerID]/location | /printers/printer[$printerID]/device_uri | /printers/printer[$printerID]/model" 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 
 	# Define array to hold the printer info 
 	printerSettings=()
@@ -122,7 +149,15 @@ printerConfig
 		checkStatusCode $curlCode
 
 		# Prompt if we want to create another printer.
-		createAnother=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Do you want to create another printer?" buttons {"Yes", "No"}')
+		createAnother=$( /usr/bin/osascript << EndOfScript
+			tell application "System Events" 
+				activate
+				display dialog "Do you want to create another printer?" ¬
+				with title "Create Another?" ¬
+				buttons {"Yes", "No"}
+			end tell
+EndOfScript
+		)
 }
 
 checkStatusCode() {
@@ -158,7 +193,13 @@ checkStatusCode() {
 informBy() {
 	case $ranBy in
 		Jamf )
-			/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "'"${1}"'" buttons {"OK"}' > /dev/null
+			/usr/bin/osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					display dialog "${1}" ¬
+					buttons {"OK"} default button 1 ¬
+				end tell
+EndOfScript
 		;;
 		CLI )
 			echo "${1}"
@@ -173,8 +214,8 @@ informBy() {
 	if [[ "${4}" == "Jamf" ]]; then
 		ranBy="Jamf"
 		createdByUser="${3}"
-		jamfAPIUser=$(DecryptString $5 'Salt' 'Passphrase')
-		jamfAPIPassword=$(DecryptString $6 'Salt' 'Passphrase')
+		jamfAPIUser=$(DecryptString "${5}" "${jamfAPIUser_Salt}" "${jamfAPIUser_Passphrase}")
+		jamfAPIPassword=$(DecryptString "${6}" "${jamfAPIPassword_Salt}" "${jamfAPIPassword_Passphrase}")
 	else
 		action="${1}"
 		ranBy="CLI"
@@ -187,8 +228,25 @@ informBy() {
 		esac
 
 		# Prompt for credentials.
-		jamfAPIUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
-		jamfAPIPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
+		jamfAPIUser=$( /usr/bin/osascript << EndOfScript
+			tell application "System Events" 
+				activate
+				set userInput to the text returned of ¬
+				( display dialog "Enter your Jamf Pro Admin Username:" ¬
+				default answer "" )
+			end tell
+EndOfScript
+		)
+		jamfAPIPassword=$( /usr/bin/osascript << EndOfScript
+			tell application "System Events" 
+				activate
+				set userInput to the text returned of ¬
+				( display dialog "Enter your Jamf Pro Admin Password:" ¬
+				default answer "" ¬
+				with hidden answer )
+			end tell
+EndOfScript
+		)
 	fi
 
 	# Define the curl switches.  Add -k (--insecure) to disable SSL verification.
@@ -215,15 +273,15 @@ else
 fi
 
 # Get a list of all printer configurations.
-	printerInfo=$(/usr/local/bin/jamf listprinters | /usr/bin/xmllint --format - | /usr/bin/xpath /printers 2>/dev/null)
+	printerInfo=$(/usr/local/bin/jamf listprinters | /usr/bin/xmllint --format - | xpath_tool /printers 2>/dev/null)
 # Get the number of printers.
-	numberOfPrinters=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath 'count(//printers/printer)' 2>/dev/null)
+	numberOfPrinters=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | xpath_tool 'count(//printers/printer)' 2>/dev/null)
 # Clear the variable, in case we're rerunning the process.
 	unset printerNames
 
 # Loop through each printer to only get the printer name and add in it's printer "ID" -- node number in the xml.
 for ((i=1; i<=$numberOfPrinters; ++i)); do
-	printerName=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | /usr/bin/xpath /printers/printer[$i]/display_name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+	printerName=$(echo $(/usr/bin/printf '%s\n' "$printerInfo") | /usr/bin/xmllint --format - | xpath_tool /printers/printer[$i]/display_name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 	printerNames+=$"${i}) ${printerName}\n"
 done
 
