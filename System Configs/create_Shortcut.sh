@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  create_Shortcut.sh
 # By:  Zack Thompson / Created:  3/26/2018
-# Version:  1.1.0 / Updated:  11/6/2018 / By:  ZT
+# Version:  1.2.0 / Updated:  11/15/2021 / By:  ZT
 #
 # Description:  This script will create a website shortcut in a specified location with a specified icon.
 #
@@ -43,11 +43,25 @@ Parameters:
 "
 }
 
+xpath_tool() {
+
+	if [[ $( /usr/bin/sw_vers -buildVersion ) > "20A" ]]; then
+
+		/usr/bin/xpath -e "$@"
+
+	else
+
+		/usr/bin/xpath "$@"
+
+	fi
+
+}
+
 ##################################################
 # Bits staged...
 
 # Check to make sure all parameters were provided.
-if [ -z "${fileName}" -a -z "${URL}" -a -z "${icon}" -a -z "${location}" ]; then
+if [[ -z "${fileName}" && -z "${URL}" && -z "${icon}" && -z "${location}" ]]; then
 	echo "ERROR:  Missing required parameters!"	
 	# Function getHelp
 	getHelp
@@ -93,7 +107,7 @@ case "${location}" in
 		alreadyExists=0
 
 		# Get the number of items in the persistent-others node; then subtract one for Array value notation.
-		indexItem=$(/usr/libexec/PlistBuddy -x -c "Print :persistent-others" "/Users/${currentUser}/Library/Preferences/com.apple.dock.plist" | /usr/bin/xmllint --format - | /usr/bin/xpath 'count(//plist/array/dict)' 2>/dev/null)
+		indexItem=$(/usr/libexec/PlistBuddy -x -c "Print :persistent-others" "/Users/${currentUser}/Library/Preferences/com.apple.dock.plist" | /usr/bin/xmllint --format - | xpath_tool 'count(//plist/array/dict)' 2>/dev/null)
 		indexItem=$((indexItem-1))
 
 		# Loop through all the items in the persistent-others node and compare to the new item being added.
