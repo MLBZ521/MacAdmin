@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Reset-Office.sh
 # By:  Zack Thompson / Created:  10/14/2020
-# Version:  1.0.0 / Updated:  10/14/2020 / By:  ZT
+# Version:  1.1.0 / Updated:  11/12/2021 / By:  ZT
 #
 # Description:  Allows for users via self service or a Site Admin to reset (and optionally uninstall) 
 #    specific or all Microsoft apps.  Supports Office 2016 and newer.
@@ -36,8 +36,18 @@ All Apps"
 if [[ "${action}" == "Self Service" ]]; then
 
     # Prompt user for actions to take
-    promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"${available_actions}\" with multiple selections allowed with title \"Reset Microsoft Office\" with prompt \"Choose application(s) to reset:\" OK button name \"Select\" cancel button name \"Cancel\""
-    selectedAction=$( /usr/bin/osascript -e "${promptForChoice}" )
+    selectedAction=$( /usr/bin/osascript << EndOfScript
+        tell application "System Events" 
+            activate
+            choose from list every paragraph of "${available_actions}" ¬
+            with multiple selections allowed ¬
+            with title "Fix-IT:  Reset Microsoft Office" ¬
+            with prompt "Choose application(s) to reset:" ¬
+            OK button name "Select" ¬
+            cancel button name "Cancel"
+        end tell
+EndOfScript
+    )
 
     if [[ "${selectedAction}" == "false" ]]; then
 
@@ -62,16 +72,26 @@ if [[ "${action}" == "Self Service" ]]; then
 
     echo "Selected Action:  ${selectedAction}"
 
-    # Prompt user warning of potentional data loss
-    acceptWarning=$( /usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Warning - Potentional Data Loss \n\nThis action has the potentional for data loss.  Please ensure all data stored in Microsoft applications is backed up and/or synced to the cloud.  \n\nDo you accept this risk?" with title "Reset Microsoft Office" with icon caution buttons {"No", "I Accept"} default button 1 giving up after 30' )
+    # Prompt user warning of potential data loss
+    acceptWarning=$( /usr/bin/osascript << EndOfScript
+        tell application "System Events" 
+            activate
+            display dialog "Warning - potential Data Loss \n\nThis action has the potential for data loss.  Please ensure all data stored in Microsoft applications is backed up and/or synced to the cloud.  \n\nDo you accept this risk?" ¬
+            with title "Fix-IT:  Reset Microsoft Office" ¬
+            buttons {"No", "I Accept"} default button 1 ¬
+            giving up after 60 ¬
+            with icon caution
+        end tell
+EndOfScript
+    )
 
     # If you want to use JamfHelper
     # Setup jamfHelper window
     # jamfHelper="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
     # title="Reset Microsoft Office"
     # windowType="utility"
-    # Heading="Warning - Potentional Data Loss"
-    # Description="This action has the potentional for data loss.  Please ensure all data stored in Microsoft applications is backed up and/or synced to the cloud.
+    # Heading="Warning - potential Data Loss"
+    # Description="This action has the potential for data loss.  Please ensure all data stored in Microsoft applications is backed up and/or synced to the cloud.
 # 
 # Do you accept this risk?"
     # Icon="/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns"
@@ -82,7 +102,7 @@ if [[ "${action}" == "Self Service" ]]; then
     # if [[ "${acceptWarning}" != "0" ]]; then
     if [[ "${acceptWarning}" != "button returned:I Accept, gave up:false" ]]; then
 
-        echo -e "NOTICE:  User did not accept potentional data loss warning.\n"
+        echo -e "NOTICE:  User did not accept potential data loss warning.\n"
         echo "*****  Reset Office Process:  COMPLETE  *****"
         exit 0
 
@@ -156,7 +176,7 @@ kill_App() {
 
 }
 
-# Stop and unlocd the passed service name
+# Stop and unload the passed service name
 stop_Service() {
 
     service="${1}"
