@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.1.1 / Updated:  10/24/2018 / By:  ZT
+# Version:  1.2.0 / Updated:  11/15/2021 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -15,7 +15,7 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 # Define Variables
 
 # JPS URL
-jamfPS=$(/usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/rev | /usr/bin/cut -c 2- | /usr/bin/rev)
+jamfPS=$( /usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/awk -F "/$" '{print $1}' )
 apiGetToken="${jamfPS}/uapi/auth/tokens"
 apiGetDetails="${jamfPS}/uapi/auth"
 computersbyID="${jamfPS}/JSSResource/computers/id"
@@ -26,12 +26,29 @@ DecryptString() {
 	# Usage: ~$ DecryptString "Encrypted String" "Salt" "Passphrase"
 	echo "${1}" | /usr/bin/openssl enc -aes256 -d -a -A -S "${2}" -k "${3}"
 }
-jamfAPIUser=$(DecryptString $4 'Salt' 'Passphrase')
-jamfAPIPassword=$(DecryptString $5 'Salt' 'Passphrase')
+jamfAPIUser=$(DecryptString "${5}" "<jamfAPIUser_Salt>" "<jamfAPIUser_Passphrase>")
+jamfAPIPassword=$(DecryptString "${6}" "<jamfAPIPassword_Salt>" "<jamfAPIPassword_Passphrase>")
 
 # Site Admin Credentials to get which Sites they have permissions too.
-siteAdminUser=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Username:" default answer "")' 2>/dev/null)
-siteAdminPassword=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter your Jamf Password:" default answer "" with hidden answer)' 2>/dev/null)
+siteAdminUser=$( /usr/bin/osascript << EndOfScript
+	tell application "System Events" 
+		activate
+		set userInput to the text returned of ¬
+		( display dialog "Enter your Site Admin Username:" ¬
+		default answer "" )
+	end tell
+EndOfScript
+)
+siteAdminPassword=$( /usr/bin/osascript << EndOfScript
+	tell application "System Events" 
+		activate
+		set userInput to the text returned of ¬
+		( display dialog "Enter your Site Admin Password:" ¬
+		default answer "" ¬
+		with hidden answer )
+	end tell
+EndOfScript
+)
 
 # Add -k (--insecure) to disable SSL verification
 curlAPI=(--silent --show-error --fail --user "${jamfAPIUser}:${jamfAPIPassword}" --write-out "statusCode:%{http_code}" --output - --header "Accept: application/xml" --header "Content-Type: application/xml" --request)
@@ -42,11 +59,33 @@ exitCode="0"
 ##################################################
 # Setup Functions
 
+xpath_tool() {
+
+	if [[ $( /usr/bin/sw_vers -buildVersion ) > "20A" ]]; then
+
+		/usr/bin/xpath -e "$@"
+
+	else
+
+		/usr/bin/xpath "$@"
+
+	fi
+
+}
+
 actions() {
 	case "${1}" in
 		"Input" )
 			# Prompt to enter Device ID
-			devices=$(/usr/bin/osascript -e 'set userInput to the text returned of (display dialog "Enter Device IDs (comma separated):" default answer "")')
+			devices=$(/usr/bin/osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					set userInput to the text returned of ¬
+					( display dialog "Enter Device IDs (comma separated):" ¬
+					default answer "" )
+				end tell
+EndOfScript
+			)
 
 			# Function canceled
 			canceled "${devices}" "No devices were entered."
@@ -56,7 +95,15 @@ actions() {
 		;;
 		"File" )
 			# Prompt for csv file of IDs
-			listLocation=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of(choose file with prompt "Select file:" of type {"csv", "txt"})' -e 'end tell')
+			listLocation=$(/usr/bin/osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					return POSIX path of ¬
+					( choose file ¬
+					with prompt "Select file:" of type {"csv", "txt"} )
+				end tell
+EndOfScript
+			)
 
 			# Function canceled
 			canceled "${listLocation}" "No file selection was made."
@@ -75,9 +122,18 @@ actions() {
 			getDevices $mobileDevicesByID mobile_device
 		;;
 		"SelectSite" )
-			# Set the osascript parameters and prompt User for Printer Selection.
-			promptForChoice="tell application (path to frontmost application as text) to choose from list every paragraph of \"$siteNames\" with prompt \"Choose Site to move device(s) too:\" OK button name \"Select\" cancel button name \"Cancel\""
-			selectedSiteName=$(/usr/bin/osascript -e "$promptForChoice")
+			# Prompt User for Site Selection
+			selectedSiteName=$( /usr/bin/osascript << EndOfScript
+				tell application "System Events" 
+					activate
+					choose from list every paragraph of "${siteNames}" ¬
+					with title "Select Site" ¬
+					with prompt "Choose Site to move device(s) too:" ¬
+					OK button name "Select" ¬
+					cancel button name "Cancel"
+				end tell
+EndOfScript
+			)
 
 			# Function canceled
 			canceled $selectedSiteName "No Site selection was made."
@@ -143,7 +199,7 @@ getDevices() {
 		fi
 
 		# Regex to get the Site
-		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | /usr/bin/xpath /$2/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
+		currentSite=$(echo "$curlReturn" | /usr/bin/sed -e 's/statusCode\:.*//g' | /usr/bin/xmllint --format - | xpath_tool /$2/general/site/name 2>/dev/null | LANG=C /usr/bin/sed -e 's/<[^/>]*>//g' | LANG=C /usr/bin/sed -e 's/<[^>]*>/\'$'\n/g')
 		echo "${deviceType} ID ${deviceID} is in the ${currentSite} Site."
 
 		# Verify device is from a site that the Site Admin has permissions too.
@@ -221,7 +277,13 @@ canceled() {
 }
 
 inform() {
-	/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "'"${1}"'" buttons {"OK"}' > /dev/null
+	/usr/bin/osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			display dialog "${1}" ¬
+			buttons {"OK"} default button 1 ¬
+		end tell
+EndOfScript
 }
 
 ##################################################
@@ -256,14 +318,32 @@ until [[ "${moveAnother}" == "button returned:No" ]]; do
 	unset deviceIDs
 
 	# Find out what device type we want to do move.
-	deviceType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Which device type do you want to move?" buttons {"Computer", "Mobile Device"} default button {"Computer"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
+	deviceTypeAnswer=$( /usr/bin/osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			display dialog "Which device type do you want to move?" ¬
+			with title "Select Device Type" ¬
+			buttons {"Computer", "Mobile Device"} default button {"Computer"}
+		end tell
+EndOfScript
+)
+	deviceType=$( echo "${deviceTypeAnswer}" | /usr/bin/awk -F "button returned:" '{print $2}' )
 	echo "Device Type selected:  ${deviceType}"
 
 	# Function actions
 	actions "SelectSite"
 
 	# Provide File or Input Device IDs?
-	methodType=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "How do you want to provide the Jamf Pro '"${deviceType}"' ID(s)?" buttons {"Input", "File"} default button {"Input"}' 2>/dev/null | awk -F "button returned:" '{print $2}')
+	methodTypeAnswer=$( /usr/bin/osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			display dialog "How do you want to provide the Jamf Pro ${deviceType} ID(s)?" ¬
+			with title "Select Method" ¬
+			buttons {"Input", "File"} default button {"Input"}
+		end tell
+EndOfScript
+)
+	methodType=$( echo "${methodTypeAnswer}" | /usr/bin/awk -F "button returned:" '{print $2}' )
 	echo "Method Type selected:  ${methodType}"
 
 	# Function actions
@@ -273,7 +353,15 @@ until [[ "${moveAnother}" == "button returned:No" ]]; do
 	actions "${deviceType}"
 
 	# Prompt if we want to move another device.
-	moveAnother=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Do you want to move another device?" buttons {"Yes", "No"}')
+	moveAnother=$( /usr/bin/osascript << EndOfScript
+		tell application "System Events" 
+			activate
+			display dialog "Do you want to move another device?" ¬
+			with title "Perform another move?" ¬
+			buttons {"Yes", "No"}
+		end tell
+EndOfScript
+	)
 
 done
 
