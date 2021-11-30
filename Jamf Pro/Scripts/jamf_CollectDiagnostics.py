@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 """
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.3.1 / Updated:  3/23/2020 By:  ZT
+# Version:  1.4.0 / Updated:  11/29/2021 By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -19,26 +19,17 @@ from Foundation import NSBundle
 import json
 import objc
 import os
+import plistlib
 import shutil
 import sqlite3
 import subprocess
 import sys
 import zipfile
 
-try:
-    from urllib import request as urllib  # For Python 3
-except ImportError:
-    import urllib2 as urllib # For Python 2
-
-try:
-    from plistlib import dump as custom_plist_Writer  # For Python 3
-    from plistlib import load as custom_plist_Reader  # For Python 3
-except ImportError:
-    from plistlib import writePlist as custom_plist_Writer  # For Python 2
-    from plistlib import readPlist as custom_plist_Reader  # For Python 2
+from urllib import request as urllib
 
 
-# Jamf Funcation to obfuscate credentials.
+# Jamf Function to obfuscate credentials.
 def DecryptString(inputString, salt, passphrase):
     """Usage: >>> DecryptString("Encrypted String", "Salt", "Passphrase")"""
     result = runUtility('echo \'{inputString}\' | /usr/bin/openssl enc -aes256 -d -a -A -S \'{salt}\' -k \'{passphrase}\''.format(salt=salt, passphrase=passphrase, inputString=inputString))
@@ -76,7 +67,7 @@ def plistReader(plistFile, verbose):
             print('Opening plist:  {}'.format(plistFile))
 
         try:
-            plist_Contents = custom_plist_Reader(plistFile)
+            plist_Contents = plistlib.load(plistFile)
         except Exception:
             file_cmd = '/usr/bin/file --mime-encoding {}'.format(plistFile)
             file_response = runUtility(file_cmd)
@@ -90,7 +81,7 @@ def plistReader(plistFile, verbose):
                 plutil_cmd = '/usr/bin/plutil -convert xml1 {}'.format(plistFile)
                 plutil_response = runUtility(plutil_cmd)
 
-            plist_Contents = custom_plist_Reader(plistFile)
+            plist_Contents = plistlib.load(plistFile)
     else:
         print('ERROR:  Unable to locate the specified plist file!')
         sys.exit(3)
@@ -259,6 +250,11 @@ def main():
 
     args = parser.parse_known_args()
     args = args[0]
+
+    # args = parser.parse_known_args()
+    # print('args:  {}'.format(args))
+    # # args = args[0]
+    # sys.exit(0)
 
     print('Argparse args:  {}'.format(args))
 
