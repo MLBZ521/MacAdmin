@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_MoveDevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.2.0 / Updated:  11/15/2021 / By:  ZT
+# Version:  1.2.1 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -30,7 +30,7 @@ jamfAPIUser=$(DecryptString "${5}" "<jamfAPIUser_Salt>" "<jamfAPIUser_Passphrase
 jamfAPIPassword=$(DecryptString "${6}" "<jamfAPIPassword_Salt>" "<jamfAPIPassword_Passphrase>")
 
 # Site Admin Credentials to get which Sites they have permissions too.
-siteAdminUser=$( /usr/bin/osascript << EndOfScript
+siteAdminUser=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 	tell application "System Events" 
 		activate
 		set userInput to the text returned of ¬
@@ -39,7 +39,7 @@ siteAdminUser=$( /usr/bin/osascript << EndOfScript
 	end tell
 EndOfScript
 )
-siteAdminPassword=$( /usr/bin/osascript << EndOfScript
+siteAdminPassword=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 	tell application "System Events" 
 		activate
 		set userInput to the text returned of ¬
@@ -277,7 +277,7 @@ canceled() {
 }
 
 inform() {
-	/usr/bin/osascript << EndOfScript
+	/usr/bin/osascript >/dev/null << EndOfScript
 		tell application "System Events" 
 			activate
 			display dialog "${1}" ¬
@@ -318,7 +318,7 @@ until [[ "${moveAnother}" == "button returned:No" ]]; do
 	unset deviceIDs
 
 	# Find out what device type we want to do move.
-	deviceTypeAnswer=$( /usr/bin/osascript << EndOfScript
+	deviceTypeAnswer=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 		tell application "System Events" 
 			activate
 			display dialog "Which device type do you want to move?" ¬
@@ -334,7 +334,7 @@ EndOfScript
 	actions "SelectSite"
 
 	# Provide File or Input Device IDs?
-	methodTypeAnswer=$( /usr/bin/osascript << EndOfScript
+	methodTypeAnswer=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 		tell application "System Events" 
 			activate
 			display dialog "How do you want to provide the Jamf Pro ${deviceType} ID(s)?" ¬
