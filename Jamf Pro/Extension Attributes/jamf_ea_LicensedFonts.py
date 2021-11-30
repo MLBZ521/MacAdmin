@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 
 ###################################################################################################
 # Script Name:  jamf_ea_LicensedFonts.py
 # By:  Zack Thompson / Created:  1/12/2019
-# Version:  1.2.0 / Updated:  2/18/2021 / By:  ZT
+# Version:  1.2.1 / Updated:  10/22/2021 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check if any Licensed Fonts are installed.
 #
