@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Reset-Office.sh
 # By:  Zack Thompson / Created:  10/14/2020
-# Version:  1.1.0 / Updated:  11/12/2021 / By:  ZT
+# Version:  1.1.1 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  Allows for users via self service or a Site Admin to reset (and optionally uninstall) 
 #    specific or all Microsoft apps.  Supports Office 2016 and newer.
@@ -36,7 +36,7 @@ All Apps"
 if [[ "${action}" == "Self Service" ]]; then
 
     # Prompt user for actions to take
-    selectedAction=$( /usr/bin/osascript << EndOfScript
+    selectedAction=$( /usr/bin/osascript 2>/dev/null << EndOfScript
         tell application "System Events" 
             activate
             choose from list every paragraph of "${available_actions}" ¬
@@ -73,7 +73,7 @@ EndOfScript
     echo "Selected Action:  ${selectedAction}"
 
     # Prompt user warning of potential data loss
-    acceptWarning=$( /usr/bin/osascript << EndOfScript
+    acceptWarning=$( /usr/bin/osascript 2>/dev/null << EndOfScript
         tell application "System Events" 
             activate
             display dialog "Warning - potential Data Loss \n\nThis action has the potential for data loss.  Please ensure all data stored in Microsoft applications is backed up and/or synced to the cloud.  \n\nDo you accept this risk?" ¬
