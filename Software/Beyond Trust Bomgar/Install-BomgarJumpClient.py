@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
+
 """
 
 Script Name:  Install-BomgarJumpClient.py
 By:  Zack Thompson / Created:  3/2/2020
-Version:  1.4.0 / Updated:  10/20/2020 / By:  ZT
+Version:  1.4.1 / Updated:  11/29/2021 / By:  ZT
 
 Description:  Installs a Bomgar Jump Client with the passed parameters
 
