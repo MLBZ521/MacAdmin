@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 
 ###################################################################################################
 # Script Name:  jamf_Patcher.py
 # By:  Zack Thompson / Created:  7/10/2019
-# Version:  1.0.0 / Updated:  7/10/2019 / By:  ZT
+# Version:  1.0.1 / Updated:  10/22/2021 / By:  ZT
 #
 # Description:  This script handles patching of applications with user notifications.
 #
@@ -11,22 +11,15 @@
 
 import os
 import platform
-try:
-    from plistlib import dump as custom_plist_Writer  # For Python 3
-    from plistlib import load as custom_plist_Reader  # For Python 3
-except ImportError:
-    from plistlib import writePlist as custom_plist_Writer  # For Python 2
-    from plistlib import readPlist as custom_plist_Reader  # For Python 2
-try:
-    import requests # Use requests if available
-except ImportError:
-    try:
-        from urllib import request as urllib  # For Python 3
-    except ImportError:
-        import urllib  # For Python 2
+import plistlib
 import signal
 import subprocess
 import sys
+
+try:
+    import requests # Use requests if available
+except ImportError:
+    from urllib import request as urllib  # For Python 3
 
 def runUtility(command,  errorAction='continue'):
     """A helper function for subprocess.
@@ -62,7 +55,7 @@ def plistReader(plistFile):
         # print('Reading {}...'.format(plistFile))
 
         try:
-            plist_Contents = custom_plist_Reader(plistFile)
+            plist_Contents = plistlib.load(plistFile)
         except Exception:
             file_cmd = '/usr/bin/file --mime-encoding {}'.format(plistFile)
             file_response = runUtility(file_cmd)
@@ -74,7 +67,7 @@ def plistReader(plistFile):
                 plutil_cmd = '/usr/bin/plutil -convert xml1 {}'.format(plistFile)
                 plutil_response = runUtility(plutil_cmd)
 
-            plist_Contents = custom_plist_Reader(plistFile)
+            plist_Contents = plistlib.load(plistFile)
     else:
         print('Something\'s terribly wrong here...')
 
@@ -139,10 +132,10 @@ def delayDaemon(**parameters):
     if os.path.exists(parameters.get('patchPlist')):
         patchPlist_contents = plistReader(parameters.get('patchPlist'))
         patchPlist_contents.update( { parameters.get('applicationName') : "Delayed" } )
-        custom_plist_Writer(patchPlist_contents, parameters.get('patchPlist'))
+        plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
     else:
         patchPlist_contents = { parameters.get('applicationName') : "Delayed" }
-        custom_plist_Writer(patchPlist_contents, parameters.get('patchPlist'))
+        plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
 
     print('Creating the Patcher launchDaemon...')
 
@@ -153,7 +146,7 @@ def delayDaemon(**parameters):
     'AbandonProcessGroup' : True
     }
 
-    custom_plist_Writer(launchDaemon_plist, parameters.get('launchDaemonLocation'))
+    plistlib.dump(launchDaemon_plist, parameters.get('launchDaemonLocation'))
 
     if os.path.exists(parameters.get('launchDaemonLocation')):
 
@@ -199,7 +192,7 @@ def cleanUp(**parameters):
         if patchPlist_contents.get(parameters.get('applicationName')):
             patchPlist_contents.pop(parameters.get('applicationName'), None)
             print('Removing previously delayed app:  {}'.format(parameters.get('applicationName')))
-            custom_plist_Writer(patchPlist_contents, parameters.get('patchPlist'))
+            plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
         else:
             print('App not listed in patchPlist:  {}'.format(parameters.get('applicationName')))
 
