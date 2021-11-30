@@ -1,8 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
+
 ###################################################################################################
 # Script Name:  license_AutoCAD.py
 # By:  Zack Thompson / Created:  8/21/2020
-# Version:  1.0.0 / Updated:  8/21/2020 / By:  ZT
+# Version:  1.0.2 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  This script applies the license for AutoCAD 2020 and newer.
 #
@@ -42,14 +43,12 @@ def runUtility(command):
         shell=False, universal_newlines=True )
     (stdout, stderr) = process.communicate()
 
-    result_dict = {
+    return {
         "stdout": (stdout).strip(),
         "stderr": (stderr).strip() if stderr != None else None,
         "exitcode": process.returncode,
         "success": True if process.returncode == 0 else False
     }
-
-    return result_dict
 
 
 def main():
@@ -70,9 +69,9 @@ def main():
 
     else:
 
-		print("ERROR:  Invalid License Type provided")
-		print("*****  License AutoCAD process:  FAILED  *****")
-		sys.exit(1)
+        print("ERROR:  Invalid License Type provided")
+        print("*****  License AutoCAD process:  FAILED  *****")
+        sys.exit(1)
 
     # Determine License Mechanism
     if sys.argv[5] in ["LM", "License Manager", "Network"]:
@@ -93,9 +92,9 @@ def main():
 
     else:
 
-		print("ERROR:  Invalid License Mechanism provided")
-		print("*****  License AutoCAD process:  FAILED  *****")
-		sys.exit(2)
+        print("ERROR:  Invalid License Mechanism provided")
+        print("*****  License AutoCAD process:  FAILED  *****")
+        sys.exit(2)
 
     ##################################################
     # Define Variables
@@ -113,7 +112,7 @@ def main():
 
         print("ERROR:  AutoCAD was not found!")
         print("*****  License AutoCAD process:  FAILED  *****")
-    	sys.exit(3)
+        sys.exit(3)
 
     # Check for registered applications
     list_results = runUtility( "'{}' list".format(autodesk_lic_helper) )
@@ -153,10 +152,9 @@ def main():
                 --lic_method NETWORK --lic_server_type REDUNDANT --lic_servers '{}'".format(
                     autodesk_lic_helper, product_key, product_version, license_servers ) )
 
-        else license_mechanism == "Local"
+        # else license_mechanism == "Local":
 
             # Functionality would need to be added to support a local license
-            print("Functionality would need to be added to support a local license.")
 
         if not change_results['success']:
 
