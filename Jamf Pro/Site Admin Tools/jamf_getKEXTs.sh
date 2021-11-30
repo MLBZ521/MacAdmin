@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_getKEXTs.sh
 # By:  Zack Thompson / Created: 5/2/2018
-# Version:  1.0 / Updated:  5/2/2018 / By:  ZT
+# Version:  1.1.0 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  This script asks for an output file and dumps all KEXT Info to the file.
 #
@@ -15,7 +15,15 @@ echo "*****  jamf_getKEXTs process:  START  *****"
 
 ##################################################
 # Define Variables
-outFile=$(/usr/bin/osascript -e 'tell application (path to frontmost application as text)' -e 'return POSIX path of (choose file name with prompt "Provide a file name and location to save:")' -e 'end tell' 2>/dev/null)
+outFile=$( /usr/bin/osascript 2>/dev/null << EndOfScript
+	tell application "System Events" 
+		activate
+		return POSIX path of ¬
+		( choose file name ¬
+		with prompt "Provide a file name and location to save:" )
+	end tell
+EndOfScript
+)
 
 # Stop IFS linesplitting on spaces
 OIFS=$IFS
@@ -61,13 +69,27 @@ if [ ${#results[@]} != "0" ]; then
 		bundid=$(/usr/bin/defaults read "${results[$loop]}"/Contents/Info.plist CFBundleIdentifier)
 
 		echo "KEXT:  ${results[$loop]}" >> "${outFile}"
-		echo "Team ID:  $teamid | Bundle ID: $bundid" >> "${outFile}"
+		echo "Team ID:  ${teamid} | Bundle ID: ${bundid}" >> "${outFile}"
 	done
 
-	/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "'"List has been saved to:  ${outFile}"'" buttons {"OK"}' > /dev/null
+	/usr/bin/osascript >/dev/null << EndOfScript
+	tell application "System Events" 
+		activate
+		display dialog "List has been saved to:  ${outFile}" ¬
+		buttons {"OK"} ¬
+	end tell
+EndOfScript
 
 else
-	/usr/bin/osascript -e 'tell application (path to frontmost application as text) to display dialog "Either no KEXTs were found or there was a problem." buttons {"OK"}' > /dev/null
+
+	/usr/bin/osascript >/dev/null << EndOfScript
+	tell application "System Events" 
+		activate
+		display dialog "Either no KEXTs were found or there was a problem" ¬
+		buttons {"OK"} ¬
+	end tell
+EndOfScript
+
 fi
 
 IFS=$OIFS
