@@ -1,9 +1,10 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
+
 """
 ###################################################################################################
 # Script Name:  jamf_ea_Location.py
 # By:  Zack Thompson / Created:  8/24/2019
-# Version:  1.0.0 / Updated:  8/24/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  11/30/2021 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to get the physical location of a device.
 #
@@ -11,13 +12,8 @@
 """
 
 import json
+import requests
 import subprocess
-import sys
-
-try:
-    from urllib import request as urllib  # For Python 3
-except ImportError:
-    import urllib2 as urllib # For Python 2
 
 
 def runUtility(command):
@@ -47,24 +43,23 @@ def webLookup(url):
     """
 
     try:
-        print('Trying urllib...')
+        print('Trying requests...')
         headers = {'Accept': 'application/json'}
-        request = urllib.Request(url, headers=headers)
-        response = urllib.urlopen(request)
-        statusCode = response.code
-        json_response = json.loads(response.read())
+        response = requests.get(url, headers=headers)
+        statusCode = response.status_code
+        json_response = response.json()
 
     except Exception:
         # If urllib fails, resort to using curl
-        sys.exc_clear()
         print('Trying curl...')
         # Build the command
         curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --write-out "statusCode:%{{http_code}}" --location --header "Accept: application/json" --url {url} --request GET'.format(url=url)
         response = runUtility(curl_cmd)
-        json_content, statusCode = response.split('statusCode:')
+        json_content, statusCode = response.split(b'statusCode:')
         json_response = json.loads(json_content)
 
     return statusCode, json_response
+
 
 def main():
 
