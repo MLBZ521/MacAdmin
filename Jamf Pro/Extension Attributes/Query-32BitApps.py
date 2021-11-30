@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 """
 ###################################################################################################
 # Script Name:  Query-32BitApps.py
 # By:  Zack Thompson / Created:  3/23/2020
-# Version:  1.0.0 / Updated:  3/23/2020 / By:  ZT
+# Version:  1.0.1 / Updated:  10/22/2021 / By:  ZT
 #
 # Description:  For OS versions older than 10.15, queries system_profiler for 32bit Apps that are not Apple, first party Apps.
 #
