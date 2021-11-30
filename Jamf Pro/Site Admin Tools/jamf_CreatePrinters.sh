@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CreatePrinters.sh
 # By:  Zack Thompson / Created:  3/1/2018
-# Version:  1.8.0 / Updated:  11/15/2021 / By:  ZT
+# Version:  1.8.1 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  The purpose of this script is to assist Site Admins in creating Printers in Jamf without needing to use the Jamf Admin utility.
 #
@@ -193,7 +193,7 @@ checkStatusCode() {
 informBy() {
 	case $ranBy in
 		Jamf )
-			/usr/bin/osascript << EndOfScript
+			/usr/bin/osascript >/dev/null << EndOfScript
 				tell application "System Events" 
 					activate
 					display dialog "${1}" ¬
@@ -228,7 +228,7 @@ EndOfScript
 		esac
 
 		# Prompt for credentials.
-		jamfAPIUser=$( /usr/bin/osascript << EndOfScript
+		jamfAPIUser=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 			tell application "System Events" 
 				activate
 				set userInput to the text returned of ¬
@@ -237,7 +237,7 @@ EndOfScript
 			end tell
 EndOfScript
 		)
-		jamfAPIPassword=$( /usr/bin/osascript << EndOfScript
+		jamfAPIPassword=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 			tell application "System Events" 
 				activate
 				set userInput to the text returned of ¬
