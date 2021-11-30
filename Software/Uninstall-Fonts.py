@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 
 ###################################################################################################
 # Script Name:  Uninstall-Fonts.py
 # By:  Zack Thompson / Created:  2/18/2021
-# Version:  1.0.0 / Updated:  2/18/2021 / By:  ZT
+# Version:  1.0.1 / Updated:  10/22/2021 / By:  ZT
 #
 # Description:  Removes the specified Fonts from the system and user directories, if they exist.
 #
