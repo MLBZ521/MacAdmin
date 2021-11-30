@@ -1,9 +1,10 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
+
 """
 ###################################################################################################
 # Script Name:  jamf_ea_UpTime.py
 # By:  Zack Thompson / Created:  8/24/2019
-# Version:  1.0.0 / Updated:  8/24/2019 / By:  ZT
+# Version:  1.0.1 / Updated:  11/30/2021 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to get the up time of a device.
 #
