@@ -1,20 +1,18 @@
-#!/usr/bin/python
+#!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 
 ###################################################################################################
 # Script Name:  jamf_ea_JDKVersion.py
 # By:  Zack Thompson / Created:  3/12/2019
-# Version:  1.0.0 / Updated:  3/12/2019 / By:  ZT
+# Version:  1.1.0 / Updated:  11/30/2021 / By:  ZT
 #
 # Description:  A Jamf Extension Attribute to check the latest JDK version installed.
 #
 ###################################################################################################
 
 import os
+import plistlib
 import sys
-try:
-    from plistlib import load as plist_Reader  # For Python 3
-except ImportError:
-    from plistlib import readPlist as plist_Reader  # For Python 2
+
 
 def main():
 
@@ -32,25 +30,26 @@ def main():
 
             # Loop through each JDK.
             for jdk in installed_JDKs:
-                # print('Testing JDK:  {}'.format(jdk))
+                jdk_plist_path = '{}/{}/Contents/Info.plist'.format(jdk_Directory, jdk)
+                # print('Checking JDK:  {}'.format(jdk_plist_path))
 
-                # Get the contents of the plist file.
-                try:
-                    # print('Location:  {}/{}/Contents/Info.plist'.format(jdk_Directory, jdk))
-                    plist_contents = plist_Reader('{}/{}/Contents/Info.plist'.format(jdk_Directory, jdk))
-                except Exception:
-                    print ('Unable to locate the specified plist file.')
-                    sys.exit('<result>Error</result>')
+                if os.path.exists(jdk_plist_path):
 
-                # Get the JVM Version for this JDK.
-                jvm_version=plist_contents.get('JavaVM').get('JVMVersion')
-                installed_JDK_Versions.append(jvm_version)
+                    # Get the contents of the plist file.
+                    with open(jdk_plist_path, "rb") as jdk_plist:
+                        plist_contents = plistlib.load(jdk_plist)
+
+                    # Get the JVM Version for this JDK.
+                    jvm_version=plist_contents.get('JavaVM').get('JVMVersion')
+                    installed_JDK_Versions.append(jvm_version)
+
 
             # Get the latest version.
             newest_JDK = sorted(installed_JDK_Versions)[-1]
 
             if newest_JDK:
                 print("<result>{}</result>".format(newest_JDK))
+
             else:
                 print("<result>Unknown</result>")
         
@@ -59,6 +58,7 @@ def main():
 
     else:
         print("<result>Not installed</result>")
+
 
 if __name__ == "__main__":
     main()
