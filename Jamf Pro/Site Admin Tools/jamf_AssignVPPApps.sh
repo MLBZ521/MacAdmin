@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_AssignVPPApps.sh
 # By:  Zack Thompson / Created:  2/16/2018
-# Version:  1.1.0 / Updated:  11/15/2021 / By:  ZT
+# Version:  1.1.1 / Updated:  11/29/2021 / By:  ZT
 #
 # Description:  This script is used to scope groups to VPP Apps.
 #
@@ -16,7 +16,7 @@ echo "*****  AssignVPPApps process:  START  *****"
 	# Either hard code or prompt for credentials
 	# jamfAPIUser="APIUsername"
 	# jamfAPIPassword="APIPassword"
-	jamfAPIUser=$( osascript << EndOfScript
+	jamfAPIUser=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 		tell application "System Events" 
 			activate
 			set userInput to the text returned of ¬
@@ -25,7 +25,7 @@ echo "*****  AssignVPPApps process:  START  *****"
 		end tell
 EndOfScript
 	)
-	jamfAPIPassword=$( osascript << EndOfScript
+	jamfAPIPassword=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 		tell application "System Events" 
 			activate
 			set userInput to the text returned of ¬
@@ -46,7 +46,7 @@ EndOfScript
 	if [[ "${4}" == "Jamf" ]]; then
 		actions="Get VPP Apps
 		Assign VPP Apps"
-		action=$( osascript << EndOfScript
+		action=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 			tell application "System Events" 
 				activate
 				choose from list every paragraph of "${actions}" ¬
@@ -210,7 +210,7 @@ fileExists() {
 informBy() {
 	case $ranBy in
 		Jamf )
-			osascript << EndOfScript
+			/usr/bin/osascript >/dev/null << EndOfScript
 			tell application "System Events" 
 				activate
 				display dialog "${1}" ¬
@@ -254,7 +254,7 @@ case $action in
 			# Function getApps
 				getApps
 		else
-			outFile=$( osascript << EndOfScript
+			outFile=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 				tell application "System Events" 
 					activate
 					return POSIX path of ¬
@@ -277,7 +277,7 @@ EndOfScript
 			# Function assignApps
 				assignApps
 		else
-			inputFile=$( osascript << EndOfScript
+			inputFile=$( /usr/bin/osascript 2>/dev/null << EndOfScript
 				tell application "System Events" 
 					activate
 					return POSIX path of ¬
