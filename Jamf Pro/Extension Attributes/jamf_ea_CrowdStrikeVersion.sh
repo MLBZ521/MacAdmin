@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeVersion.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  1.3.1 / Updated:  3/22/2021 / By:  ZT
+# Version:  1.4.0 / Updated:  12/1/2021 / By:  ZT
 #
 # Description:  This script gets the version of Crowd Strike, if installed.
 #
@@ -19,14 +19,22 @@ falconctl_old_location="/Library/CS/falconctl"
 #############################################n#####
 # Functions
 
+write_to_log() {
+
+    local_ea_history="/opt/ManagedFrameworks/EA_History.log"
+    message="${1}"
+    time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
+    echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+}
+
 get_falconctl_version() {
 
     csAgentInfo=$( "${1}" stats agent_info --plist )
 
-	cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" /dev/stdin <<< "${csAgentInfo}" 2> /dev/null )
-	plistBuddy_exit_code=$?
+    cs_version=$( /usr/libexec/PlistBuddy -c "Print :agent_info:version" /dev/stdin <<< "${csAgentInfo}" 2> /dev/null )
+    plistBuddy_exit_code=$?
 
-	if [[ $plistBuddy_exit_code -ne 0 ]]; then
+    if [[ $plistBuddy_exit_code -ne 0 ]]; then
 
         # Get the Crowd Strike version from sysctl for versions prior to v5.36.
         cs_version=$( /usr/sbin/sysctl -n cs.version )
@@ -40,7 +48,7 @@ get_falconctl_version() {
 
     fi
 
-	echo "${cs_version}"
+    echo "${cs_version}"
 
 }
 
@@ -66,5 +74,6 @@ else
 
 fi
 
+write_to_log "CS:F Version:  ${cs_version}"
 echo "<result>${cs_version}</result>"
 exit 0
