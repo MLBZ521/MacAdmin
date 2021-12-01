@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.5.0 / Updated:  5/7/2021 / By:  ZT
+# Version:  2.6.0 / Updated:  12/1/2021 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -37,6 +37,22 @@ lastConnectedVariance=7
 
 ##################################################
 # Functions
+
+write_to_log() {
+
+    local_ea_history="/opt/ManagedFrameworks/EA_History.log"
+    message="${1}"
+    time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
+    echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+}
+
+report_result() {
+
+    write_to_log "CS:F Status:  ${1}"
+    echo "<result>${1}</result>"
+    exit 0
+
+}
 
 getFalconctlStats() {
 
@@ -87,30 +103,27 @@ osMinorPatchVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $2"."$3
 # Hold statuses
 returnResult=""
 
-if [[ "${osMajorVersion}" == "10" && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 12" ) -eq 1 ]]; then
-
-    # macOS 10.12 or older
-    echo "<result>OS Version Not Supported</result>"
-    exit 0
-
-elif  [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
+if [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
 
     # Multiple versions installed
-    echo "<result>ERROR:  Multiple CS Versions installed</result>"
-    exit 0
+    report_result "ERROR:  Multiple CS Versions installed"
 
-elif  [[ -e "${falconctl_app_location}" ]]; then
+elif [[ -e "${falconctl_app_location}" ]]; then
 
     falconctl="${falconctl_app_location}"
 
-elif  [[ -e "${falconctl_old_location}" ]]; then
+elif [[ -e "${falconctl_old_location}" ]]; then
 
-    falconctl="${falconctl_old_location}"
+    report_result "Sensor Version Not Supported"
+
+elif [[ "${osMajorVersion}" == "10" && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 13" ) -eq 1 ]]; then
+
+    # macOS 10.13 or older
+    report_result "OS Version Not Supported"
 
 else
 
-    echo "<result>Not Installed</result>"
-    exit 0
+    report_result "Not Installed"
 
 fi
 
@@ -124,25 +137,25 @@ falconctlVersion=$( getCSFVersion "${falconctlStats}" )
 csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
 
 
-if [[ -z "${csMajorMinorVersion}" ]]; then
+# if [[ -z "${csMajorMinorVersion}" ]]; then
 
-    # Get the Crowd Strike version from sysctl for versions prior to v5.36.
-    falconctlVersion=$( /usr/sbin/sysctl -n cs.version )
-    csVersionExitCode=$?
+#     # Get the Crowd Strike version from sysctl for versions prior to v5.36.
+#     falconctlVersion=$( /usr/sbin/sysctl -n cs.version )
+#     csVersionExitCode=$?
 
-    if [[ $csVersionExitCode -eq 0 ]]; then
+#     if [[ $csVersionExitCode -eq 0 ]]; then
 
-        # Get the CS Major.Minor Version string
-        csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${falconctlVersion}" )
-        falconctl="${falconctl_old_location}"
+#         # Get the CS Major.Minor Version string
+#         csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${falconctlVersion}" )
+#         falconctl="${falconctl_old_location}"
 
-    else
+#     else
 
-        returnResult+="Not Running;"
+#         returnResult+="Not Running;"
 
-    fi
+#     fi
 
-fi
+# fi
 
 # Check the Locale; this will affect the output of falconctl stats
 lib_locale=$( /usr/bin/defaults read "/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
@@ -173,15 +186,14 @@ fi
 
 
 # Check CS Version
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.34" ) -eq 1 ]]; then
+if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.18" ) -eq 1 ]]; then
 
-    echo "<result>Sensor Version Not Supported</result>"
-    exit 0
+    report_result "Sensor Version Not Supported"
 
-elif [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.36" ) -eq 1 ]]; then
+# elif [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.36" ) -eq 1 ]]; then
 
-    # Get the customer ID to compare.
-    csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
+#     # Get the customer ID to compare.
+#     csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
 
 else
 
@@ -256,7 +268,14 @@ with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plis
     plist_contents = plistlib.load(plist)
 
 object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
-print(plist_contents.get("$objects")[object_index]["Enabled"])')
+print(plist_contents.get("$objects")[object_index]["Enabled"])' 2> /dev/null )
+
+        if [[ $? != 0 ]]; then
+            
+            # If the Python command fails for any reason, fall back to defaults
+            filter_state=$( /usr/bin/defaults read /Library/Preferences/com.apple.networkextension | /usr/bin/awk "/com.crowdstrike.falcon.App/,/identifier/" | /usr/bin/grep "Enabled" | /usr/bin/sed "s/[^0-9]//g" )
+
+        fi
 
     else
 
@@ -316,6 +335,8 @@ if [[ "${sipStatus}" == "enabled" ]]; then
             # echo "falconctlVersion:  ${falconctlVersion}"
             # echo "Compared version:  ${compare_extension_version}"
 
+            declare -a extension_status
+
             # Loop through the extensions found
             while IFS=$'\n' read -r extension; do
 
@@ -324,20 +345,22 @@ if [[ "${sipStatus}" == "enabled" ]]; then
 
                 if [[ "${extension_version}" == "${compare_extension_version}" ]]; then
 
-                    extension_status=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
-                    # echo "extension_status:  ${extension_status}"
-                    break
+                    extension_status+=( "$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )" )
 
                 fi
 
             done < <(echo "${extensions}")
 
+            last_result="${extension_status[${#extension_status[@]} - 1]}"
+            # echo "Number of matching extension status result:  ${#extension_status[@]}"
+            # echo "Last extension status result:  ${last_result}"
+
             # Verify Extension is Activated and Enabled
-            if [[ "${extension_status}" != "activated enabled" ]]; then
+            if [[ "${last_result}" != "activated enabled" ]]; then
 
-                if [[ -n "${extension_status}" ]]; then
+                if [[ -n "${last_result}" ]]; then
 
-                    returnResult+=" SysExt: ${extension_status};"
+                    returnResult+=" SysExt: ${last_result};"
 
                 else
 
@@ -477,12 +500,10 @@ if [[ -n "${returnResult}" ]]; then
     # Trim leading space
     returnResult="${returnResult## }"
     # Trim trailing ;
-    echo "<result>${returnResult%%;}</result>"
+    report_result "${returnResult%%;}"
 
 else
 
-    echo "<result>Running</result>"
+    report_result "Running"
 
 fi
-
-exit 0
