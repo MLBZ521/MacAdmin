@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_CollectDiagnostics.py
 # By:  Zack Thompson / Created:  8/22/2019
-# Version:  1.4.0 / Updated:  11/29/2021 By:  ZT
+# Version:  1.4.1 / Updated:  12/03/2021 By:  ZT
 #
 # Description:  This script allows you to upload a compressed zip of specified files to a
 #               computers' inventory record.
@@ -54,22 +54,24 @@ def runUtility(command):
     return process
 
 
-def plistReader(plistFile, verbose):
+def plistReader(plist_file_path, verbose):
     """A helper function to get the contents of a Property List.
     Args:
-        plistFile:  A .plist file to read in.
+        plist_file_path:  A .plist file to read in.
     Returns:
         stdout:  Returns the contents of the plist file.
     """
 
-    if os.path.exists(plistFile):
+    if os.path.exists(plist_file_path):
         if verbose:
-            print('Opening plist:  {}'.format(plistFile))
+            print('Opening plist:  {}'.format(plist_file_path))
 
         try:
-            plist_Contents = plistlib.load(plistFile)
+            # Get the contents of the plist file.
+            with open(plist_file_path, "rb") as plist_file:
+                plist_Contents = plistlib.load(plist_file)
         except Exception:
-            file_cmd = '/usr/bin/file --mime-encoding {}'.format(plistFile)
+            file_cmd = '/usr/bin/file --mime-encoding {}'.format(plist_file_path)
             file_response = runUtility(file_cmd)
             file_type = file_response.split(': ')[1].strip()
             if verbose:
@@ -78,10 +80,12 @@ def plistReader(plistFile, verbose):
             if file_type == 'binary':
                 if verbose:
                     print('Converting plist...')
-                plutil_cmd = '/usr/bin/plutil -convert xml1 {}'.format(plistFile)
+                plutil_cmd = '/usr/bin/plutil -convert xml1 {}'.format(plist_file_path)
                 plutil_response = runUtility(plutil_cmd)
 
-            plist_Contents = plistlib.load(plistFile)
+            # Get the contents of the plist file.
+            with open(plist_file_path, "rb") as plist_file:
+                plist_Contents = plistlib.load(plist_file)
     else:
         print('ERROR:  Unable to locate the specified plist file!')
         sys.exit(3)
@@ -134,10 +138,10 @@ def get_system(attribute):
     objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
 
     def io_key(keyname):
-        return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0, IOServiceMatching("IOPlatformExpertDevice".encode("utf-8"))), keyname, None, 0)
+        return IORegistryEntryCreateCFProperty(int(IOServiceGetMatchingService(0, IOServiceMatching("IOPlatformExpertDevice".encode("utf-8")))), keyname, None, 0)
 
     def get_hardware_uuid():
-        return io_key("IOPlatformUUID".encode("utf-8"))
+        return io_key("IOPlatformUUID")
 
     # def get_hardware_serial():
     #     return io_key("IOPlatformSerialNumber".encode("utf-8"))
@@ -178,13 +182,13 @@ def apiGET(**parameters):
 
     except Exception:
         # If urllib fails, resort to using curl.
-        sys.exc_clear()
+
         if parameters.get('verbose'):
             print('Trying curl...')
         # Build the command.
         curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --write-out "statusCode:%{{http_code}}" --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request GET'.format(jps_credentials=parameters.get('jps_credentials'), url=url)
         response = runUtility(curl_cmd)
-        json_content, statusCode = response.split('statusCode:')
+        json_content, statusCode = response.split(b'statusCode:')
         json_response = json.loads(json_content)
 
     return statusCode, json_response
@@ -221,13 +225,13 @@ def apiPOST(**parameters):
 
     # except Exception:
         # If urllib fails, resort to using curl.
-        # sys.exc_clear()
+
     if parameters.get('verbose'):
         print('Trying curl...')
     # Build the command.
     curl_cmd = '/usr/bin/curl --silent --show-error --no-buffer --fail --write-out "statusCode:%{{http_code}}" --location --header "Accept: application/json" --header "Authorization: Basic {jps_credentials}" --url {url} --request POST --form name=@{file_to_upload}'.format(jps_credentials=parameters.get('jps_credentials'), url=url, file_to_upload=parameters.get('file_to_upload'))
     response = runUtility(curl_cmd)
-    content, statusCode = response.split('statusCode:')
+    content, statusCode = response.split(b'statusCode:')
 
     return statusCode, content
 
@@ -286,9 +290,9 @@ def main():
     # Define Variables
 
     jamf_plist = '/Library/Preferences/com.jamfsoftware.jamf.plist'
-    jps_api_user = (DecryptString((args.api_username).strip(), '8e12a14a386166c2', '0a0bd294022f2091e8484814')).strip()
-    jps_api_password = (DecryptString((args.api_password).strip(), '596880db0d4d45a1', 'c045f87e5e7a47e3fd56110a')).strip()
-    jps_credentials = base64.b64encode(jps_api_user + ':' + jps_api_password)
+    jps_api_user = (DecryptString((args.api_username).strip(), '<SALT>', '<PASSPHRASE>')).strip().decode()
+    jps_api_password = (DecryptString((args.api_password).strip(), '<SALT>', '<PASSPHRASE>')).strip().decode()
+    jps_credentials = ( base64.b64encode( "{}:{}".format(jps_api_user, jps_api_password).encode() ) ).decode()
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     archive_file = '/private/tmp/{}_logs'.format(time_stamp)
     archive_max_size = 40000000
