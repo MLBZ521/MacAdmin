@@ -4,14 +4,15 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.11.0c / Updated:  9/30/2021 / By:  ZT
+# Version:  1.12.0 / Updated:  12/03/2021 / By:  ZT
 #
-# Description:  A Jamf Extension Attribute to check the latest compatible version of macOS.
+# Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
 #	System Requirements can be found here:
-#		Monterey - https://www.apple.com/macos/monterey-preview/
-#		Big Sur - https://support.apple.com/en-us/HT211238
-# 			* If you’re running Mountain Lion 10.8, you will need to upgrade to El Capitan 10.11 first.
+#		Full List - https://support.apple.com/en-us/HT211683
+#		Monterey - https://support.apple.com/en-us/HT212735
+#		Big Sur - https://support.apple.com/en-us/HT211238 / https://support.apple.com/kb/sp833
+#			* If you’re running Mountain Lion 10.8, you will need to upgrade to El Capitan 10.11 first.
 #		Catalina - https://support.apple.com/en-us/HT210222
 #		Mojave - https://support.apple.com/en-us/HT210190
 #			* MacPro5,1's = https://support.apple.com/en-us/HT208898
@@ -27,14 +28,16 @@
 # Setting the minimum RAM and free disk space required for compatibility.
 	minimumRAMMojaveOlder=2
 	minimumRAMCatalinaPlus=4
-	minimumFreeSpace=20 # This isn't the technical specification for pervious versions, just a suggestion
+	minimumFreeSpace=20 # This isn't the technical specification for previous versions, just a suggestion
 	minimumFreeSpaceBigSur=35.5 # For 10.12 or newer
+	minimumFreeSpaceMonterey=26 # For 10.12 or newer
 # Transform GB into Bytes
 	convertToGigabytes=$((1024 * 1024 * 1024))
 	requiredRAMMojaveOlder=$((minimumRAMMojaveOlder * convertToGigabytes))
 	requiredRAMCatalinaPlus=$((minimumRAMCatalinaPlus * convertToGigabytes))
 	requiredFreeSpace=$((minimumFreeSpace * convertToGigabytes))
 	requiredFreeSpaceBigSur=$( /usr/bin/bc <<< "${minimumFreeSpaceBigSur} * ${convertToGigabytes}" )
+	requiredFreeSpaceMonterey=$( /usr/bin/bc <<< "${minimumFreeSpaceMonterey} * ${convertToGigabytes}" )
 # Get the OS Version
 	osVersion=$( /usr/bin/sw_vers -productVersion )
 	osMajorVersion=$( echo "${osVersion}" | /usr/bin/awk -F '.' '{print $1}' )
@@ -184,7 +187,7 @@ macProModelCheck() {
 case $modelType in
 	"iMac" )
 		# Function iMacModelCheck
-		latestOSSupport=$( iMacModelCheck 7 10 13 13 14 16 )
+		latestOSSupport=$( iMacModelCheck 7 10 13 13 14 15 )
 	;;
 	"MacBook" )
 		# Function modelCheck
@@ -266,7 +269,14 @@ else
 fi
 
 # Check if the available free space is sufficient
-if [[ "${latestOSSupport}" == "Big Sur" || "${latestOSSupport}" == "Monterey" ]]; then
+if [[ "${latestOSSupport}" == "Monterey" ]]; then
+
+	if [[  $( /usr/bin/bc <<< "${systemFreeSpace} <= ${requiredFreeSpaceMonterey}" ) -eq 1 ]]; then
+		finalResult+=" / Insufficient Storage"
+
+	fi
+
+elif [[ "${latestOSSupport}" == "Big Sur" ]]; then
 
 	if [[  $( /usr/bin/bc <<< "${systemFreeSpace} <= ${requiredFreeSpaceBigSur}" ) -eq 1 ]]; then
 		finalResult+=" / Insufficient Storage"
