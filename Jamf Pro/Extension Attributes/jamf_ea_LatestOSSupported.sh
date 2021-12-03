@@ -48,7 +48,7 @@
 	systemRAM=$( /usr/sbin/sysctl -n hw.memsize )
 	RAMUpgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs )
 # Get free space on the boot disk
-	systemFreeSpace=$( /usr/sbin/diskutil info / | /usr/bin/awk -F '[()]' '/Free Space|Available Space/ {print $2}' | /usr/bin/cut -d " " -f1 )
+	systemFreeSpace=$( osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
 
 ##################################################
 # Setup Functions
