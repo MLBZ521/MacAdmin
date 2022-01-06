@@ -1,13 +1,11 @@
 #!/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3
 
 """
-
 Script Name:  Install-BomgarJumpClient.py
 By:  Zack Thompson / Created:  3/2/2020
-Version:  1.4.1 / Updated:  11/29/2021 / By:  ZT
+Version:  1.4.2 / Updated:  1/4/2022 / By:  ZT
 
 Description:  Installs a Bomgar Jump Client with the passed parameters
-
 """
 
 import argparse
@@ -18,58 +16,76 @@ import re
 import shlex
 import subprocess
 import sys
-import urllib
 from Cocoa import NSBundle
 from SystemConfiguration import SCDynamicStoreCopyConsoleUser
 from xml.etree import ElementTree
 
-def runUtility(command):
-    """A helper function for subprocess.
+import requests
+
+def execute_process(command):
+    """
+    A helper function for subprocess.
+
     Args:
-        command:  Must be a string.
+        command (str):  The command line level syntax that would be written in a 
+            shell script or a terminal window
+
     Returns:
-        Results in a dictionary.
+        dict:  Results in a dictionary
     """
 
-    # Validate that command is a string
+    # Validate that command is not a string
     if not isinstance(command, str):
-        raise TypeError('Command must be in a str')
+        raise TypeError('Command must be a str type')
 
+    # Format the command
     command = shlex.split(command)
 
-    process = subprocess.Popen( command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False )
+    # Run the command
+    process = subprocess.Popen( command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+        shell=False, universal_newlines=True )
     (stdout, stderr) = process.communicate()
 
-    result_dict = {
+    return {
         "stdout": (stdout).strip(),
         "stderr": (stderr).strip() if stderr != None else None,
-        "status": process.returncode,
+        "exitcode": process.returncode,
         "success": True if process.returncode == 0 else False
     }
 
-    return result_dict
 
-# Credit to (Mikey Mike/Froger/Pudquick/etc) for this logic:  https://gist.github.com/pudquick/c7dd1262bd81a32663f0
 def get_system(attribute):
     """A helper function to get specific system attributes.
+
+    Credit:  Mikey Mike/Froger/Pudquick/etc
+    Source:  https://gist.github.com/pudquick/c7dd1262bd81a32663f0
+
     Args:
         attribute:  The system attribute desired.
+
     Returns:
         stdout:  The system attribute value.
     """
 
     IOKit_bundle = NSBundle.bundleWithIdentifier_('com.apple.framework.IOKit')
-    functions = [("IOServiceGetMatchingService", b"II@"), ("IOServiceMatching", b"@*"), ("IORegistryEntryCreateCFProperty", b"@I@@I"),]
+    functions = [
+        ("IOServiceGetMatchingService", b"II@"), 
+        ("IOServiceMatching", b"@*"), 
+        ("IORegistryEntryCreateCFProperty", b"@I@@I")
+    ]
     objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
 
     def io_key(keyname):
-        return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0, IOServiceMatching("IOPlatformExpertDevice".encode("utf-8"))), keyname, None, 0)
+        return IORegistryEntryCreateCFProperty(
+            IOServiceGetMatchingService(
+                0, IOServiceMatching(
+                    "IOPlatformExpertDevice".encode("utf-8"))), keyname, None, 0)
 
-    def get_hardware_uuid():
-        return io_key("IOPlatformUUID".encode("utf-8"))
+    # def get_hardware_uuid():
+    #     return io_key("IOPlatformUUID".encode("utf-8"))
 
     def get_hardware_serial():
-        return io_key("IOPlatformSerialNumber".encode("utf-8"))
+        return io_key("IOPlatformSerialNumber")
 
     # def get_board_id():
     #     return str(io_key("board-id".encode("utf-8"))).rstrip('\x00')
@@ -97,14 +113,13 @@ def get_model(serial_number):
         print("Unexpected serial number length:  {}".format(serial_number))
         return ""
 
-    lookup_url = "https://support-sp.apple.com/sp/product?cc={lookup_code}".format(lookup_code=lookup_code)
+    lookup_url = "https://support-sp.apple.com/sp/product?cc={}".format(lookup_code)
 
-    xml = urllib.urlopen(lookup_url).read()
+    xml = requests.get(lookup_url).text
 
     try:
         tree = ElementTree.fromstringlist(xml)
-        model_friendly = tree.find('.//configCode').text
-        return model_friendly
+        return tree.find('.//configCode').text
 
     except ElementTree.ParseError as err:
         print("Failed to retrieve model name:  {}".format(err.strerror))
@@ -118,10 +133,10 @@ def mount(pathname):
         stdout:  Returns the path to the mounted volume.
     """
 
-    mount_cmd = "/usr/bin/hdiutil attach -plist -mountrandom /private/tmp -nobrowse {}".format(pathname)
-    # print("mount_cmd: {}".format(mount_cmd))
+    mount_cmd = "/usr/bin/hdiutil attach -plist -mountrandom /private/tmp -nobrowse {}".format(
+        pathname)
 
-    results = runUtility(mount_cmd)
+    results = execute_process(mount_cmd)
 
     if not results['success']:
         print("ERROR:  failed to mount:  {}".format(pathname))
@@ -130,8 +145,7 @@ def mount(pathname):
         sys.exit(2)
 
     # Read output plist.
-    xml = plistlib.readPlistFromString(results['stdout'])
-    # xml = plistlib.readPlistFromString(pliststr.encode())  # Python3
+    xml = plistlib.loads(results['stdout'].encode())
 
     # Find mount point.
     for part in xml.get("system-entities", []):
@@ -179,21 +193,19 @@ def main():
     jumpKey = args.key
 
     # Set the Jump Client Group
-    if args.tag != None:
-        jumpGroup = "--jc-jump-group 'jumpgroup:{}'".format(args.group)
-    else:
+    if args.group is None:
         jumpGroup = ""
+    else:
+        jumpGroup = "--jc-jump-group 'jumpgroup:{}'".format(args.group)
 
     # Set the Jump Client Tag
-    if args.tag != None:
-        jumpTag = "--jc-tag '{}'".format(args.tag)
-    else:
+    if args.tag is None:
         jumpTag = ""
+    else:
+        jumpTag = "--jc-tag '{}'".format(args.tag)
 
     # Set the Jump Client Name
-    if args.name != None:
-        jumpName = "--jc-name '{}'".format(args.name)
-    else:
+    if args.name is None:
         # Get the Console User
         username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]
         console_user = [username,""][username in [u"loginwindow", None, u""]]
@@ -201,18 +213,17 @@ def main():
         # Verify that a console user was present
         if console_user:
             # Get the Console Users' Full Name
-            full_name_cmd = "/usr/bin/dscl . -read \"/Users/{console_user}\" dsAttrTypeStandard:RealName".format(console_user=console_user)
-            full_name_results = runUtility(full_name_cmd)
+            full_name_cmd = "/usr/bin/dscl . -read \"/Users/{}\" dsAttrTypeStandard:RealName".format(
+                console_user)
+            full_name_results = execute_process(full_name_cmd)
 
             if full_name_results['success']:
                 full_name = re.sub("RealName:\s+", "", full_name_results['stdout'])
 
-                if "Setup User (_mbsetupuser)" != "{full_name} ({console_user})".format(full_name=full_name, console_user=console_user):
-
-                    jumpName = "--jc-name '{full_name} ({console_user})'".format(full_name=full_name, console_user=console_user)
+                if "Setup User (_mbsetupuser)" != "{} ({})".format(full_name, console_user):
+                    jumpName = "--jc-name '{} ({})'".format(full_name, console_user)
 
                 else:
-
                     jumpName = ""
 
             else:
@@ -222,37 +233,43 @@ def main():
         else:
             # If a console user was not present, set to none
             jumpName = ""
+    else:
+        jumpName = "--jc-name '{}'".format(args.name)
 
     # Set the Jump Client Comments
-    if args.comments == None:
+    if args.comments is None:
         serial_number = get_system("serial")
         model_friendly = get_model(serial_number)
-        jumpComments = "--jc-comments '{model_friendly}, {serial_number}'".format(model_friendly=model_friendly, serial_number=serial_number)
+        jumpComments = "--jc-comments '{}, {}'".format(model_friendly, serial_number)
     else:
         jumpComments = "--jc-comments '{}'".format(args.comments)
 
     # Set the Jump Client Site
-    if args.site != None:
-        jumpSite = "--jc-public-site-address '{}'".format(args.site)
-    else:
+    if args.site is None:
         jumpSite = ""
+    else:
+        jumpSite = "--jc-public-site-address '{}'".format(args.site)
 
     # Set the Jump Client Console User Not Present Policy
-    if args.policy_not_present != None:
-        jumpPolicyNotPresent = "--jc-session-policy-not-present '{}'".format(args.policy_not_present)
-    else:
+    if args.policy_not_present is None:
         jumpPolicyNotPresent = ""
+    else:
+        jumpPolicyNotPresent = "--jc-session-policy-not-present '{}'".format(
+            args.policy_not_present)
 
     # Set the Jump Client Console User Present Policy
-    if args.policy_present != None:
-        jumpPolicyPresent = "--jc-session-policy-present '{}'".format(args.policy_present)
-    else:
+    if args.policy_present is None:
         jumpPolicyPresent = ""
+    else:
+        jumpPolicyPresent = "--jc-session-policy-present '{}'".format(args.policy_present)
 
     ##################################################
     # Define Variables
 
-    parameters = [ jumpGroup, jumpSite, jumpPolicyNotPresent, jumpTag, jumpName, jumpComments, jumpPolicyPresent ]
+    parameters = [ 
+        jumpGroup, jumpSite, jumpPolicyNotPresent, jumpTag, 
+        jumpName, jumpComments, jumpPolicyPresent 
+    ]
     install_parameters = " ".join( filter( None, parameters ) )
     bomgar_dmg = ""
     mount_point = ""
@@ -287,10 +304,11 @@ def main():
 
         if os.path.exists(install_app):
             # Build the command.
-            install_cmd = "'{install_app}/Contents/MacOS/sdcust' --silent {install_parameters}".format(install_app=install_app, install_parameters=install_parameters)
+            install_cmd = "'{}/Contents/MacOS/sdcust' --silent {}".format(
+                install_app, install_parameters)
             print("install_cmd:  {}".format(install_cmd))
 
-            results = runUtility(install_cmd)
+            results = execute_process(install_cmd)
 
             if not results['success']:
                 print("ERROR:  failed to install Bomgar Jump Client")
@@ -307,8 +325,8 @@ def main():
 
     finally:
 
-        unmount_cmd = "/usr/bin/hdiutil detach {mount_point}".format(mount_point=mount_point)
-        results = runUtility(unmount_cmd)
+        unmount_cmd = "/usr/bin/hdiutil detach {}".format(mount_point)
+        results = execute_process(unmount_cmd)
 
         if not results['success']:
             print("ERROR:  failed to mount:  {}".format(mount_point))
