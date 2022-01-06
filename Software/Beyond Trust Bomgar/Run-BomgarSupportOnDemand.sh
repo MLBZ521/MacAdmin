@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Run-BomgarSupportOnDemand.sh
 # By:  Zack Thompson / Created:  5/11/2020
-# Version:  1.1.0 / Updated:  5/6/2021 / By:  ZT
+# Version:  1.2.0 / Updated:  1/6/2022 / By:  ZT
 #
 # Description:  Utilizing the Bomgar API, downloads a Bomgar Support Client and assigns it to the
 #               supplied team's queue based on the passed parameters.
@@ -104,6 +104,14 @@ delete_file() {
 
 }
 
+lookup_model() {
+
+	# Get the Friendly Model Name from Apple
+/usr/bin/curl -s "https://support-sp.apple.com/sp/product?cc=${1}" | 
+	/usr/bin/xmllint --format - | xpath_tool "/root/configCode/text()" 2>/dev/null
+
+}
+
 ##################################################
 # Bits staged...
 
@@ -111,21 +119,21 @@ delete_file() {
 serialNumber=$( /usr/sbin/ioreg -c IOPlatformExpertDevice -d 2 | 
 	/usr/bin/awk -F\" '/IOPlatformSerialNumber/{print $(NF-1)}' )
 
-# Determine the length and get the required characters
-if [[ ${#serialNumber} -eq 12 ]]; then
+# Determine the length and get the required characters and then get the Friendly Model Name
+if [[ ${#serialNumber} -eq 10 ]]; then
 
-	serialIdentifer=$( echo "${serialNumber}" | /usr/bin/tail -c 5 )
+	friendlyModelName=$( /usr/libexec/PlistBuddy -c "Print 0:product-name" \
+		/dev/stdin <<< "$(/usr/sbin/ioreg -arc IOPlatformDevice -k product-name)" )
+
+elif [[ ${#serialNumber} -eq 12 ]]; then
+
+	friendlyModelName=$( lookup_model "$( echo "${serialNumber}" | /usr/bin/tail -c 5 )" )
 
 elif [[ ${#serialNumber} -eq 11 ]]; then
 
-	serialIdentifer=$( echo "${serialNumber}" | /usr/bin/tail -c 4 )
+	friendlyModelName=$( lookup_model "$( echo "${serialNumber}" | /usr/bin/tail -c 4 )" )
 
 fi
-
-# Get the Friendly Model Name
-friendlyModelName=$( /usr/bin/curl -s \
-	"https://support-sp.apple.com/sp/product?cc=${serialIdentifer}" | 
-	/usr/bin/xmllint --format - | xpath_tool "/root/configCode/text()" 2>/dev/null )
 
 # Assign Friendly Model Name and Serial Number to a Variable
 customerDetails="${friendlyModelName}, ${serialNumber}"
