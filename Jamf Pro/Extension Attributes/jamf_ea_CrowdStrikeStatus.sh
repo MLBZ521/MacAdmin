@@ -4,13 +4,13 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.6.0 / Updated:  12/1/2021 / By:  ZT
+# Version:  2.7.0 / Updated:  1/21/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
 ###################################################################################################
 
-echo "Checking the Crowd Strike configuration..."
+echo "Checking the CrowdStrike Falcon Sensor configuration..."
 
 ##################################################
 ## Set variables for your environment
@@ -27,13 +27,17 @@ python_path=""
 remediate_network_filter="true"
 
 # Set whether CrowdStrike Firmware Analysis is enabled in your environment ( true | false ).
-csFirmwareAnalysisEnable="false"
+csFirmwareAnalysisEnabled="false"
 
 # Define Variables for each item that we want to check for
 expectedCSCustomerID="12345678-90AB-CDEF-1234-567890ABCDEF"
 
 # The number of days before report device has not connected to the CS Cloud.
 lastConnectedVariance=7
+
+# The number of attempts to get information from the 
+#    Falcon Service with a ten second sleep in-between.
+retry=10
 
 ##################################################
 # Functions
@@ -57,7 +61,7 @@ report_result() {
 getFalconctlStats() {
 
     # Get the current stats.
-    "${1}" stats agent_info Communications
+    "${1}" stats agent_info Communications 2>&1
     # Will eventually move to the --plist format, once it's fully supported
     # "${1}" stats agent_info Communications --plist
 
@@ -133,29 +137,36 @@ falconctlStats=$( getFalconctlStats "${falconctl}" )
 # Get Falcon Sensor full version string
 falconctlVersion=$( getCSFVersion "${falconctlStats}" )
 
+# Ensure falconctl stats command was successful and a version was obtained
+while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" || "${falconctlStats}" == "" || "${falconctlVersion}" == "" ]]; do
+
+    # "Error: Error while accessing Falcon service"
+        # This can happen if the Falcon Sensor is not loaded
+        # This could be due to an in-progress upgrade or other reasons (Malware, user, etc.)
+
+    # echo "Failed to get required details, sleeping and trying again..."
+
+    if [[ $retry == 0 ]]; then
+
+        # Failed to gather required info from Falcon service within allotted time
+        report_result "Falcon Sensor is not loaded"
+
+    fi
+
+    retry=$(( retry - 1 ))
+    sleep 10
+
+    # Get falconctl stats
+    falconctlStats=$( getFalconctlStats "${falconctl}" )
+
+    # Get Falcon Sensor full version string
+    falconctlVersion=$( getCSFVersion "${falconctlStats}" )
+
+done
+
 # Get the CS Major.Minor Version string
 csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
 
-
-# if [[ -z "${csMajorMinorVersion}" ]]; then
-
-#     # Get the Crowd Strike version from sysctl for versions prior to v5.36.
-#     falconctlVersion=$( /usr/sbin/sysctl -n cs.version )
-#     csVersionExitCode=$?
-
-#     if [[ $csVersionExitCode -eq 0 ]]; then
-
-#         # Get the CS Major.Minor Version string
-#         csMajorMinorVersion=$( getCSMajorMinorVersion "version: ${falconctlVersion}" )
-#         falconctl="${falconctl_old_location}"
-
-#     else
-
-#         returnResult+="Not Running;"
-
-#     fi
-
-# fi
 
 # Check the Locale; this will affect the output of falconctl stats
 lib_locale=$( /usr/bin/defaults read "/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
@@ -184,16 +195,10 @@ if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 && $( /usr/bin/bc
 
 fi
 
-
 # Check CS Version
 if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.18" ) -eq 1 ]]; then
 
     report_result "Sensor Version Not Supported"
-
-# elif [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 5.36" ) -eq 1 ]]; then
-
-#     # Get the customer ID to compare.
-#     csCustomerID=$( /usr/sbin/sysctl -n cs.customerid 2>&1 )
 
 else
 
@@ -270,8 +275,10 @@ with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plis
 object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
 print(plist_contents.get("$objects")[object_index]["Enabled"])' 2> /dev/null )
 
-        if [[ $? != 0 ]]; then
-            
+    filter_state_exit_code=$?
+
+        if [[ $filter_state_exit_code != 0 ]]; then
+
             # If the Python command fails for any reason, fall back to defaults
             filter_state=$( /usr/bin/defaults read /Library/Preferences/com.apple.networkextension | /usr/bin/awk "/com.crowdstrike.falcon.App/,/identifier/" | /usr/bin/grep "Enabled" | /usr/bin/sed "s/[^0-9]//g" )
 
@@ -330,43 +337,44 @@ if [[ "${sipStatus}" == "enabled" ]]; then
         if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
 
             extensions=$( /usr/bin/systemextensionsctl list | /usr/bin/grep "X9E956P446" )
-            # Multiple extension versions can show up in the list collected above, only care to check against the sensor version installed
-            compare_extension_version=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
-            # echo "falconctlVersion:  ${falconctlVersion}"
-            # echo "Compared version:  ${compare_extension_version}"
+            # echo -e "system_extensions:\n${extensions}"
 
-            declare -a extension_status
+            # Multiple extension versions can show up in the list collected above, check only against the sensor version installed
+            falconclt_version_in_sysext_format=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
+            # echo "falconctlVersion:  ${falconctlVersion}"
+            # echo "Match SysExt version to:  ${falconclt_version_in_sysext_format}"
 
             # Loop through the extensions found
             while IFS=$'\n' read -r extension; do
+                # echo "extension:  ${extension}"
 
+                # Get extension version
                 extension_version=$( echo "${extension}" |  /usr/bin/awk -F '\\(|\\)' '{print $2}' )
                 # echo "extension_version:  ${extension_version}"
 
-                if [[ "${extension_version}" == "${compare_extension_version}" ]]; then
+                # Check if extesion matches the Falcon.app's version
+                if [[ "${extension_version}" == "${falconclt_version_in_sysext_format}" ]]; then
 
-                    extension_status+=( "$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )" )
+                    # If the versions match, get the extension's current state
+                    extension_state=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
+                    # echo "extension_state:  ${extension_state[*]}"
+
+                    # Check if the extensions state is desired state, break if true
+                    if [[ "${extension_state}" == "activated enabled" || "${extension_state}" == "activated waiting to upgrade" ]]; then
+
+                        extension_loaded="true"
+                        break
+
+                    fi
 
                 fi
 
             done < <(echo "${extensions}")
 
-            last_result="${extension_status[${#extension_status[@]} - 1]}"
-            # echo "Number of matching extension status result:  ${#extension_status[@]}"
-            # echo "Last extension status result:  ${last_result}"
+            # Check if the extension is managed if it is not loaded
+            if [[ "${extension_loaded}" != "true" ]]; then
 
-            # Verify Extension is Activated and Enabled
-            if [[ "${last_result}" != "activated enabled" ]]; then
-
-                if [[ -n "${last_result}" ]]; then
-
-                    returnResult+=" SysExt: ${last_result};"
-
-                else
-
-                    returnResult+=" SysExt not loaded"
-
-                fi
+                returnResult+=" SysExt not loaded"
 
                 teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
                 extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
@@ -398,11 +406,11 @@ if [[ "${sipStatus}" == "enabled" ]]; then
     # Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
     ## Support for 10.13 is dropping at end of 2020!
     ### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
-    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnable}" == "true" ) ]]; then
+    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
 
-    # A KEXT will be used on 10.15.4+ until Apple resolves an System Extension issue per CrowdStrike.
+    # A KEXT will be used on 10.15.4 - 10.15.x until Apple resolves an System Extension issue per CrowdStrike.
     ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
-    # if [[ ( $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 15.3" ) -eq 1 ) || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnable}" == "true" ) ]]; then
+    # if [[ ( $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 15.3" ) -eq 1 ) || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
 
         # Get how many KEXTs are loaded.
         kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
