@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  2.3.0 / Updated:  3/5/2021 / By:  ZT
+# Version:  2.4.0 / Updated:  8/23/2021 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
@@ -72,7 +72,6 @@ setPermsLocalLicense() {
 	/bin/chmod 644 "${2}"
 
 }
-
 
 ##################################################
 # Turn on case-insensitive pattern matching
@@ -238,14 +237,14 @@ else
 		if [[ $licenseMechanism == "Network" ]]; then
 			echo "Configuring the License Manager Server for version:  ${versionSPSS}"
 
-			if [[ "${versionSPSS}" == "27" ]]; then
+			if [[ $( /usr/bin/bc <<< "${versionSPSS} >= 27" ) -eq 1 ]]; then
 
 				# Set the Network License file path
 				networkLicense="${installPath}/Resources/Activation/commutelicense.ini"
 				# Set the Local License file path
 				localLicense="${installPath}/Resources/Activation/lservrc"
 
-				# Apply new licensing method; this information is stored in a different file, but instead of directly injecting it...  Let's follow the expect process this time.
+				# Apply new licensing method; this information is stored in a different file, but instead of directly injecting it...  Let's follow the expected process this time.
 				"${installPath}/Resources/Activation/licenseactivator" LSHOST="${licenseManager}" COMMUTE_MAX_LIFE="${commuterDays}"
 
 			else
