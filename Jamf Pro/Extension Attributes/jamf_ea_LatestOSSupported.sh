@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  1.12.1 / Updated:  2/18/2022 / By:  ZT
+# Version:  1.12.2 / Updated:  2/18/2022 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -109,10 +109,10 @@ MacBookProModelCheck() {
 
 }
 
-# Apple just had to make one iMac model (14,x) support Big Sur...and one 16,x support Monterey...
+# Apple just had to make one iMac model (14,x) support Big Sur...
 iMacModelCheck() {
 
-	if [[ $modelMajorVersion -ge $6 && $modelMinorVersion -ge 2 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
+	if [[ $modelMajorVersion -ge $6 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Monterey"
 	elif [[ $modelMajorVersion -gt $5 && ( $(/usr/bin/bc <<< "${osMajorVersion} >= 11") -eq 1 || $(/usr/bin/bc <<< "${osMinorPatchVersion} >= 9") -eq 1 ) ]]; then
 		echo "Big Sur"
