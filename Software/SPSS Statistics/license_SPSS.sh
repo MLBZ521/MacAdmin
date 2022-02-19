@@ -3,13 +3,16 @@
 ###################################################################################################
 # Script Name:  license_SPSS.sh
 # By:  Zack Thompson / Created:  1/3/2018
-# Version:  2.4.0 / Updated:  8/23/2021 / By:  ZT
+# Version:  2.5.0 / Updated:  9/7/2021 / By:  ZT
 #
 # Description:  This script applies the license for SPSS applications.
 #
 ###################################################################################################
 
 echo "*****  License SPSS process:  START  *****"
+
+# Define the minimum supported version
+minimum_supported_version="26"
 
 ##################################################
 # Define Functions
@@ -28,6 +31,23 @@ exitCheck() {
 		exit 0
 
 	fi
+}
+
+status_code_check() {
+
+	if [[ $1 != 0 ]]; then
+
+		echo "Exit Code:  ${1}"
+		echo "Command results:  ${2}"
+		echo "*****  License SPSS process:  FAILED  *****"
+		exit $1
+
+	elif [[ -n $2 ]]; then
+
+		echo "Command results:  ${2}"
+
+	fi
+
 }
 
 renameLocalLicense(){
@@ -130,6 +150,10 @@ LicenseInfo() {
 		# Determine License Code
 		case "${versionSPSS}" in
 
+			"28" )
+				licenseCode="2812345678910"
+			;;
+
 			"27" )
 				licenseCode="2712345678910"
 			;;
@@ -163,6 +187,10 @@ LicenseInfo() {
 
 		# Determine License Code
 		case "${versionSPSS}" in
+
+			"28" )
+				licenseCode="2812345678911"
+			;;
 
 			"27" )
 				licenseCode="2712345678911"
@@ -201,6 +229,8 @@ exitCode=0
 # Find all installed versions of SPSS.
 appPaths=$( /usr/bin/find -E /Applications -iregex ".*[/](SPSS) ?(Statistics) ?([0-9]{2})?[.]app" -type d -prune )
 
+echo -e "Found appPaths:  \n\n${appPaths}"
+
 # Verify at least one version of SPSS was found.
 if [[ -z "${appPaths}" ]]; then
 
@@ -225,6 +255,11 @@ else
 		# Get the SPSS version
 		versionSPSS=$( /usr/bin/defaults read "${spssContents}/Info.plist" CFBundleShortVersionString | /usr/bin/awk -F "." '{print $1}' )
 
+		if [[ $( /usr/bin/bc <<< "${versionSPSS} < ${minimum_supported_version}" ) -eq 1 ]]; then
+			echo "WARNING:  SPSS Version ${versionSPSS} is no longer supported.  Please upgrade to a newer version."
+			continue
+		fi
+
 		# Function LicenseInfo
 		LicenseInfo
 
@@ -245,7 +280,9 @@ else
 				localLicense="${installPath}/Resources/Activation/lservrc"
 
 				# Apply new licensing method; this information is stored in a different file, but instead of directly injecting it...  Let's follow the expected process this time.
-				"${installPath}/Resources/Activation/licenseactivator" LSHOST="${licenseManager}" COMMUTE_MAX_LIFE="${commuterDays}"
+				activation_results=$( "${installPath}/Resources/Activation/licenseactivator" LSHOST="${licenseManager}" COMMUTE_MAX_LIFE="${commuterDays}" )
+				activation_exit_status=$?
+				status_code_check $activation_exit_status "${activation_results}"
 
 			else
 
@@ -262,7 +299,6 @@ else
 
 			# If the local license file exists, disable it.
 			renameLocalLicense "${localLicense}" "Disabling local license..."
-
 
 		# Verify a license code was defined for this version
 		elif [[ $licenseMechanism == "Local" && -n "${licenseCode}" ]]; then
