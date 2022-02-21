@@ -2,7 +2,7 @@
 # set -x
 
 ####################################################################################################
-# Script Name:  jamf_ea_LatestOSSupported.sh
+# Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
 # Version:  2.0.0 / Updated:  2/21/2022 / By:  ZT
 #
