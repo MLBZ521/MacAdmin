@@ -214,6 +214,11 @@ storage_check() {
 	# Get free space on the boot disk
 	storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
 
+	# Workaround for NSURLVolumeAvailableCapacityForImportantUsageKey returning 0 if no user is logged in - use NSURLVolumeAvailableCapacityKey instead
+	if [[ ${storage_free_space} -eq 0 ]]; then
+		storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
+	fi
+	
 	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
 		"Monterey" )
