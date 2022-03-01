@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.0.0 / Updated:  2/21/2022 / By:  ZT
+# Version:  2.1.0 / Updated:  2/28/2022 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -307,9 +307,46 @@ mac_model=$( /usr/sbin/sysctl -n hw.model )
 
 # Check for compatibility
 model_result=$( model_check "${mac_model}" )
-os_result=$( os_check  "${model_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" "${mac_model}" )
-ram_check_results=$( ram_check "${os_result}" )
-storage_check_results=$( storage_check "${os_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
 
-echo "<result>${ram_check_results}${storage_check_results}</result>"
+case "${model_result}" in
+	"Monterey" )
+		version_string="12"
+	;;
+	"Big Sur" )
+		version_string="11"
+	;;
+	"Catalina" )
+		version_string="10.15"
+	;;
+	"Mojave" )
+		version_string="10.14"
+	;;
+	"High Sierra" )
+		version_string="10.13"
+	;;
+	"Sierra" )
+		version_string="10.12"
+	;;
+	"El Capitan" )
+		version_string="10.11"
+	;;
+esac
+
+# Check to see if device is already running the latest supported OS
+# If so, no reason to check further specifications
+if [[ "${version_string}" -eq "${current_os_major}" || 
+	  "${version_string}" -eq "${current_os_major}.${current_os_minor}" ]]; then
+
+	echo "<result>${model_result}</result>"
+
+else
+
+	os_result=$( os_check  "${model_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" "${mac_model}" )
+	ram_check_results=$( ram_check "${os_result}" )
+	storage_check_results=$( storage_check "${os_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
+
+	echo "<result>${ram_check_results}${storage_check_results}</result>"
+
+fi
+
 exit 0
