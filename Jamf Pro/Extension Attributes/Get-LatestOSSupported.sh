@@ -139,7 +139,12 @@ os_check() {
 }
 
 check_ram_upgradeable() {
-	/usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs 2&> /dev/null
+	ram_upgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs 2&> /dev/null )
+	# M1 Macs don't return the "Upgradeable Memory:" attribute as of early 2022
+	if [[ -z ${ram_upgradeable} ]]; then
+		ram_upgradeable="No"
+	fi
+	echo "${ram_upgradeable}"
 }
 
 # Check if the current RAM meets specs
