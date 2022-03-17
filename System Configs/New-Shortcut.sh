@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ###################################################################################################
-# Script Name:  create_Shortcut.sh
+# Script Name:  New-Shortcut.sh
 # By:  Zack Thompson / Created:  3/26/2018
-# Version:  1.2.0 / Updated:  11/15/2021 / By:  ZT
+# Version:  1.3.0 / Updated:  3/17/2022 / By:  ZT
 #
 # Description:  This script will create a website shortcut in a specified location with a specified icon.
 #
@@ -13,15 +13,19 @@ echo "*****  Create Shortcut process:  START  *****"
 
 ##################################################
 # Define Variables
+
 # If using Jamf, change these values to:  4, 5, 6, 7
-	fileName="${1}"
-	URL="${2}"
-	icon="${3}"
-	location="${4}"
+fileName="${1}"
+URL="${2}"
+icon="${3}"
+location="${4}"
 
 # Get the current user
-	currentUser=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username + "\n");')
-	defaultLocation="/Users/${currentUser}/Library/Shortcuts"
+currentUser=$( /usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+defaultLocation="/Users/${currentUser}/Library/Shortcuts"
+
+# Set custom Python binary path
+python_binary="/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3"
 
 ##################################################
 # Setup Functions
@@ -96,7 +100,7 @@ fi
 
 # Set the icon on the shortcut file.
 echo -e "\t Adding the requested icon to shortcut..."
-/usr/bin/python -c "import Cocoa; import sys; Cocoa.NSWorkspace.sharedWorkspace().setIcon_forFile_options_(Cocoa.NSImage.alloc().initWithContentsOfFile_(sys.argv[1].decode('utf-8')), sys.argv[2].decode('utf-8'), 0) or sys.exit(\"Unable to set file icon\")" "${icon}" "${defaultLocation}/${fileName}.url"
+"${python_binary}" -c "import Cocoa, sys; Cocoa.NSWorkspace.sharedWorkspace().setIcon_forFile_options_(Cocoa.NSImage.alloc().initWithContentsOfFile_(sys.argv[1].decode('utf-8')), sys.argv[2].decode('utf-8'), 0) or sys.exit(\"Unable to set file icon\")" "${icon}" "${defaultLocation}/${fileName}.url"
 
 echo ""
 # Check where to place the file.
