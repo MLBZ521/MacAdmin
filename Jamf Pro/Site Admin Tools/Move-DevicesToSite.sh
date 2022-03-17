@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ###################################################################################################
-# Script Name:  jamf_MoveDevicesToSite.sh
+# Script Name:  Move-DevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.2.1 / Updated:  11/29/2021 / By:  ZT
+# Version:  1.3.0 / Updated:  3/17/2022 / By:  ZT
 #
 # Description:  This script allows Site Admins to move devices between Sites that they have perms to.
 #
@@ -13,6 +13,9 @@ echo "*****  MoveDevicesToSite process:  START  *****"
 
 ##################################################
 # Define Variables
+
+# Set custom Python binary path
+python_binary="/opt/ManagedFrameworks/Python.framework/Versions/Current/bin/python3"
 
 # JPS URL
 jamfPS=$( /usr/bin/defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url | /usr/bin/awk -F "/$" '{print $1}' )
@@ -145,14 +148,14 @@ EndOfScript
 
 getSites() {
 	# Create a token based on user provided credentials
-	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | /usr/bin/python -c "import sys,json; print json.load(sys.stdin)['token']")
+	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | "${python_binary}" -c "import sys,json; print json.load(sys.stdin)['token']")
 
 	echo "Getting a list of Sites..."
 	# GET All User Details
 	allDetails=$(/usr/bin/curl --silent --show-error --fail --output - --header "Accept: application/json" --header "Authorization: jamf-token ${authToken}" --request GET ${apiGetDetails})
 
 	# Get a list of all the Site IDs that the Site Admin has Enroll Permissions too
-	siteIDs=$(echo "${allDetails}" | /usr/bin/python -c '
+	siteIDs=$(echo "${allDetails}" | "${python_binary}" -c '
 import sys, json
 
 objects = json.load(sys.stdin)
@@ -164,7 +167,7 @@ for key in objects["accountGroups"]:
 
 # For each Site ID, get the Site Name
 	for siteID in $siteIDs; do
-		siteName=$(echo "${allDetails}" | /usr/bin/python -c "
+		siteName=$(echo "${allDetails}" | "${python_binary}" -c "
 import sys, json
 
 objects = json.load(sys.stdin)
