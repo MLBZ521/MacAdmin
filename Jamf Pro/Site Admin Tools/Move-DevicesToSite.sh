@@ -3,9 +3,9 @@
 ###################################################################################################
 # Script Name:  Move-DevicesToSite.sh
 # By:  Zack Thompson / Created: 4/19/2018
-# Version:  1.3.0 / Updated:  3/17/2022 / By:  ZT
+# Version:  1.3.1 / Updated:  3/21/2022 / By:  ZT
 #
-# Description:  This script allows Site Admins to move devices between Sites that they have perms to.
+# Description:  This script allows Site Admins to move devices between Sites that they have permissions too.
 #
 ###################################################################################################
 
@@ -148,7 +148,7 @@ EndOfScript
 
 getSites() {
 	# Create a token based on user provided credentials
-	authToken=$(/usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | "${python_binary}" -c "import sys,json; print json.load(sys.stdin)['token']")
+	authToken=$( /usr/bin/curl --silent --show-error --fail --user "${siteAdminUser}:${siteAdminPassword}" --output - --header "Accept: application/json" --request POST ${apiGetToken} | "${python_binary}" -c "import sys, json; print(json.load(sys.stdin)['token'])" )
 
 	echo "Getting a list of Sites..."
 	# GET All User Details
