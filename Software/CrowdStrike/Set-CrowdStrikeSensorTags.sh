@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Set-CrowdStrikeSensorTags.sh
 # By:  Zack Thompson / Created:  3/2/2021
-# Version:  1.5.0 / Updated:  3/22/2021 / By:  ZT
+# Version:  1.5.1 / Updated:  3/21/2022 / By:  ZT
 #
 # Description:  This script sets the CrowdStrike Sensor Group Tags.
 #
@@ -255,14 +255,14 @@ if [[ "${current_tags[*]}" == *"mojave_hold"* || ( "${os_major_version}" == 10 &
 
 fi
 
+echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags}"
+
 # Apply tags if different
 if [[ "${current_tags}" == "${sensor_tags}" ]]; then
 
     echo "NOTICE:  Sensors tags are current, no change required."
 
 else
-
-    echo -e "Current Sensor Tags:  ${current_tags} \nNew Sensor Tags:  ${sensor_tags}"
 
     echo "Applying sensor tags..."
     exit_status=$( "${falconctl}" grouping-tags set "${sensor_tags}" 2>&1 )
