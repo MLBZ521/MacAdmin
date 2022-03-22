@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.7.0 / Updated:  1/21/2022 / By:  ZT
+# Version:  2.8.0 / Updated:  3/21/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -68,14 +68,14 @@ getFalconctlStats() {
 }
 
 # Get the CS:F Full Version string
-getCSFVersion(){
+getCSFVersion() {
 
     echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs
 
 }
 
 # Get the CS Major.Minor Version string
-getCSMajorMinorVersion(){
+getCSMajorMinorVersion() {
 
     echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs | /usr/bin/awk -F '.' '{print $1"."$2}'
 
@@ -87,6 +87,210 @@ checkLastConnection() {
     if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$( echo "${1}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g' )" +"%s" ) -lt $( /bin/date -j -v-"${2}"d +"%s" ) ]]; then
 
         returnResult+=" Last Connected:  ${1};"
+
+    fi
+
+}
+
+sip_status() {
+
+    # Get the status of SIP, if SIP is disabled, no need to check if SysExts, KEXTs, nor FDA are enabled.
+    /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{print $2}' | /usr/bin/awk -F '.' '{print $1}'
+
+}
+
+
+check_system_extension() {
+
+    ##### System Extension Verification #####
+    # Check if the OS version is 10.15.4 or newer, if it is, check if the System Extension is enabled.
+    if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+    # A KEXT will be used on 10.15.4+ until Apple resolves an System Extension issue per CrowdStrike.
+    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
+    # if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 15.4" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+
+        if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
+
+            extensions=$( /usr/bin/systemextensionsctl list | /usr/bin/grep "X9E956P446" )
+            # echo -e "system_extensions:\n${extensions}"
+
+            # Multiple extension versions can show up in the list collected above, check only against the sensor version installed
+            falconclt_version_in_sysext_format=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
+            # echo "falconctlVersion:  ${falconctlVersion}"
+            # echo "Match SysExt version to:  ${falconclt_version_in_sysext_format}"
+
+            # Loop through the extensions found
+            while IFS=$'\n' read -r extension; do
+                # echo "extension:  ${extension}"
+
+                # Get extension version
+                extension_version=$( echo "${extension}" |  /usr/bin/awk -F '\\(|\\)' '{print $2}' )
+                # echo "extension_version:  ${extension_version}"
+
+                # Check if extension matches the Falcon.app's version
+                if [[ "${extension_version}" == "${falconclt_version_in_sysext_format}" ]]; then
+
+                    # If the versions match, get the extension's current state
+                    extension_state=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
+                    # echo "extension_state:  ${extension_state[*]}"
+
+                    # Check if the extensions state is desired state, break if true
+                    if [[ "${extension_state}" == "activated enabled" || "${extension_state}" == "activated waiting to upgrade" ]]; then
+
+                        extension_enabled="true"
+                        break
+
+                    fi
+
+                fi
+
+            done < <(echo "${extensions}")
+
+            if [[ "${extension_enabled}" != "true" ]]; then
+
+                returnResult+=" SysExt not activated;"
+
+            fi
+
+            # Check if the extension is managed if it is not activated and enabled
+            teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
+            extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
+            extensionTypesAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensionTypes:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
+
+            if [[ "${teamIDAllowed}" != *"X9E956P446"*  && "${extensionAllowed}" != *"com.crowdstrike.falcon.Agent"* ]]; then
+
+                returnResult+=" SysExt not managed;"
+
+            fi
+
+            if [[ "${extensionTypesAllowed}" != *"com.apple.system_extension.network_extension"* || "${extensionTypesAllowed}" != *"com.apple.system_extension.endpoint_security"* ]]; then
+
+                returnResult+=" SysExt Types not managed;"
+
+            fi
+
+
+        else
+
+            returnResult+=" SysExt not enabled or managed;"
+
+        fi
+
+    fi
+
+}
+
+check_kernel_extension() {
+
+    ##### Kernel Extension Verification #####
+    # Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
+    ## Support for 10.13 is dropping at end of 2020!
+    ### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
+    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
+
+    # A KEXT will be used on 10.15.4 - 10.15.x until Apple resolves an System Extension issue per CrowdStrike.
+    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
+    # if [[ ( $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 15.3" ) -eq 1 ) || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
+
+        # Get how many KEXTs are loaded.
+        kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
+
+        # Compare loaded KEXTs versus expected KEXTs
+        if [[ "${kextsLoaded}" -eq 0 ]]; then
+
+            # Check if there's an issue with loading KEXTs
+            if [[ -e "/private/var/db/KernelExtensionManagement" && -z $( /usr/bin/find "/private/var/db/KernelExtensionManagement" -flags "restricted" -maxdepth 0 ) ]]; then
+
+                # Device will need to be booted to Recovery and run the following command:  `chflags restricted /private/var/db/KernelExtensionManagement`
+                returnResult+=" KEXT loading blocked"
+
+            else
+
+                returnResult+=" KEXT not loaded;"
+
+                # Check if the kernel extension is enabled (whether approved by MDM or by a user).
+                mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446';" )
+                user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
+
+                if [[ -n "${mdm_cs_sensor}" || -n "${user_cs_sensor}" ]]; then
+
+                    # Combine the results -- not to concerned how it's enabled as long as it _is_ enabled.
+                    cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
+
+                    if [[ "${cs_sensor}" -eq 0 ]]; then
+
+                        returnResult+=" KEXT not managed;"
+
+                    fi
+
+                fi
+
+            fi
+
+        fi
+
+    fi
+
+}
+
+check_privacy_preferences() {
+
+    ##### Privacy Preferences Profile Control Verification #####
+    # Check if Full Disk Access is enabled.
+    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 14" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+
+        # Get the TCC Database versions
+        tccdbVersion=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select value from admin where key == 'version';" )
+
+        # Check if FDA is enabled (whether by MDM or by a user).
+        if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 ]]; then
+        # If running CrowdStrike v6.x+
+
+            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
+
+                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :com.crowdstrike.falcon.Agent:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
+
+            fi
+
+            # Check which version of the TCC database being accessed
+            if [[ $tccdbVersion -eq 15 ]]; then
+
+                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
+
+            elif [[ $tccdbVersion -eq 19 ]]; then
+
+                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
+
+            fi
+
+        else
+            # If running CrowdStrike v5.x.x
+
+            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
+
+                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :/Library/CS/falcond:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
+
+            fi
+
+            # Check which version of the TCC database being accessed
+            if [[ $tccdbVersion -eq 15 ]]; then
+
+                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
+
+            elif [[ $tccdbVersion -eq 19 ]]; then
+
+                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
+
+            fi
+
+        fi
+
+        # Not to concerned how it's enabled as long as it _is_ enabled.
+        if [[ "${mdm_fda_enabled}" != "true" && "${mdm_fda_enabled}" -ne 1 && "${user_fda_enabled}" -ne 1 ]]; then
+
+            returnResult+=" FDA not managed;"
+
+        fi
 
     fi
 
@@ -110,7 +314,7 @@ returnResult=""
 if [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
 
     # Multiple versions installed
-    report_result "ERROR:  Multiple CS Versions installed"
+    report_result "ERROR:  Multiple CS:F versions installed"
 
 elif [[ -e "${falconctl_app_location}" ]]; then
 
@@ -140,6 +344,8 @@ falconctlVersion=$( getCSFVersion "${falconctlStats}" )
 # Ensure falconctl stats command was successful and a version was obtained
 while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" || "${falconctlStats}" == "" || "${falconctlVersion}" == "" ]]; do
 
+    echo "Waiting for the Falcon Sensor to load..."
+
     # "Error: Error while accessing Falcon service"
         # This can happen if the Falcon Sensor is not loaded
         # This could be due to an in-progress upgrade or other reasons (Malware, user, etc.)
@@ -149,6 +355,18 @@ while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" ||
     if [[ $retry == 0 ]]; then
 
         # Failed to gather required info from Falcon service within allotted time
+        if [[ "$( sip_status )" == "enabled" ]]; then
+
+            csMajorMinorVersion=$( /usr/bin/defaults read "/Applications/Falcon.app/Contents/Info.plist" CFBundleShortVersionString )
+
+            check_system_extension
+
+            check_system_extension
+
+            check_privacy_preferences
+
+        fi
+
         report_result "Falcon Sensor is not loaded"
 
     fi
@@ -322,183 +540,13 @@ print(plist_contents.get("$objects")[object_index]["Enabled"])' 2> /dev/null )
 
 fi
 
-# Get the status of SIP, if SIP is disabled, we don't need to check if the SysExts, KEXTs, nor FDA are enabled.
-sipStatus=$( /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{print $2}' | /usr/bin/awk -F '.' '{print $1}' )
+if [[ "$( sip_status )" == "enabled" ]]; then
 
-if [[ "${sipStatus}" == "enabled" ]]; then
+    check_system_extension
 
-    ##### System Extension Verification #####
-    # Check if the OS version is 10.15.4 or newer, if it is, check if the System Extension is enabled.
-    if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
-    # A KEXT will be used on 10.15.4+ until Apple resolves an System Extension issue per CrowdStrike.
-    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
-    # if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 15.4" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+    check_system_extension
 
-        if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
-
-            extensions=$( /usr/bin/systemextensionsctl list | /usr/bin/grep "X9E956P446" )
-            # echo -e "system_extensions:\n${extensions}"
-
-            # Multiple extension versions can show up in the list collected above, check only against the sensor version installed
-            falconclt_version_in_sysext_format=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
-            # echo "falconctlVersion:  ${falconctlVersion}"
-            # echo "Match SysExt version to:  ${falconclt_version_in_sysext_format}"
-
-            # Loop through the extensions found
-            while IFS=$'\n' read -r extension; do
-                # echo "extension:  ${extension}"
-
-                # Get extension version
-                extension_version=$( echo "${extension}" |  /usr/bin/awk -F '\\(|\\)' '{print $2}' )
-                # echo "extension_version:  ${extension_version}"
-
-                # Check if extesion matches the Falcon.app's version
-                if [[ "${extension_version}" == "${falconclt_version_in_sysext_format}" ]]; then
-
-                    # If the versions match, get the extension's current state
-                    extension_state=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
-                    # echo "extension_state:  ${extension_state[*]}"
-
-                    # Check if the extensions state is desired state, break if true
-                    if [[ "${extension_state}" == "activated enabled" || "${extension_state}" == "activated waiting to upgrade" ]]; then
-
-                        extension_loaded="true"
-                        break
-
-                    fi
-
-                fi
-
-            done < <(echo "${extensions}")
-
-            # Check if the extension is managed if it is not loaded
-            if [[ "${extension_loaded}" != "true" ]]; then
-
-                returnResult+=" SysExt not loaded"
-
-                teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
-                extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
-                extensionTypesAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensionTypes:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
-
-                if [[ "${teamIDAllowed}" != *"X9E956P446"*  && "${extensionAllowed}" != *"com.crowdstrike.falcon.Agent"* ]]; then
-
-                    returnResult+=" SysExt not managed;"
-
-                fi
-
-                if [[ "${extensionTypesAllowed}" != *"com.apple.system_extension.network_extension"* || "${extensionTypesAllowed}" != *"com.apple.system_extension.endpoint_security"* ]]; then
-
-                    returnResult+=" SysExt Types not managed;"
-
-                fi
-
-            fi
-
-        else
-
-            returnResult+=" SysExt not enabled or managed;"
-
-        fi
-
-    fi
-
-    ##### Kernel Extension Verification #####
-    # Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
-    ## Support for 10.13 is dropping at end of 2020!
-    ### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
-    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
-
-    # A KEXT will be used on 10.15.4 - 10.15.x until Apple resolves an System Extension issue per CrowdStrike.
-    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
-    # if [[ ( $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 15.3" ) -eq 1 ) || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
-
-        # Get how many KEXTs are loaded.
-        kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
-
-        # Compare loaded KEXTs versus expected KEXTs
-        if [[ "${kextsLoaded}" -eq 0 ]]; then
-
-            returnResult+=" KEXT not loaded;"
-
-            # Check if the kernel extension is enabled (whether approved by MDM or by a user).
-            mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446';" )
-            user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
-
-            if [[ -n "${mdm_cs_sensor}" || -n "${user_cs_sensor}" ]]; then
-
-                # Combine the results -- not to concerned how it's enabled as long as it _is_ enabled.
-                cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
-
-                if [[ "${cs_sensor}" -eq 0 ]]; then
-
-                    returnResult+=" KEXT not enabled;"
-
-                fi
-
-            fi
-
-        fi
-
-    fi
-
-    ##### Privacy Preferences Profile Control Verification #####
-    # Check if Full Disk Access is enabled.
-    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 14" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
-
-        # Get the TCC Database versions
-        tccdbVersion=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select value from admin where key == 'version';" )
-
-        # Check if FDA is enabled (whether by MDM or by a user).
-        if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 ]]; then
-        # If running CrowdStrike v6.x+
-
-            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
-
-                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :com.crowdstrike.falcon.Agent:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
-
-            fi
-
-            # Check which version of the TCC database being accessed
-            if [[ $tccdbVersion -eq 15 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
-
-            elif [[ $tccdbVersion -eq 19 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
-
-            fi
-
-        else
-            # If running CrowdStrike v5.x.x
-
-            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
-
-                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :/Library/CS/falcond:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
-
-            fi
-
-            # Check which version of the TCC database being accessed
-            if [[ $tccdbVersion -eq 15 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
-
-            elif [[ $tccdbVersion -eq 19 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
-
-            fi
-
-        fi
-
-        # Not to concerned how it's enabled as long as it _is_ enabled.
-        if [[ "${mdm_fda_enabled}" != "true" && "${mdm_fda_enabled}" -ne 1 && "${user_fda_enabled}" -ne 1 ]]; then
-
-            returnResult+=" FDA not enabled;"
-
-        fi
-
-    fi
+    check_privacy_preferences
 
 fi
 
