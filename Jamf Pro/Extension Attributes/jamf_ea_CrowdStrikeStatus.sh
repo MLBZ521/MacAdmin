@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.8.0 / Updated:  3/21/2022 / By:  ZT
+# Version:  2.8.1 / Updated:  3/22/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -361,7 +361,7 @@ while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" ||
 
             check_system_extension
 
-            check_system_extension
+            check_kernel_extension
 
             check_privacy_preferences
 
@@ -544,7 +544,7 @@ if [[ "$( sip_status )" == "enabled" ]]; then
 
     check_system_extension
 
-    check_system_extension
+    check_kernel_extension
 
     check_privacy_preferences
 
