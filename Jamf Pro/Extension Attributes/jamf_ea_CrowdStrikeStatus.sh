@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.8.1 / Updated:  3/22/2022 / By:  ZT
+# Version:  2.9.0 / Updated:  3/23/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -14,10 +14,6 @@ echo "Checking the CrowdStrike Falcon Sensor configuration..."
 
 ##################################################
 ## Set variables for your environment
-
-# Set path to a Python3 framework
-# If left blank, default shell will be used
-python_path=""
 
 # Set whether you want to remediate the Network Filter State
 # Only force enables if running macOS 11.3 or newer
@@ -152,23 +148,42 @@ check_system_extension() {
 
             fi
 
-            # Check if the extension is managed if it is not activated and enabled
-            teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
-            extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
-            extensionTypesAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:0:allowedExtensionTypes:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
 
-            if [[ "${teamIDAllowed}" != *"X9E956P446"*  && "${extensionAllowed}" != *"com.crowdstrike.falcon.Agent"* ]]; then
+            number_of_dictionaries=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies" /Library/SystemExtensions/db.plist 2> /dev/null | /usr/bin/grep "    Dict {" | /usr/bin/wc -l | /usr/bin/xargs )
+            count=0
+
+            for (( count=0; count < number_of_dictionaries; ++count )); do
+
+                # Check if the extension is managed if it is not activated and enabled
+                teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
+                extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
+                extensionTypesAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedExtensionTypes:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
+
+                if [[ "${teamIDAllowed}" =~ .*X9E956P446.*  || "${extensionAllowed}" =~ .*com\.crowdstrike\.falcon\.Agent.* ]]; then
+
+                    extensions_allowed+="true"
+
+                fi
+
+                if [[ "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.network_extension.* && "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.endpoint_security.* ]]; then
+
+                    extensions_types_allowed+="true"
+
+                fi
+
+            done
+
+            if [[ "${extensions_allowed}" != "true" ]]; then
 
                 returnResult+=" SysExt not managed;"
 
             fi
 
-            if [[ "${extensionTypesAllowed}" != *"com.apple.system_extension.network_extension"* || "${extensionTypesAllowed}" != *"com.apple.system_extension.endpoint_security"* ]]; then
+            if [[ "${extensions_types_allowed}" != "true" ]]; then
 
                 returnResult+=" SysExt Types not managed;"
 
             fi
-
 
         else
 
@@ -293,6 +308,14 @@ check_privacy_preferences() {
         fi
 
     fi
+
+}
+
+check_network_filter() {
+
+    ##### Network Filter State Verification #####
+    # Using an official, unsupported, but "more reliable" method for validating the Network Filter Status
+    /usr/bin/defaults read "/Library/Application Support/CrowdStrike/Falcon/simplestore.plist" networkFilterEnabled
 
 }
 
@@ -482,33 +505,9 @@ fi
 # Only check if running 6.12 or newer; this is when the filter was enabled
 if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} > 6.11" ) -eq 1 ]]; then
 
-    # Get Network Filter State
-    if [[ -e "${python_path}" ]]; then
+    filter_state=$( check_network_filter )
 
-        # shellcheck disable=SC2016
-        filter_state=$( "${python_path}" -c 'import plistlib
-with open("/Library/Preferences/com.apple.networkextension.plist", "rb") as plist:
-    plist_contents = plistlib.load(plist)
-
-object_index = plist_contents.get("$objects").index("com.crowdstrike.falcon.App") + 1
-print(plist_contents.get("$objects")[object_index]["Enabled"])' 2> /dev/null )
-
-    filter_state_exit_code=$?
-
-        if [[ $filter_state_exit_code != 0 ]]; then
-
-            # If the Python command fails for any reason, fall back to defaults
-            filter_state=$( /usr/bin/defaults read /Library/Preferences/com.apple.networkextension | /usr/bin/awk "/com.crowdstrike.falcon.App/,/identifier/" | /usr/bin/grep "Enabled" | /usr/bin/sed "s/[^0-9]//g" )
-
-        fi
-
-    else
-
-        filter_state=$( /usr/bin/defaults read /Library/Preferences/com.apple.networkextension | /usr/bin/awk "/com.crowdstrike.falcon.App/,/identifier/" | /usr/bin/grep "Enabled" | /usr/bin/sed "s/[^0-9]//g" )
-
-    fi
-
-    if [[ "${filter_state}" == "False" || "${filter_state}" == "0" ]]; then
+    if [[ "${filter_state}" != "1" ]]; then
 
         if [[ "${remediate_network_filter}" == "true" ]]; then
 
