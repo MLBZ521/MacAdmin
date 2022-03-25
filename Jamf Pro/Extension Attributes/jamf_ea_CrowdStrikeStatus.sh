@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.10.0 / Updated:  3/25/2022 / By:  ZT
+# Version:  2.11.0 / Updated:  3/25/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -58,7 +58,7 @@ write_to_log() {
 
             bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
             /usr/bin/touch "${local_ea_history}"
-        
+
         fi
 
         time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
@@ -210,6 +210,12 @@ check_system_extension() {
         else
 
             returnResult+=" SysExt not enabled or managed;"
+
+        fi
+
+        if [[ -z $( /usr/bin/find /Library/SystemExtensions/ -name "com.crowdstrike.falcon.Agent.systemextension" ) ]]; then
+
+            returnResult+=" SysExt not staged;"
 
         fi
 
