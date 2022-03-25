@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.9.0 / Updated:  3/23/2022 / By:  ZT
+# Version:  2.10.0 / Updated:  3/25/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -13,37 +13,59 @@
 echo "Checking the CrowdStrike Falcon Sensor configuration..."
 
 ##################################################
-## Set variables for your environment
+# Set variables for your environment
 
-# Set whether you want to remediate the Network Filter State
-# Only force enables if running macOS 11.3 or newer
+# Set whether to remediate the Network Filter State.
+# Only force enables if running macOS 11.3 or newer.
 # Supported actions:
 #   true - if network filter state is disabled, enable it
 #   false - do not change network filter state, only report on it
 remediate_network_filter="true"
 
-# Set whether CrowdStrike Firmware Analysis is enabled in your environment ( true | false ).
+# Set whether CrowdStrike Firmware Analysis is enabled in your Prevention Policy.
+# Supported actions:
+#   true - Firmware Analysis is enabled
+#   false - Firmware Analysis is disabled
 csFirmwareAnalysisEnabled="false"
 
-# Define Variables for each item that we want to check for
+# Set environments' Customer ID (CID)
 expectedCSCustomerID="12345678-90AB-CDEF-1234-567890ABCDEF"
 
-# The number of days before report device has not connected to the CS Cloud.
+# The number of days before reporting device has not connected to the CrowdStrike Cloud.
 lastConnectedVariance=7
 
 # The number of attempts to get information from the 
 #    Falcon Service with a ten second sleep in-between.
 retry=10
 
+# Locally log EA value for historical reference (since Jamf Pro only ever has the last value).
+# Supported actions:
+#   true - Do locally Log
+#   false - Do not log locally
+locally_log="true"
+local_ea_history="/opt/ManagedFrameworks/EA_History.log"
+
 ##################################################
 # Functions
 
 write_to_log() {
 
-    local_ea_history="/opt/ManagedFrameworks/EA_History.log"
     message="${1}"
-    time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
-    echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+
+    if [[ "${locally_log}" == "true" ]]; then
+
+        if [[ ! -e "${local_ea_history}" ]]; then
+
+            bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
+            /usr/bin/touch "${local_ea_history}"
+        
+        fi
+
+        time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
+        echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+
+    fi
+
 }
 
 report_result() {
