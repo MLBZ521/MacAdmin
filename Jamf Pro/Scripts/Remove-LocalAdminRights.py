@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Remove-LocalAdminRights.py
 # By:  Zack Thompson / Created:  4/20/2020
-# Version:  1.0.1 / Updated:  10/22/2021 / By:  ZT
+# Version:  1.1.0 / Updated:  4/1/2022 / By:  ZT
 #
 # Description:  This script removes accounts from the local admin group; accounts that need to 
 # 		remain in the admin group can be specified in Jamf Pro script parameters
@@ -17,83 +17,67 @@ import shlex
 import subprocess
 import sys
 
-def runUtility(command):
-    """A helper function for subprocess.
+
+def execute_process(command, input=None):
+    """
+    A helper function for subprocess.
+
     Args:
-        command:  Must be a string.
+        command (str):  The command line level syntax that would be written in a shell script or 
+            a terminal window.
+        input (str, optional): Any input that should be passed "interactively" to the process 
+            being executed.
+
     Returns:
-        Results in a dictionary.
+        dict:  Results in a dictionary
     """
 
-    # Validate that command is a string
+    # Validate that command is not a string
     if not isinstance(command, str):
-        raise TypeError('Command must be in a str')
+        raise TypeError("Command must be a str type")
 
     # Format the command
     command = shlex.split(command)
 
     # Run the command
-    process = subprocess.Popen( command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False )
+    process = subprocess.Popen( command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+        shell=False, universal_newlines=True )
 
-    # Execute the command
-    (stdout, stderr) = process.communicate()
+    if input:
+        (stdout, stderr) = process.communicate(input=input)
 
-    # Return a result dictionary
+    else:
+        (stdout, stderr) = process.communicate()
+
     return {
         "stdout": (stdout).strip(),
         "stderr": (stderr).strip() if stderr != None else None,
-        "status": process.returncode,
+        "exitcode": process.returncode,
         "success": True if process.returncode == 0 else False
     }
 
 
-def plistFile_Reader(plistFile):
-    """A helper function to get the contents of a Property List.
+def execute_dscl(option="-plist", datasource=".", command="-read", parameters=""):
+    """Execute dscl and return the values
+
     Args:
-        plistFile:  A .plist file to read in.
+        option (str, optional): The option to use. Defaults to "-plist".
+        datasource (str, optional): The node to query. Defaults to ".".
+        command (str, optional): The dscl command to run. Defaults to "-read".
+        parameters (str, optional): Parameters that will be passed to the command option. Defaults to "".
+
     Returns:
-        stdout:  Returns the contents of the plist file.
+        dict: A dict of the results from dscl
     """
+    results = execute_process(f"/usr/bin/dscl {option} {datasource} {command} {parameters}")
 
-    # Verify the file exists
-    if os.path.exists(plistFile):
+    # Verify command result
+    if not results['success']:
+        print("Failed to admin group membership!")
+        print(results['stderr'])
+        sys.exit(2)
 
-        try:
-            # Read the plist file
-            plist_Contents = plistlib.readPlist(plistFile)
-
-        except Exception:
-
-            # If it fails, check the encoding
-            result_encoding = runUtility('/usr/bin/file --mime-encoding {}'.format(plistFile))
-
-            # Verify command result
-            if not result_encoding['success']:
-                print("ERROR:  failed to get the file encoding of:  {}".format(plistFile))
-                print(result_encoding['stderr'])
-                sys.exit(4)
-
-            # Get the result of the command
-            file_encoding = result_encoding['stdout'].split(': ')[1].strip()
-
-            if file_encoding == 'binary':
-                # Convert the file t xml if it's in binary format
-                plutil_response = runUtility('/usr/bin/plutil -convert xml1 {}'.format(plistFile))
-
-                # Verify command result
-                if not plutil_response['success']:
-                    print("ERROR:  failed to convert the file encoding on:  {}".format(plistFile))
-                    print(plutil_response['stderr'])
-                    sys.exit(5)
-
-                # Read the plist file again
-                plist_Contents = plistlib.readPlist(plistFile)
-
-    else:
-        print('ERROR:  Unable to locate the plist file:  {}'.format(plistFile))
-        sys.exit(3)
-    
-    return plist_Contents
+    return plistlib.loads(results['stdout'].encode())
 
 
 def main():
@@ -102,16 +86,19 @@ def main():
     ##################################################
     # Define Variables
 
-    exitCode=0
-    protected_admins = []
-    jamf_plist = "/Library/Preferences/com.jamfsoftware.jamf.plist"
+    # List your environments jps servers and local admins here 
     prod_jps = "https://prod.jps.server.com:8443/"
+    prod_protected_admins = ["jma"]
     dev_jps = "https://dev.jps.server.com:8443/"
+    dev_protected_admins = ["jmadev"]
+
+    exit_code=0
+    jamf_plist = "/Library/Preferences/com.jamfsoftware.jamf.plist"
 
     ##################################################
     # Build protected_admins list
 
-    protected_admins.append("root")
+    protected_admins = ["root"]
 
     # Loop through the passed script parameters
     for arg in sys.argv[4:]:
@@ -129,15 +116,23 @@ def main():
 
     # Check the local environment and add the proper accounts
     # Read the Jamf Plist to get the current environment
-    jamf_plist_contents = plistFile_Reader(jamf_plist)
+
+    # Verify the file exists
+    if not os.path.exists(jamf_plist):
+        raise Exception("Missing:  com.jamfsoftware.jamf.plist")
+
+    with open(jamf_plist, "rb") as plist:
+        jamf_plist_contents = plistlib.load(plist)
+
     jss_url = jamf_plist_contents['jss_url']
 
     # Determine which environment we're in
     if jss_url == prod_jps:
-        protected_admins.append("jma")
+        protected_admins.extend(prod_protected_admins)
 
     elif jss_url == dev_jps:
-        protected_admins.extend(["jmadev"])
+        protected_admins.extend(dev_protected_admins)
+ 
     else:
         print("ERROR:  Unknown Jamf Pro environment!")
         sys.exit(1)
@@ -147,18 +142,9 @@ def main():
     ##################################################
     # Bits staged...
 
-    # Get a list of the current admin group
-    results = runUtility("/usr/bin/dscl -plist . -read Groups/admin GroupMembership")
-
-    # Verify command result
-    if not results['success']:
-        print("Failed to admin group membership!")
-        print(results['stderr'])
-        sys.exit(2)
-
     # Get the admin group memembership
-    plist_contents = plistlib.readPlistFromString(results['stdout'])
-    admin_group = plist_contents.get('dsAttrTypeStandard:GroupMembership')
+    results_admin_group_members = execute_dscl(parameters="Groups/admin GroupMembership")
+    admin_group = results_admin_group_members.get('dsAttrTypeStandard:GroupMembership')
 
     # For verbosity in the policy log
     print("The following accounts are in the local admin group:")
@@ -174,13 +160,13 @@ def main():
         if user not in protected_admins:
 
     		# Remove user from the admin group
-            results = runUtility("/usr/sbin/dseditgroup -o edit -d '{}' -t user admin".format(user))
+            results = execute_process("/usr/sbin/dseditgroup -o edit -d '{}' -t user admin".format(user))
 
     		# Check if the removal was successful
             if not results['success']:
                 print("{} - FAILED to remove from admin group".format(user))
                 print(results['stderr'])
-                exitCode=6
+                exit_code=6
 
             else:
                 print("{} - removed from admin group".format(user))
@@ -188,17 +174,8 @@ def main():
     print("\n")
 
     # Get an updated list of the local admin group
-    updated_results = runUtility("/usr/bin/dscl -plist . -read Groups/admin GroupMembership")
-
-    # Verify command result
-    if not updated_results['success']:
-        print("Failed to admin group membership!")
-        print(results['stderr'])
-        sys.exit(2)
-
-    # Get the admin group memembership
-    updated_plist_contents = plistlib.readPlistFromString(updated_results['stdout'])
-    updated_admin_group = updated_plist_contents.get('dsAttrTypeStandard:GroupMembership')
+    results_updated_admin_group_members = execute_dscl(parameters="Groups/admin GroupMembership")
+    updated_admin_group = results_updated_admin_group_members.get('dsAttrTypeStandard:GroupMembership')
 
     # For verbosity in the policy log
     print("Updated local admin group:")
@@ -206,7 +183,7 @@ def main():
         print(" - {}".format(user))
 
     print("\n*****  Remove-LocalAdminRights Process:  COMPLETE  *****")
-    sys.exit(exitCode)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
