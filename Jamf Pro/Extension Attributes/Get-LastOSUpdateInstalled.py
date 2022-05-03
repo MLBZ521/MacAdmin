@@ -2,7 +2,7 @@
 """
 Script Name:  Get-LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.5.0 / Updated:  5/6/2021 / By:  ZT
+Version:  1.6.0 / Updated:  5/2/2022 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 
@@ -32,7 +32,7 @@ import re
 import platform
 import plistlib
 
-from datetime import datetime, timezone, timedelta, tzinfo
+from datetime import datetime, timezone, timedelta
 from pkg_resources import parse_version
 
 
@@ -94,7 +94,7 @@ def intstall_history():
         pattern_process_names = re.compile(
             "(?:installer)|(?:macOS Installer)|(?:OS X Installer)|(?:softwareupdated)")
         pattern_display_names = re.compile(
-            "(?:macOS .+ Beta)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
+            "(?:macOS .+ Beta)|(?:macOS 12.+)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
         pattern_package_identifiers = re.compile(
             "(?:com\.apple\.pkg\.macOSBrain)|(?:com\.apple\.pkg\.InstallAssistantMAS)")
         pattern_package_identifiers_ignore = re.compile(
@@ -133,11 +133,13 @@ def intstall_history():
                 display_name = str(update.get("displayName")).lstrip("Install ")
 
                 # If the display name includes the version, don't repeat the version string
-                if ( not update.get("displayVersion") 
-                     and update.get("displayVersion") != " "
-                     and re.search(update.get("displayVersion"), display_name) ):
+                if ( 
+                    update.get("displayVersion") is not None
+                    and update.get("displayVersion") != " " 
+                    and re.search(update.get("displayVersion"), display_name) 
+                ):
 
-                        last_update = display_name
+                    last_update = display_name
 
                 else:
                     last_update = "{} {}".format(display_name, update.get("displayVersion"))
@@ -156,10 +158,7 @@ def intstall_history():
 
 def main():
 
-    # Define Variables
-    os_version = platform.mac_ver()[0]
-
-    if parse_version(os_version) >= parse_version("10.16"):
+    if parse_version(platform.mac_ver()[0]) >= parse_version("10.16"):
 
         last_update, local_time_stamp = update_journal()
 
@@ -168,20 +167,15 @@ def main():
             last_update, local_time_stamp = intstall_history()
 
     else:
-        
-        last_update, local_time_stamp = intstall_history()
 
+        last_update, local_time_stamp = intstall_history()
 
     if last_update:
 
         local_inventory = "/opt/ManagedFrameworks/Inventory.plist"
         current_time = utc_to_local(datetime.now())
 
-        if current_time - timedelta(hours=24) <= local_time_stamp:
-            within_24hours = True
-
-        else:
-            within_24hours = False
+        within_24hours = current_time - timedelta(hours=24) <= local_time_stamp
 
         # Check if local inventory exists
         if os.path.exists(local_inventory):
