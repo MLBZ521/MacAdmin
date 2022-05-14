@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Run-BomgarSupportOnDemand.sh
 # By:  Zack Thompson / Created:  5/11/2020
-# Version:  1.2.0 / Updated:  1/6/2022 / By:  ZT
+# Version:  1.3.0 / Updated:  5/12/2022 / By:  ZT
 #
 # Description:  Utilizing the Bomgar API, downloads a Bomgar Support Client and assigns it to the
 #               supplied team's queue based on the passed parameters.
@@ -107,8 +107,8 @@ delete_file() {
 lookup_model() {
 
 	# Get the Friendly Model Name from Apple
-/usr/bin/curl -s "https://support-sp.apple.com/sp/product?cc=${1}" | 
-	/usr/bin/xmllint --format - | xpath_tool "/root/configCode/text()" 2>/dev/null
+	/usr/bin/curl -s "https://support-sp.apple.com/sp/product?cc=${1}" | 
+		/usr/bin/xmllint --format - | xpath_tool "/root/configCode/text()" 2>/dev/null
 
 }
 
@@ -176,25 +176,40 @@ if [[ -n $pre_existing_dmg ]]; then
 
 fi
 
+# Delete pre-existing failure file, just in case
+/bin/rm "/private/tmp/start_session" > /dev/null 2>&1
+
 echo "Downloading client..."
 
-# Download the Support Application -- 
+# Download the Support Application
 # Using a User Agent here that downloads a .dmg as I 
 # wasn't able get a .zip to extract via cli and work.
-exitStatus1=$(  su - "${consoleUser}" -c "cd ${temp_dir} && /usr/bin/curl \
-	--silent --show-error --fail \
+exitStatus1=$( /usr/bin/su - "${consoleUser}" -c "/usr/bin/curl \
+	--silent --show-error --fail --location --request POST \
 	--url \"https://${bomgarSiteURL}/api/start_session\" \
 	--header 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/601.5.17 (KHTML, like Gecko) Version/9.1 Safari/601.5.17' \
-	-d issue_menu=1 \
-	-d codeName=\"${issueCodeName}\" \
-	-d customer.name=\"${fullName} (${consoleUser})\" \
-	-d customer.details=\"${customerDetails}\" \
+	--header 'Content-Type: application/x-www-form-urlencoded' \
+	--data-urlencode issue_menu=1 \
+	--data-urlencode codeName=\"${issueCodeName}\" \
+	--data-urlencode customer.name=\"${fullName} (${consoleUser})\" \
+	--data-urlencode customer.details=\"${customerDetails}\" \
 	--compressed \
 	--remote-name \
-	--remote-header-name"
-	)
+	--remote-header-name \
+	--output-dir \"${temp_dir}\""
+)
+
 exitCode1=$?
 exitCheck $exitCode1 "${exitStatus1}" "Failed to download the Remote Support application!"
+
+if [[ -e "/private/tmp/start_session" && $( /bin/cat "/private/tmp/start_session" ) =~ .*ERROR:[[:space:]]Sorry,[[:space:]]this[[:space:]]issue[[:space:]]code[[:space:]]name[[:space:]]is[[:space:]]not[[:space:]]valid\..* ]]; then
+
+	/bin/rm "/private/tmp/start_session"
+	echo "ERROR:  The specified issue code name is not valid"
+	echo "*****  Run BomgarSupportOnDemand Process:  FAILED  *****"
+	exit 3
+
+fi
 
 # Get the filename of the .dmg file
 bomgarDMG=$( find_bomgar_dmg )
