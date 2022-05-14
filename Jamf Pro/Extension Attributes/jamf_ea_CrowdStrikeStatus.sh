@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.11.0 / Updated:  3/25/2022 / By:  ZT
+# Version:  2.12.0 / Updated:  5/10/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -34,7 +34,7 @@ expectedCSCustomerID="12345678-90AB-CDEF-1234-567890ABCDEF"
 # The number of days before reporting device has not connected to the CrowdStrike Cloud.
 lastConnectedVariance=7
 
-# The number of attempts to get information from the 
+# The number of attempts to get information from the
 #    Falcon Service with a ten second sleep in-between.
 retry=10
 
@@ -50,300 +50,377 @@ local_ea_history="/opt/ManagedFrameworks/EA_History.log"
 
 write_to_log() {
 
-    message="${1}"
+	# Arguments
+	# $1 = (str) Message that will be written to a log file
 
-    if [[ "${locally_log}" == "true" ]]; then
+	local message="${1}"
 
-        if [[ ! -e "${local_ea_history}" ]]; then
+	if [[ "${locally_log}" == "true" ]]; then
 
-            bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
-            /usr/bin/touch "${local_ea_history}"
+		if [[ ! -e "${local_ea_history}" ]]; then
 
-        fi
+			bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
+			/usr/bin/touch "${local_ea_history}"
 
-        time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
-        echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+		fi
 
-    fi
+		time_stamp=$( /bin/date +%Y-%m-%d\ %H:%M:%S )
+		echo "${time_stamp}:  ${message}" >> "${local_ea_history}"
+
+	fi
 
 }
 
 report_result() {
 
-    write_to_log "CS:F Status:  ${1}"
-    echo "<result>${1}</result>"
-    exit 0
+	# Arguments
+	# $1 = (str) Message that will be written to a log file
+
+	local message="${1}"
+
+	write_to_log "CS:F Status:  ${message}"
+	echo "<result>${message}</result>"
+	exit 0
 
 }
 
-getFalconctlStats() {
+PlistBuddy_Helper() {
+	# Helper function to interact with plists.
 
-    # Get the current stats.
-    "${1}" stats agent_info Communications 2>&1
-    # Will eventually move to the --plist format, once it's fully supported
-    # "${1}" stats agent_info Communications --plist
+	# Arguments
+	# $1 = (str) action to perform on the plist
+		# The "print" action expects to work text (passed to PlistBuddy via stdin), which can be generated via "print_xml"
+	# $2 = (str) Path to plist or generated xml
+	# $3 = (str) Key or key path to read
+	# $4 = (str) Type that will be used for the value
+	# $5 = (str) Value to be set to the passed key
+
+	local action="${1}"
+	local plist="${2}"
+	local key="${3}"
+	local type="${4}"
+	local value="${5}"
+
+	# Delete existing values if required
+	if [[ "${action}" = "print_xml"  ]]; then
+
+		/usr/libexec/PlistBuddy -x -c "print" "${plist}" 2> /dev/null
+
+	elif [[ "${action}" = "print"  ]]; then
+
+		/usr/libexec/PlistBuddy -c "Print :${key}" /dev/stdin <<< "${plist}" 2> /dev/null
+
+	elif [[ "${action}" = "add"  ]]; then
+
+		# Configure values
+		/usr/libexec/PlistBuddy -c "Add :${key} ${type} ${value}" "${plist}" > /dev/null 2>&1 || /usr/libexec/PlistBuddy -c "Set :${key} ${value}" "${plist}" > /dev/null 2>&1
+
+	elif [[ "${action}" = "delete"  ]]; then
+
+		/usr/libexec/PlistBuddy -c "Delete :${key} ${type}" "${plist}" > /dev/null 2>&1
+
+	elif [[ "${action}" = "clear"  ]]; then
+
+		/usr/libexec/PlistBuddy -c "clear ${type}" "${plist}" > /dev/null 2>&1
+
+	fi
 
 }
 
-# Get the CS:F Full Version string
-getCSFVersion() {
+get_falconctl_stats() {
 
-    echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs
+	# Get the current stats.
+	# Arguments
+	# $1 = (str) path to falconctl
 
-}
-
-# Get the CS Major.Minor Version string
-getCSMajorMinorVersion() {
-
-    echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs | /usr/bin/awk -F '.' '{print $1"."$2}'
+	"${1}" stats agent_info Communications 2>&1
+	# Will eventually move to the --plist format, once it's fully supported
+	# "${1}" stats agent_info Communications --plist
 
 }
 
-checkLastConnection() {
+get_falcon_version() {
 
-    # Check if the last connected date is older than seven days.
-    if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$( echo "${1}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g' )" +"%s" ) -lt $( /bin/date -j -v-"${2}"d +"%s" ) ]]; then
+	# Get the CS:F Full Version string
+	# Arguments
+	# $1 = (str) output from `falconctl stats agent_info`
 
-        returnResult+=" Last Connected:  ${1};"
+	echo "${1}" | /usr/bin/awk -F "version:" '{print $2}' | /usr/bin/xargs
 
-    fi
+}
+
+check_last_connection() {
+
+	# Check if the last connected date is older than seven days.
+	# Arguments
+	# $1 = (str) date formatted string, captured from "last connected date" in `falconctl stats Communications`
+	# $2 = (int) number (of days)
+
+	if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$( echo "${1}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g' )" +"%s" ) -lt $( /bin/date -j -v-"${2}"d +"%s" ) ]]; then
+
+		returnResult+=" Last Connected: ${1};"
+
+	fi
 
 }
 
 sip_status() {
 
-    # Get the status of SIP, if SIP is disabled, no need to check if SysExts, KEXTs, nor FDA are enabled.
-    /usr/bin/csrutil status | /usr/bin/awk -F ': ' '{print $2}' | /usr/bin/awk -F '.' '{print $1}'
+	# Get the status of SIP, if SIP is disabled, no need to check if SysExts, KEXTs, nor FDA are enabled.
+	/usr/bin/csrutil status | /usr/bin/awk -F ': ' '{print $2}' | /usr/bin/awk -F '.' '{print $1}'
 
 }
 
-
 check_system_extension() {
 
-    ##### System Extension Verification #####
-    # Check if the OS version is 10.15.4 or newer, if it is, check if the System Extension is enabled.
-    if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
-    # A KEXT will be used on 10.15.4+ until Apple resolves an System Extension issue per CrowdStrike.
-    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
-    # if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 15.4" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+	##### System Extension Verification #####
+	# Check if System Extension is active, enabled, and loaded
+	# Arguments
+	# $1 = (str) current collected results
 
-        if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
+	local current_results="${1}"
 
-            extensions=$( /usr/bin/systemextensionsctl list | /usr/bin/grep "X9E956P446" )
-            # echo -e "system_extensions:\n${extensions}"
+	# Check if the OS version is 11 or newer, if it is, check if the System Extension is enabled.
+	if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
 
-            # Multiple extension versions can show up in the list collected above, check only against the sensor version installed
-            falconclt_version_in_sysext_format=$( echo "${falconctlVersion}" | /usr/bin/awk -F '.' '{print $1"."$2"/" substr($3,1,3) "." substr($3,4) }' )
-            # echo "falconctlVersion:  ${falconctlVersion}"
-            # echo "Match SysExt version to:  ${falconclt_version_in_sysext_format}"
+		if [[ -e "/Library/SystemExtensions/db.plist" ]]; then
 
-            # Loop through the extensions found
-            while IFS=$'\n' read -r extension; do
-                # echo "extension:  ${extension}"
+			sysext_db=$( PlistBuddy_Helper "print_xml" "/Library/SystemExtensions/db.plist" )
 
-                # Get extension version
-                extension_version=$( echo "${extension}" |  /usr/bin/awk -F '\\(|\\)' '{print $2}' )
-                # echo "extension_version:  ${extension_version}"
+			number_of_known_extensions=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions" | /usr/bin/grep -a -E "^    Dict {$" | /usr/bin/wc -l | /usr/bin/xargs )
 
-                # Check if extension matches the Falcon.app's version
-                if [[ "${extension_version}" == "${falconclt_version_in_sysext_format}" ]]; then
+			for (( count=0; count < number_of_known_extensions; ++count )); do
 
-                    # If the versions match, get the extension's current state
-                    extension_state=$( echo "${extension}" |  /usr/bin/awk -F 'X9E956P446.+\\[|\\]' '{print $2}' )
-                    # echo "extension_state:  ${extension_state[*]}"
+				identifier=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions:${count}:identifier" )
+				teamID=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions:${count}:teamID" )
 
-                    # Check if the extensions state is desired state, break if true
-                    if [[ "${extension_state}" == "activated enabled" || "${extension_state}" == "activated waiting to upgrade" ]]; then
+				if [[ "${teamID}" == "X9E956P446" && "${identifier}" == "com.crowdstrike.falcon.Agent" ]]; then
 
-                        extension_enabled="true"
-                        break
+					bundle_short_version=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions:${count}:bundleVersion:CFBundleShortVersionString" )
+					bundle_version=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions:${count}:bundleVersion:CFBundleVersion" )
+					state=$( PlistBuddy_Helper "print" "${sysext_db}" "extensions:${count}:state" )
 
-                    fi
+					# Multiple extension(s)/versions may appear in the database, verify the extension matches the Falcon.app's version
+					if [[ "${falcon_app_short_version}.${falcon_app_bundle_version}" == "${bundle_short_version}.${bundle_version}" ]]; then
 
-                fi
+						# Verify the extension state is the desired state
+						if [[ "${state}" == "activated_enabled" || "${state}" == "activated_waiting_to_upgrade" ]]; then
 
-            done < <(echo "${extensions}")
+							extension_enabled="true"
+							break
 
-            if [[ "${extension_enabled}" != "true" ]]; then
+						elif [[ "${state}" =~ .*activated.* ]]; then
 
-                returnResult+=" SysExt not activated;"
+							matching_activated_version_state="${state}"
 
-            fi
+						else
 
+							matching_version_state="${state}"
 
-            number_of_dictionaries=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies" /Library/SystemExtensions/db.plist 2> /dev/null | /usr/bin/grep "    Dict {" | /usr/bin/wc -l | /usr/bin/xargs )
-            count=0
+						fi
 
-            for (( count=0; count < number_of_dictionaries; ++count )); do
+					fi
 
-                # Check if the extension is managed if it is not activated and enabled
-                teamIDAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedTeamIDs" /Library/SystemExtensions/db.plist 2> /dev/null )
-                extensionAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedExtensions:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
-                extensionTypesAllowed=$( /usr/libexec/PlistBuddy -c "Print :extensionPolicies:${count}:allowedExtensionTypes:X9E956P446" /Library/SystemExtensions/db.plist 2> /dev/null )
+				fi
 
-                if [[ "${teamIDAllowed}" =~ .*X9E956P446.*  || "${extensionAllowed}" =~ .*com\.crowdstrike\.falcon\.Agent.* ]]; then
+			done
 
-                    extensions_allowed+="true"
+			if [[ "${extension_enabled}" != "true" ]]; then
 
-                fi
+				if [[ -n $matching_activated_version_state ]]; then
 
-                if [[ "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.network_extension.* && "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.endpoint_security.* ]]; then
+					returnResult+=" SysExt: ${matching_activated_version_state};"
 
-                    extensions_types_allowed+="true"
+				elif [[ -n $matching_version_state ]]; then
 
-                fi
+					returnResult+=" SysExt: ${matching_version_state};"
 
-            done
+				else
 
-            if [[ "${extensions_allowed}" != "true" ]]; then
+					returnResult+=" SysExt not activated;"
 
-                returnResult+=" SysExt not managed;"
+				fi
 
-            fi
+			fi
 
-            if [[ "${extensions_types_allowed}" != "true" ]]; then
+			# Check if System Extensions are managed.
+			number_of_managed_policies=$( PlistBuddy_Helper "print" "${sysext_db}" "extensionPolicies" | /usr/bin/grep -a -E "^    Dict {$" | /usr/bin/wc -l | /usr/bin/xargs )
 
-                returnResult+=" SysExt Types not managed;"
+			for (( count=0; count < number_of_managed_policies; ++count )); do
 
-            fi
+				# Check if the extension is managed if it is not activated and enabled
+				teamIDAllowed=$( PlistBuddy_Helper "print" "${sysext_db}" "extensionPolicies:${count}:allowedTeamIDs" )
+				extensionAllowed=$( PlistBuddy_Helper "print" "${sysext_db}" "extensionPolicies:${count}:allowedExtensions:X9E956P446" )
+				extensionTypesAllowed=$( PlistBuddy_Helper "print" "${sysext_db}" "extensionPolicies:${count}:allowedExtensionTypes:X9E956P446" )
 
-        else
+				if [[ "${teamIDAllowed}" =~ .*X9E956P446.*  || "${extensionAllowed}" =~ .*com\.crowdstrike\.falcon\.Agent.* ]]; then
 
-            returnResult+=" SysExt not enabled or managed;"
+					extensions_allowed="true"
 
-        fi
+				fi
 
-        if [[ -z $( /usr/bin/find /Library/SystemExtensions/ -name "com.crowdstrike.falcon.Agent.systemextension" ) ]]; then
+				if [[ "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.network_extension.* && "${extensionTypesAllowed}" =~ .*com\.apple\.system_extension\.endpoint_security.* ]]; then
 
-            returnResult+=" SysExt not staged;"
+					extensions_types_allowed="true"
 
-        fi
+				fi
 
-    fi
+			done
+
+			if [[ "${extensions_allowed}" != "true" ]]; then
+
+				returnResult+=" SysExt not managed;"
+
+			fi
+
+			if [[ "${extensions_types_allowed}" != "true" ]]; then
+
+				returnResult+=" SysExt Types not managed;"
+
+			fi
+
+		else
+
+			returnResult+=" SysExt not enabled or managed;"
+
+		fi
+
+		if [[ "${current_results}" =~ .*Sensor[[:space:]]not[[:space:]]loaded.* ]]; then
+
+			# Check to see if the System Extension is failing to be staged
+			# The last minute _should_ be sufficient considering sysextd retries to load the System Extension every ten seconds
+			log_sysextd=$( /usr/bin/log show --predicate 'subsystem contains "com.apple.sx"' --style json --last 1m )
+
+			# Yes, the `\u00a0` character is supposed to be in the below conditional -- why?  Ask Apple.
+			returnResult+=$( /usr/bin/osascript -l JavaScript << EndOfScript
+
+	var json_object=JSON.parse(\`$log_sysextd\`)
+	json_object.reverse()
+	var re = new RegExp("^staging bundle from /Applications/Falcon\.app/Contents/Library/SystemExtensions/com\.crowdstrike\.falcon\.Agent\.systemextension to: /Library/SystemExtensions/\.staging/[A-F0-9\-]{36}/com\.crowdstrike\.falcon\.Agent\.systemextension$")
+
+	for ( var entry of json_object ) {
+
+		if ( re.test(entry.eventMessage) ) {
+
+			var stage_message = true
+
+		}
+
+		if ( entry.eventMessage == "unable to copy to\u00a0staging folder: [0: Success]" ) {
+
+			var failed_msg = true
+
+		}
+
+		if ( stage_message && failed_msg ) {
+
+			" Unable to stage SysExt;"
+
+		}
+
+	}
+EndOfScript
+)
+
+		fi
+
+	fi
 
 }
 
 check_kernel_extension() {
 
-    ##### Kernel Extension Verification #####
-    # Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
-    ## Support for 10.13 is dropping at end of 2020!
-    ### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
-    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
+	##### Kernel Extension Verification #####
+	# Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
+	## Support for 10.13 is dropping at end of 2020!
+	### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
+	if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
 
-    # A KEXT will be used on 10.15.4 - 10.15.x until Apple resolves an System Extension issue per CrowdStrike.
-    ## The below condition will be replace the one above, once the issue is resolved and implemented in a future version of CrowdStrike.
-    # if [[ ( $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 15.3" ) -eq 1 ) || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
+		# Get how many KEXTs are loaded.
+		kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
 
-        # Get how many KEXTs are loaded.
-        kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
+		# Compare loaded KEXTs versus expected KEXTs
+		if [[ "${kextsLoaded}" -eq 0 ]]; then
 
-        # Compare loaded KEXTs versus expected KEXTs
-        if [[ "${kextsLoaded}" -eq 0 ]]; then
+			# Check if there's an issue with loading KEXTs
+			if [[ -z $( /usr/bin/find "/private/var/db/KernelExtensionManagement" -flags "restricted" -maxdepth 0 2> /dev/null ) ]]; then
 
-            # Check if there's an issue with loading KEXTs
-            if [[ -e "/private/var/db/KernelExtensionManagement" && -z $( /usr/bin/find "/private/var/db/KernelExtensionManagement" -flags "restricted" -maxdepth 0 ) ]]; then
+				# Device will need to be booted to Recovery and run the following command:  `chflags restricted /private/var/db/KernelExtensionManagement`
+				returnResult+=" KEXT loading blocked;"
 
-                # Device will need to be booted to Recovery and run the following command:  `chflags restricted /private/var/db/KernelExtensionManagement`
-                returnResult+=" KEXT loading blocked"
+			else
 
-            else
+				returnResult+=" KEXT not loaded;"
 
-                returnResult+=" KEXT not loaded;"
+			fi
 
-                # Check if the kernel extension is enabled (whether approved by MDM or by a user).
-                mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446';" )
-                user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
+			# Check if the kernel extension is enabled (whether approved by MDM or by a user).
+			mdm_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy_mdm where team_id='X9E956P446';" )
+			user_cs_sensor=$( /usr/bin/sqlite3 /var/db/SystemPolicyConfiguration/KextPolicy "select allowed from kext_policy where team_id='X9E956P446' and bundle_id='com.crowdstrike.sensor';" )
 
-                if [[ -n "${mdm_cs_sensor}" || -n "${user_cs_sensor}" ]]; then
+			if [[ -n "${mdm_cs_sensor}" || -n "${user_cs_sensor}" ]]; then
 
-                    # Combine the results -- not to concerned how it's enabled as long as it _is_ enabled.
-                    cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
+				# Combine the results -- not to concerned how it's enabled as long as it _is_ enabled.
+				cs_sensor=$(( mdm_cs_sensor + user_cs_sensor ))
 
-                    if [[ "${cs_sensor}" -eq 0 ]]; then
+				if [[ "${cs_sensor}" -eq 0 ]]; then
 
-                        returnResult+=" KEXT not managed;"
+					returnResult+=" KEXT not managed;"
 
-                    fi
+				fi
 
-                fi
+			fi
 
-            fi
+		fi
 
-        fi
-
-    fi
+	fi
 
 }
 
 check_privacy_preferences() {
 
-    ##### Privacy Preferences Profile Control Verification #####
-    # Check if Full Disk Access is enabled.
-    if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 14" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+	##### Privacy Preferences Profile Control Verification #####
+	# Check if Full Disk Access is enabled (whether by MDM or by a user).
+	if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 14" ) -eq 1 || $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
 
-        # Get the TCC Database versions
-        tccdbVersion=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select value from admin where key == 'version';" )
+		# Get the TCC Database version
+		tccdbVersion=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select value from admin where key == 'version';" )
 
-        # Check if FDA is enabled (whether by MDM or by a user).
-        if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 ]]; then
-        # If running CrowdStrike v6.x+
+		if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
 
-            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
+			tcc_mdm_db=$( PlistBuddy_Helper "print_xml" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" )
 
-                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :com.crowdstrike.falcon.Agent:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
+		fi
 
-            fi
+		mdm_fda_enabled=$( PlistBuddy_Helper "print" "${tcc_mdm_db}" "com.crowdstrike.falcon.Agent:kTCCServiceSystemPolicyAllFiles:Allowed" )
 
-            # Check which version of the TCC database being accessed
-            if [[ $tccdbVersion -eq 15 ]]; then
+		# Check which version of the TCC database being accessed
+		if [[ $tccdbVersion -eq 15 ]]; then
 
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
+			user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
 
-            elif [[ $tccdbVersion -eq 19 ]]; then
+		elif [[ $tccdbVersion -eq 19 ]]; then
 
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
+			user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like 'com.crowdstrike.falcon.Agent';" )
 
-            fi
+		fi
 
-        else
-            # If running CrowdStrike v5.x.x
+	fi
 
-            if [[ -e "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" ]]; then
+	# Not to concerned how it's enabled as long as it _is_ enabled.
+	if [[ "${mdm_fda_enabled}" != "true" && "${mdm_fda_enabled}" -ne 1 && "${user_fda_enabled}" -ne 1 ]]; then
 
-                mdm_fda_enabled=$( /usr/libexec/PlistBuddy -c "Print :/Library/CS/falcond:kTCCServiceSystemPolicyAllFiles:Allowed" "/Library/Application Support/com.apple.TCC/MDMOverrides.plist" 2>/dev/null )
+		returnResult+=" FDA not managed;"
 
-            fi
-
-            # Check which version of the TCC database being accessed
-            if [[ $tccdbVersion -eq 15 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select allowed from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
-
-            elif [[ $tccdbVersion -eq 19 ]]; then
-
-                user_fda_enabled=$( /usr/bin/sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select auth_value from access where service = 'kTCCServiceSystemPolicyAllFiles' and client like '/Library/CS/falcond';" )
-
-            fi
-
-        fi
-
-        # Not to concerned how it's enabled as long as it _is_ enabled.
-        if [[ "${mdm_fda_enabled}" != "true" && "${mdm_fda_enabled}" -ne 1 && "${user_fda_enabled}" -ne 1 ]]; then
-
-            returnResult+=" FDA not managed;"
-
-        fi
-
-    fi
+	fi
 
 }
 
 check_network_filter() {
 
-    ##### Network Filter State Verification #####
-    # Using an official, unsupported, but "more reliable" method for validating the Network Filter Status
-    /usr/bin/defaults read "/Library/Application Support/CrowdStrike/Falcon/simplestore.plist" networkFilterEnabled
+	##### Network Filter State Verification #####
+	# Using an official, unsupported, but "more reliable" method for validating the Network Filter Status
+	/usr/bin/defaults read "/Library/Application Support/CrowdStrike/Falcon/simplestore.plist" "networkFilterEnabled"
 
 }
 
@@ -364,121 +441,120 @@ returnResult=""
 
 if [[ -e "${falconctl_app_location}" && -e "${falconctl_old_location}" ]]; then
 
-    # Multiple versions installed
-    report_result "ERROR:  Multiple CS:F versions installed"
+	# Multiple versions installed
+	report_result "ERROR:  Multiple CS:F versions installed"
 
 elif [[ -e "${falconctl_app_location}" ]]; then
 
-    falconctl="${falconctl_app_location}"
+	falconctl="${falconctl_app_location}"
 
 elif [[ -e "${falconctl_old_location}" ]]; then
 
-    report_result "Sensor Version Not Supported"
+	report_result "Sensor Version Not Supported"
 
-elif [[ "${osMajorVersion}" == "10" && $( /usr/bin/bc <<< "${osMinorPatchVersion} <= 13" ) -eq 1 ]]; then
+elif [[ "${osMajorVersion}" == "10" && $( /usr/bin/bc <<< "${osMinorPatchVersion} < 14" ) -eq 1 ]]; then
 
-    # macOS 10.13 or older
-    report_result "OS Version Not Supported"
+	# macOS 10.13 or older
+	report_result "OS Version Not Supported"
 
 else
 
-    report_result "Not Installed"
+	report_result "Not Installed"
 
 fi
-
-# Get falconctl stats
-falconctlStats=$( getFalconctlStats "${falconctl}" )
-
-# Get Falcon Sensor full version string
-falconctlVersion=$( getCSFVersion "${falconctlStats}" )
-
-# Ensure falconctl stats command was successful and a version was obtained
-while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" || "${falconctlStats}" == "" || "${falconctlVersion}" == "" ]]; do
-
-    echo "Waiting for the Falcon Sensor to load..."
-
-    # "Error: Error while accessing Falcon service"
-        # This can happen if the Falcon Sensor is not loaded
-        # This could be due to an in-progress upgrade or other reasons (Malware, user, etc.)
-
-    # echo "Failed to get required details, sleeping and trying again..."
-
-    if [[ $retry == 0 ]]; then
-
-        # Failed to gather required info from Falcon service within allotted time
-        if [[ "$( sip_status )" == "enabled" ]]; then
-
-            csMajorMinorVersion=$( /usr/bin/defaults read "/Applications/Falcon.app/Contents/Info.plist" CFBundleShortVersionString )
-
-            check_system_extension
-
-            check_kernel_extension
-
-            check_privacy_preferences
-
-        fi
-
-        report_result "Falcon Sensor is not loaded"
-
-    fi
-
-    retry=$(( retry - 1 ))
-    sleep 10
-
-    # Get falconctl stats
-    falconctlStats=$( getFalconctlStats "${falconctl}" )
-
-    # Get Falcon Sensor full version string
-    falconctlVersion=$( getCSFVersion "${falconctlStats}" )
-
-done
-
-# Get the CS Major.Minor Version string
-csMajorMinorVersion=$( getCSMajorMinorVersion "${falconctlStats}" )
-
 
 # Check the Locale; this will affect the output of falconctl stats
 lib_locale=$( /usr/bin/defaults read "/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
 root_locale=$( /usr/bin/defaults read "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale )
 
 if [[ "${lib_locale}" != "en_US" ]]; then
-    /usr/bin/defaults write "/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
+	/usr/bin/defaults write "/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
 fi
 
 if [[ "${root_locale}" != "en_US" ]]; then
-    /usr/bin/defaults write "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
+	/usr/bin/defaults write "/var/root/Library/Preferences/.GlobalPreferences.plist" AppleLocale "en_US"
+fi
+
+falcon_app_short_version=$( /usr/bin/defaults read "/Applications/Falcon.app/Contents/Info.plist" CFBundleShortVersionString )
+falcon_app_bundle_version=$( /usr/bin/defaults read "/Applications/Falcon.app/Contents/Info.plist" CFBundleVersion )
+
+# Get falconctl stats
+falconctlStats=$( get_falconctl_stats "${falconctl}" )
+
+# Ensure falconctl stats command was successful and a version was obtained
+while [[ "${falconctlStats}" == "Error: Error while accessing Falcon service" || "${falconctlStats}" == "" ]]; do
+
+	echo "Waiting for the Falcon Sensor to load..."
+
+	# "Error: Error while accessing Falcon service"
+		# This can happen if the Falcon Sensor is not loaded
+		# This could be due to an in-progress upgrade or other reasons (Malware, user, etc.)
+
+	# echo "Failed to get required details, sleeping and trying again..."
+
+	if [[ $retry == 0 ]]; then
+
+		if [[ "${falconctlStats}" == "" ]]; then
+
+			returnResult+=" Sensor not loaded - reboot may resolve;"
+
+		else
+
+			returnResult+=" Sensor not loaded;"
+
+		fi
+
+		check_system_extension "${returnResult}"
+
+		check_kernel_extension
+
+		check_privacy_preferences
+
+		# Trim leading space
+		returnResult="${returnResult## }"
+		# Trim trailing ;
+		report_result "${returnResult%%;}"
+
+	fi
+
+	retry=$(( retry - 1 ))
+	sleep 10
+
+	# Get falconctl stats
+	falconctlStats=$( get_falconctl_stats "${falconctl}" )
+
+done
+
+# Check CS Version
+if [[ $( /usr/bin/bc <<< "${falcon_app_short_version} >= 6" ) -eq 1 && $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+
+	# Get the Sensor State
+	sensorState=$( echo "${falconctlStats}" | /usr/bin/awk -F "Sensor operational:" '{print $2}' | /usr/bin/xargs )
+
+	# Verify Sensor State
+	if [[ "${sensorState}" != "true" && -n "${sensorState}" ]]; then
+
+		returnResult+=" Sensor State: ${sensorState};"
+
+	fi
+
 fi
 
 # Check CS Version
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} >= 6" ) -eq 1 && $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 ]]; then
+if [[ $( /usr/bin/bc <<< "${falcon_app_short_version} < 6.18" ) -eq 1 ]]; then
 
-    # Get the Sensor State
-    sensorState=$( echo "${falconctlStats}" | /usr/bin/awk -F "Sensor operational:" '{print $2}' | /usr/bin/xargs )
-
-    # Verify Sensor State
-    if [[ "${sensorState}" != "true" && -n "${sensorState}" ]]; then
-
-        returnResult+=" Sensor State: ${sensorState};"
-
-    fi
-
-fi
-
-# Check CS Version
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} < 6.18" ) -eq 1 ]]; then
-
-    report_result "Sensor Version Not Supported"
+	report_result "Sensor Version Not Supported"
 
 else
 
-    csCustomerID=$( echo "${falconctlStats}" | /usr/bin/awk -F "customerID:" '{print $2}' | /usr/bin/xargs )
+	csCustomerID=$( echo "${falconctlStats}" | /usr/bin/awk -F "customerID:" '{print $2}' | /usr/bin/xargs )
 
 fi
 
 # Verify CS Customer ID (CID)
-if [[ "${csCustomerID}" != "${expectedCSCustomerID}" ]]; then
+if [[ -n "${csCustomerID}" && "${csCustomerID}" != "${expectedCSCustomerID}" ]]; then
 
-    returnResult+=" Invalid Customer ID;"
+	returnResult+=" Invalid Customer ID;"
 
 fi
 
@@ -489,104 +565,95 @@ lastEstablished=$( echo "${falconctlStats}" | /usr/bin/awk -F "Last Established 
 
 if [[ "${connectionState}" == "connected" ]]; then
 
-    # Compare if both were available.
-    if [[ -n "${established}" && -n "${lastEstablished}" ]]; then
+	# Compare if both were available.
+	if [[ -n "${established}" && -n "${lastEstablished}" ]]; then
 
-        # Check which is more recent.
-        if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${established}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) -ge $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${lastEstablished}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) ]]; then
+		# Check which is more recent.
+		if [[ $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${established}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) -ge $( /bin/date -j -f "%b %d %Y %H:%M:%S" "$(echo "${lastEstablished}" | /usr/bin/sed 's/,//g; s/ at//g; s/ [AP]M//g')" +"%s" ) ]]; then
 
-            testConnectionDate="${established}"
+			testConnectionDate="${established}"
 
-        else
+		else
 
-            testConnectionDate="${lastEstablished}"
+			testConnectionDate="${lastEstablished}"
 
-        fi
+		fi
 
-        # Check if the more recent date is older than seven days
-        checkLastConnection "${testConnectionDate}" $lastConnectedVariance
+		# Check if the more recent date is older than seven days
+		check_last_connection "${testConnectionDate}" $lastConnectedVariance
 
-    elif [[ -n "${established}" ]]; then
+	elif [[ -n "${established}" ]]; then
 
-        # If only the Established date was available, check if it is older than seven days.
-        checkLastConnection "${established}" $lastConnectedVariance
+		# If only the Established date was available, check if it is older than seven days.
+		check_last_connection "${established}" $lastConnectedVariance
 
-    elif [[ -n "${lastEstablished}" ]]; then
+	elif [[ -n "${lastEstablished}" ]]; then
 
-        # If only the Last Established date was available, check if it is older than seven days.
-        checkLastConnection "${lastEstablished}" $lastConnectedVariance
+		# If only the Last Established date was available, check if it is older than seven days.
+		check_last_connection "${lastEstablished}" $lastConnectedVariance
 
-    else
+	else
 
-        # If no connection date was available, return disconnected
-        returnResult+=" Unknown Connection State;"
+		# If no connection date was available, return disconnected
+		returnResult+=" Unknown Connection State;"
 
-    fi
+	fi
 
 elif [[ -n "${connectionState}" ]]; then
 
-    # If no connection date was available, return state
-    returnResult+=" Connection State: ${connectionState};"
+	# If no connection date was available, return state
+	returnResult+=" Connection State: ${connectionState};"
 
 fi
 
-# Only check if running 6.12 or newer; this is when the filter was enabled
-if [[ $( /usr/bin/bc <<< "${csMajorMinorVersion} > 6.11" ) -eq 1 ]]; then
+filter_state=$( check_network_filter )
 
-    filter_state=$( check_network_filter )
+if [[ "${filter_state}" != "1" ]]; then
 
-    if [[ "${filter_state}" != "1" ]]; then
+	if [[ "${remediate_network_filter}" == "true" ]]; then
 
-        if [[ "${remediate_network_filter}" == "true" ]]; then
+		# Only force enable the network filter if running macOS 11.3 or newer
+		if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 3" ) -eq 1  ]]; then
 
-            # Only force enable the network filter if running macOS 11.3 or newer
-            if [[ $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 3" ) -eq 1  ]]; then
+			# shellcheck disable=SC2034
+			enable_filter_results=$( "${falconctl}" enable-filter )
+			cs_filter_exit_code=$?
+			# echo "enable_filter_results:  ${enable_filter_results}"
 
-                # shellcheck disable=SC2034
-                enable_filter_results=$( "${falconctl}" enable-filter )
-                cs_filter_exit_code=$?
-                # echo "enable_filter_results:  ${enable_filter_results}"
+			if [[ $cs_filter_exit_code -ne 0 ]]; then
 
-                if [[ $cs_filter_exit_code -ne 0 ]]; then
+				# Return that we are unable to enable the network filter
+				returnResult+=" Unable to enable network filter;"
 
-                    # Return that we are unable to enable the network filter
-                    returnResult+=" Unable to enable network filter;"
+			fi
 
-                fi
+		fi
 
-            fi
+	else
 
-        else
+		# Return that the network filter is disabled
+		returnResult+=" Network filter disabled;"
 
-            # Return that the network filter is disabled
-            returnResult+=" Network filter disabled;"
-
-        fi
-
-    fi
+	fi
 
 fi
 
-if [[ "$( sip_status )" == "enabled" ]]; then
+check_system_extension
 
-    check_system_extension
+check_kernel_extension
 
-    check_kernel_extension
-
-    check_privacy_preferences
-
-fi
+check_privacy_preferences
 
 # Return the EA Value.
 if [[ -n "${returnResult}" ]]; then
 
-    # Trim leading space
-    returnResult="${returnResult## }"
-    # Trim trailing ;
-    report_result "${returnResult%%;}"
+	# Trim leading space
+	returnResult="${returnResult## }"
+	# Trim trailing ;
+	report_result "${returnResult%%;}"
 
 else
 
-    report_result "Running"
+	report_result "Running"
 
 fi
