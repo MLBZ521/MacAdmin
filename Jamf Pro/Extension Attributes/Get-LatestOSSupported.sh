@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.1.0 / Updated:  2/28/2022 / By:  ZT
+# Version:  2.2.0 / Updated:  6/6/2022 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -13,6 +13,7 @@
 #
 #	System Requirements can be found here:
 #		Full List - https://support.apple.com/en-us/HT211683
+#		Ventura (Preview) - https://www.apple.com/macos/macos-ventura-preview/
 #		Monterey - https://support.apple.com/en-us/HT212735
 #		Big Sur - https://support.apple.com/en-us/HT211238 / https://support.apple.com/kb/sp833
 #			* If running Mountain Lion 10.8, device will need to upgrade to El Capitan 10.11 first.
@@ -35,6 +36,7 @@ not_mojave_regex="^(MacPro[1-4],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9
 not_catalina_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-4],[0-9]|MacBookPro[1-8],[0-9])$"
 not_bigsur_regex="^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macmini[1-6],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-5],[0-9]|MacBookPro([1-9]|10),[0-9])$"
 not_monterey_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
+not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
 
 ##################################################
 # Setup Functions
@@ -56,8 +58,10 @@ model_check() {
 		echo "Catalina"
 	elif [[ $model =~ $not_monterey_regex ]]; then
 		echo "Big Sur"
-	else
+	elif [[ $model =~ $not_ventura_regex ]]; then
 		echo "Monterey"
+	else
+		echo "Ventura*"
 	fi
 }
 
@@ -73,7 +77,9 @@ os_check() {
 
 	if [[ ! "${mac_model}" =~ ^MacPro.*$ ]]; then
 
-		if [[ "${validate_os}" == "Monterey" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		if [[ "${validate_os}" == "Ventura*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+			echo "Ventura*"
+		elif [[ "${validate_os}" == "Monterey" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
 			echo "Monterey"
 		elif [[ "${validate_os}" == "Big Sur" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
 			echo "Big Sur"
@@ -99,7 +105,10 @@ os_check() {
 	else
 		# Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to the original "simplistic" logic in this script.
 
-		if [[ "${validate_os}" == "Monterey" ]]; then
+		if [[ "${validate_os}" == "Ventura*" ]]; then
+			echo "Ventura*"
+
+		elif [[ "${validate_os}" == "Monterey" ]]; then
 			# Any MacPro model that is compatible with Monterey based on model identifier alone, is 100% compatible with Monterey,
 			# since they wouldn't be compatible with any OS that is old, nor could they have incompatible hardware.
 			# e.g. MacPro6,1 (i.e. 2013/Trash Cans) and newer
@@ -159,7 +168,7 @@ ram_check() {
 	# Get RAM Info
 	system_ram=$(( $( /usr/sbin/sysctl -n hw.memsize ) / bytes_in_gigabytes ))
 
-	if [[ "${validate_os}" =~ ^(Catalina|Big\sSur|Monterey)$ ]]; then
+	if [[ "${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|Ventura*)$ ]]; then
 		# OS version requires 4GB RAM minimum
 
 		if [[ $system_ram -lt $minimum_ram_catalina_and_newer ]]; then
@@ -226,6 +235,12 @@ storage_check() {
 	
 	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
+		"Ventura*" )
+			required_free_space_newer="27917287424" # 26GB if Sierra or later
+			os_newer="10.12.0"
+			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
+			os_older="10.11.0"
+		;;
 		"Monterey" )
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
@@ -309,6 +324,9 @@ mac_model=$( /usr/sbin/sysctl -n hw.model )
 model_result=$( model_check "${mac_model}" )
 
 case "${model_result}" in
+	"Ventura*" )
+		version_string="13"
+	;;
 	"Monterey" )
 		version_string="12"
 	;;
@@ -335,7 +353,7 @@ esac
 # Check to see if device is already running the latest supported OS
 # If so, no reason to check further specifications
 if [[ "${version_string}" -eq "${current_os_major}" || 
-	  "${version_string}" -eq "${current_os_major}.${current_os_minor}" ]]; then
+	  "${version_string}" == "${current_os_major}.${current_os_minor}" ]]; then
 
 	echo "<result>${model_result}</result>"
 
