@@ -2,7 +2,7 @@
 """
 Script Name:  Get-LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.6.0 / Updated:  5/2/2022 / By:  ZT
+Version:  1.7.0 / Updated:  5/24/2022 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 
@@ -31,9 +31,54 @@ import os
 import re
 import platform
 import plistlib
+import shlex
+import subprocess
 
-from datetime import datetime, timezone, timedelta
+from datetime import timezone # datetime, timedelta
 from pkg_resources import parse_version
+
+
+def execute_process(command, input=None):
+    """
+    A helper function for subprocess.
+
+    Args:
+        command (str):  The command line level syntax that would be written in a 
+            shell script or a terminal window
+
+    Returns:
+        dict:  Results in a dictionary
+    """
+
+    # Validate that command is not a string
+    if not isinstance(command, str):
+        raise TypeError("Command must be a str type")
+
+    # Format the command
+    command = shlex.split(command)
+
+    # Run the command
+    process = subprocess.Popen( 
+        command, 
+        stdin=subprocess.PIPE, 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE, 
+        shell=False, 
+        universal_newlines=True 
+    )
+
+    if input:
+        (stdout, stderr) = process.communicate(input=input)
+
+    else:
+        (stdout, stderr) = process.communicate()
+
+    return {
+        "stdout": (stdout).strip(),
+        "stderr": (stderr).strip() if stderr != None else None,
+        "exitcode": process.returncode,
+        "success": True if process.returncode == 0 else False
+    }
 
 
 def utc_to_local(utc_dt):
@@ -44,8 +89,6 @@ def utc_to_local(utc_dt):
 def update_journal():
     # For macOS Big Sur and newer
     update_journal_plist = "/private/var/db/softwareupdate/journal.plist"
-    global last_update
-    global local_time_stamp
 
     # Verify file exists
     if os.path.exists(update_journal_plist):
@@ -65,27 +108,20 @@ def update_journal():
                     if re.search(update.get("version"), update.get("title")):
 
                         local_time_stamp = utc_to_local(update.get("installDate"))
-                        last_update = "{} @ {}".format(update.get("title"), str(local_time_stamp))
+                        return f"{update.get('title')} @ {str(local_time_stamp)}"
 
                     else:
 
                         local_time_stamp = utc_to_local(update.get("installDate"))
-                        last_update = "{} @ {} {}".format(
-                            update.get("title"), update.get("version"), str(local_time_stamp))
-
-                break
+                        return f"{update.get('title')} @ {update.get('version')} {str(local_time_stamp)}"
 
     else:
         print("Missing journal.plist")
 
-    return last_update, local_time_stamp
 
-
-def intstall_history():
+def install_history():
     # For macOS Catalina and older
     install_history_plist = "/Library/Receipts/InstallHistory.plist"
-    global last_update
-    global local_time_stamp
 
     # Verify file exists
     if os.path.exists(install_history_plist):
@@ -127,14 +163,14 @@ def intstall_history():
                             # print("Some other unwanted package")
                             break
 
-                except:
+                except Exception:
                     pass
 
                 display_name = str(update.get("displayName")).lstrip("Install ")
 
                 # If the display name includes the version, don't repeat the version string
                 if ( 
-                    update.get("displayVersion") is not None
+                    update.get("displayVersion") is not None 
                     and update.get("displayVersion") != " " 
                     and re.search(update.get("displayVersion"), display_name) 
                 ):
@@ -142,69 +178,82 @@ def intstall_history():
                     last_update = display_name
 
                 else:
-                    last_update = "{} {}".format(display_name, update.get("displayVersion"))
+                    last_update = f"{display_name} {update.get('displayVersion')}"
 
                 if update.get("date"):
                     local_time_stamp = utc_to_local(update.get("date"))
-                    last_update = "{} @ {}".format(last_update, str(local_time_stamp))
+                    last_update = f"{last_update} @ {str(local_time_stamp)}"
 
-                break
+                return last_update
 
     else:
         print("Missing InstallHistory.plist")
 
-    return last_update, local_time_stamp
-
 
 def main():
 
+    perform_recon = False
+    local_inventory = "/opt/ManagedFrameworks/Inventory.plist"
+
     if parse_version(platform.mac_ver()[0]) >= parse_version("10.16"):
 
-        last_update, local_time_stamp = update_journal()
-
-        if not last_update:
-
-            last_update, local_time_stamp = intstall_history()
+        last_update = update_journal() or install_history()
 
     else:
 
-        last_update, local_time_stamp = intstall_history()
+        last_update = install_history()
 
     if last_update:
 
-        local_inventory = "/opt/ManagedFrameworks/Inventory.plist"
-        current_time = utc_to_local(datetime.now())
-
-        within_24hours = current_time - timedelta(hours=24) <= local_time_stamp
+        print(f"Last OS update installed:  {last_update}")
 
         # Check if local inventory exists
         if os.path.exists(local_inventory):
 
-            # Open the local inventory
+            # Open the local inventory 
             with open(local_inventory, "rb") as local_inventory_path:
-
-                # Load the InstallHistory.plist
                 plist_Contents = plistlib.load(local_inventory_path)
 
+            last_reported = plist_Contents.get("last_reported_os_update_installed", None)
+
+            if last_reported:
+                print(f"Last reported OS update installed:  {last_update}")
+
+            if (
+                plist_Contents.get("last_os_update_installed_within_24hours", False) and
+                last_update != last_reported
+            ):
+                print("OS has been updated, performing recon...")
+                perform_recon = True
+
+            else:
+                print("OS has not been updated.")
+
+            plist_Contents.pop("last_os_update_installed_within_24hours", None)
+
         else:
+            # If the device doesn't have a local inventory register, it's unknown if the device 
+            # has reported its most recent OS update to Jamf Pro.
+            print("Device doesn't have a local inventory register, performing recon...")
             plist_Contents = {}
+            perform_recon = True
 
         # Update the values
         plist_Contents["last_os_update_installed"] = last_update
-        plist_Contents["last_os_update_installed_within_24hours"] = within_24hours
-
-        # Save the changes
-        with open(local_inventory, "wb") as local_inventory_path:
-            plistlib.dump(plist_Contents, fp=local_inventory_path)
-
-        print("{}".format(last_update))
 
     else:
 
         print("No Updates Installed")
+        plist_Contents = { "last_os_update_installed": "No updates installed" }
+
+    # Save the changes
+    with open(local_inventory, "wb") as local_inventory_path:
+        plistlib.dump(plist_Contents, fp=local_inventory_path)
+
+    if perform_recon:
+        # Call a Policy to perform a recon
+        execute_process("/usr/local/bin/jamf policy -id 10")
 
 
 if __name__ == "__main__":
-    last_update = None
-    local_time_stamp = None
     main()
