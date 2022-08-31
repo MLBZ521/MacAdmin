@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_db_maint.sh
 # By:  Zack Thompson / Created:  2/28/2020
-# Version:  1.0.0 / Updated:  2/28/2020 / By:  ZT
+# Version:  1.1.0 / Updated:  7/21/2021 / By:  ZT
 #
 # Description:  This script is used to perform database maintenance on the Jamf Pro database.
 #
@@ -97,7 +97,7 @@ mysqlBinary="/usr/bin/mysql"
 logFile="${logDirectory}/jamf_DBMaintenance.log"
 
 if [[ ! -d "${logDirectory}" ]]; then
-    mkdir "${logDirectory}"
+    mkdir -p "${logDirectory}"
 fi
 
 # Verify the MySQL Binary is at the expected location, if not, prompt for it
@@ -129,7 +129,7 @@ verboseHelper() {
     fi
 }
 
-# The function will promte to continue or exit early
+# The function will promote to continue or exit early
 decisionCheck()  {
 
     # Turn on case-insensitive pattern matching
@@ -152,7 +152,7 @@ decisionCheck()  {
             ;;
             * )
                 verboseHelper "Yes" "Elected to stop maintenance"
-                echo "Log written to:  "${logFile}""
+                echo "Log written to:  ${logFile}"
                 # Clear the environment variable
                 unset MYSQL_PWD
                 exit 2
@@ -179,27 +179,24 @@ echo "**************************************************"
 echo "**************************************************"
 echo ""
 
-## Clean up unused VPP Icons
+## Clean up unused Icons
 verboseHelper "No" "-- ##################################################"
 verboseHelper "Yes" "*****  Database maintenance started  *****"
 verboseHelper "No" ""
 verboseHelper "Yes" "-- icons table"
 
-verboseHelper "Yes" "-- Get total count"
-mysqlHelper "SELECT COUNT(*) FROM icons;"
-
-verboseHelper "Yes" "-- Create a backup of the table"
+verboseHelper "Yes" "-- Creating a backup of the table"
 mysqlHelper "CREATE TABLE icons_backup LIKE icons;"
 mysqlHelper "INSERT icons_backup SELECT * FROM icons;"
 
-verboseHelper "Yes" "-- Create a table of icon_id's for all icons in use"
-mysqlHelper "CREATE TABLE icons_in_use (icon_id int(11));"
+verboseHelper "Yes" "-- Get total count"
+mysqlHelper "SELECT COUNT(*) FROM icons;"
 
-verboseHelper "Yes" "-- Finding all used icon_id's"
-mysqlHelper "INSERT into icons_in_use SELECT icon_attachment_id AS id FROM ibooks UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_apps UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM mac_apps UNION ALL SELECT icon_attachment_id AS id FROM os_x_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM self_service_plugins UNION ALL SELECT icon_id AS id FROM vpp_mobile_device_app_license_app UNION ALL SELECT icon_id AS id FROM wallpaper_auto_management_settings UNION ALL SELECT self_service_icon_id AS id FROM os_x_configuration_profiles UNION ALL SELECT self_service_icon_id AS id FROM patch_policies UNION ALL SELECT self_service_icon_id AS id FROM policies UNION ALL SELECT profile_id AS id FROM mobile_device_management_commands WHERE command='Wallpaper' UNION ALL SELECT branding_icon_id AS id FROM self_service UNION ALL SELECT branding_image_id AS id FROM self_service;"
+verboseHelper "Yes" "-- Get total count of unused icons"
+mysqlHelper "SELECT COUNT(*) FROM icons WHERE icons.icon_id NOT IN ( SELECT icon_attachment_id AS id FROM ibooks UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_apps UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM mac_apps UNION ALL SELECT icon_attachment_id AS id FROM os_x_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM self_service_plugins UNION ALL SELECT icon_id AS id FROM vpp_assets UNION ALL SELECT icon_id AS id FROM wallpaper_auto_management_settings UNION ALL SELECT self_service_icon_id AS id FROM os_x_configuration_profiles UNION ALL SELECT self_service_icon_id AS id FROM patch_policies UNION ALL SELECT self_service_icon_id AS id FROM policies UNION ALL SELECT profile_id AS id FROM mobile_device_management_commands WHERE command='Wallpaper' UNION ALL SELECT deprecated_branding_icon_id AS id FROM self_service UNION ALL SELECT deprecated_branding_image_id AS id FROM self_service UNION ALL SELECT icon_id AS id FROM ss_ios_branding_settings UNION ALL SELECT icon_id AS id FROM ss_macos_branding_settings );"
 
-verboseHelper "Yes" "-- Delete VPP App Icons not in use"
-mysqlHelper "DELETE FROM icons WHERE icon_id NOT IN ( SELECT icon_id FROM icons_in_use ) AND ( filename IN ( \"100x100bb.jpg\", \"100x100bb.png\", \"1024x1024bb.png\", \"512x512bb.png\" ) OR filename REGEXP \"^[0-9]+.(png|jpg)$\");"
+verboseHelper "Yes" "-- Delete Icons not in use"
+mysqlHelper "DELETE FROM icons WHERE icons.icon_id NOT IN ( SELECT icon_attachment_id AS id FROM ibooks UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_apps UNION ALL SELECT icon_attachment_id AS id FROM mobile_device_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM mac_apps UNION ALL SELECT icon_attachment_id AS id FROM os_x_configuration_profiles UNION ALL SELECT icon_attachment_id AS id FROM self_service_plugins UNION ALL SELECT icon_id AS id FROM vpp_assets UNION ALL SELECT icon_id AS id FROM wallpaper_auto_management_settings UNION ALL SELECT self_service_icon_id AS id FROM os_x_configuration_profiles UNION ALL SELECT self_service_icon_id AS id FROM patch_policies UNION ALL SELECT self_service_icon_id AS id FROM policies UNION ALL SELECT profile_id AS id FROM mobile_device_management_commands WHERE command='Wallpaper' UNION ALL SELECT deprecated_branding_icon_id AS id FROM self_service UNION ALL SELECT deprecated_branding_image_id AS id FROM self_service UNION ALL SELECT icon_id AS id FROM ss_ios_branding_settings UNION ALL SELECT icon_id AS id FROM ss_macos_branding_settings ) AND ( icons.filename REGEXP \"^([0-9]+x[0-9]+bb|[0-9]+)[.](png|jpg)$\");"
 
 verboseHelper "Yes" "-- Get new total count"
 mysqlHelper "SELECT COUNT(*) FROM icons;"
@@ -267,6 +264,86 @@ if [[ "${fullSpeedAhead}" == "No" ]]; then
 fi
 
 verboseHelper "No" "-- ##################################################"
+verboseHelper "Yes" "-- computer_user_pushtokens table"
+## Clean up records in the computer_user_pushtokens table
+
+verboseHelper "Yes" "-- Get total count"
+mysqlHelper "SELECT COUNT(*) FROM computer_user_pushtokens;"
+
+verboseHelper "Yes" "-- Get number of records to delete"
+mysqlHelper "SELECT COUNT(*) FROM computer_user_pushtokens WHERE user_short_name LIKE \"uid_%\";"
+
+verboseHelper "Yes" "-- Rename the original table"
+mysqlHelper "RENAME TABLE computer_user_pushtokens TO computer_user_pushtokens_original;"
+
+verboseHelper "Yes" "-- Create new table like the old table"
+mysqlHelper "CREATE TABLE computer_user_pushtokens LIKE computer_user_pushtokens_original;"
+
+verboseHelper "Yes" "-- Insert the records from the original table"
+mysqlHelper "INSERT INTO computer_user_pushtokens SELECT * FROM computer_user_pushtokens_original WHERE user_short_name NOT LIKE \"uid_%\";"
+
+verboseHelper "Yes" "-- Get new total count"
+mysqlHelper "SELECT COUNT(*) FROM computer_user_pushtokens;"
+
+if [[ "${fullSpeedAhead}" == "No" ]]; then
+    decisionCheck tableMaint
+fi
+
+verboseHelper "No" "-- ##################################################"
+verboseHelper "Yes" "-- mdm_command_source and mdm_command_group tables"
+## Clean up records in the computer_user_pushtokens table
+
+verboseHelper "Yes" "-- Creating new mdm_command_source table"
+mysqlHelper "CREATE TABLE mdm_command_source_new LIKE mdm_command_source;"
+
+verboseHelper "Yes" "-- Creating new mdm_command_group table"
+mysqlHelper "CREATE TABLE mdm_command_group_new LIKE mdm_command_group;"
+
+verboseHelper "Yes" "-- Inserting desired records into new table"
+mysqlHelper "INSERT INTO mdm_command_source_new ( SELECT * FROM mdm_command_source WHERE mdm_command_id IN ( SELECT mobile_device_management_command_id FROM mobile_device_management_commands ) );"
+
+verboseHelper "Yes" "-- Renaming old table"
+mysqlHelper "RENAME TABLE mdm_command_source TO mdm_command_source_old, mdm_command_source_new TO mdm_command_source;"
+
+verboseHelper "Yes" "-- Dropping old table"
+mysqlHelper "DROP TABLE mdm_command_source_old;"
+
+verboseHelper "Yes" "-- Inserting desired records into new table"
+mysqlHelper "INSERT INTO mdm_command_group_new ( SELECT * FROM mdm_command_group WHERE id IN ( SELECT id FROM mdm_command_source ) ); "
+
+verboseHelper "Yes" "-- Renaming old table"
+mysqlHelper "RENAME TABLE mdm_command_group to mdm_command_group_old, mdm_command_group_new TO mdm_command_group;"
+
+verboseHelper "Yes" "-- Dropping old table"
+mysqlHelper "DROP TABLE mdm_command_group_old;"
+
+if [[ "${fullSpeedAhead}" == "No" ]]; then
+    decisionCheck tableMaint
+fi
+
+verboseHelper "No" "-- ##################################################"
+verboseHelper "Yes" "-- mobile_device_management_commands table"
+# Clean up records in the mobile_device_management_commands table
+
+verboseHelper "Yes" "-- Get total count"
+mysqlHelper "SELECT COUNT(*) FROM mobile_device_management_commands;"
+
+verboseHelper "Yes" "-- Get number of records to delete"
+mysqlHelper "SELECT * FROM mobile_device_management_commands WHERE apns_result_status=\"\" and device_object_id=12 and device_id NOT IN (SELECT computer_user_pushtoken_id FROM computer_user_pushtokens);"
+
+verboseHelper "Yes" "-- Rename the original table"
+mysqlHelper "RENAME TABLE mobile_device_management_commands TO mobile_device_management_commands_original;"
+
+verboseHelper "Yes" "-- Create new table like the old table"
+mysqlHelper "CREATE TABLE mobile_device_management_commands LIKE mobile_device_management_commands_original;"
+
+# verboseHelper "Yes" "-- Insert the records from the original table"
+# mysqlHelper "INSERT INTO computer_user_pushtokens SELECT * computer_user_pushtokens_original WHERE user_short_name NOT LIKE \"uid_%\";"
+
+verboseHelper "Yes" "-- Get new total count"
+mysqlHelper "SELECT COUNT(*) FROM mobile_device_management_commands;"
+
+verboseHelper "No" "-- ##################################################"
 verboseHelper "Yes" "-- locations table"
 ## Clean up location records -- remove specific records that are "empty" based on the attributes checked *expect* if it is the latest record
 
@@ -283,7 +360,7 @@ verboseHelper "Yes" "-- Create new table like the old table"
 mysqlHelper "CREATE TABLE locations LIKE locations_original;"
 
 verboseHelper "Yes" "-- Select the records that are not completely empty"
-mysqlHelper "INSERT INTO locations select * from locations_original WHERE ( ( username <> '' OR realname <> '' OR room <> '' OR phone <> '' OR email <> '' OR position <> '' ) OR ( location_id IN ( SELECT last_location_id FROM computers_denormalized ) OR location_id IN ( SELECT last_location_id FROM mobile_devices_denormalized )));"
+mysqlHelper "INSERT INTO locations SELECT * FROM locations_original WHERE ( ( username <> '' OR realname <> '' OR room <> '' OR phone <> '' OR email <> '' OR position <> '' ) OR ( location_id IN ( SELECT last_location_id FROM computers_denormalized ) OR location_id IN ( SELECT last_location_id FROM mobile_devices_denormalized )));"
 
 verboseHelper "Yes" "-- Get new total count"
 mysqlHelper "SELECT COUNT(*) FROM locations;"
@@ -318,7 +395,6 @@ verboseHelper "Yes" "-- Get new total count"
 mysqlHelper "SELECT COUNT(*) FROM location_history;"
 
 verboseHelper "No" "-- ##################################################"
-
 echo ""
 echo "We're almost done!"
 echo ""
