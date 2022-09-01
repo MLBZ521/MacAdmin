@@ -7,38 +7,38 @@
 -- Computer Groups
 
 -- Unused Computer Groups
-select distinct computer_groups.computer_group_id, computer_groups.computer_group_name
-from computer_groups
-where computer_groups.computer_group_id not in ( 
-    select target_id
-    from policy_deployment
-    where policy_deployment.target_id = computer_groups.computer_group_id 
-    and policy_deployment.target_type = "7" 
+SELECT DISTINCT computer_groups.computer_group_id, computer_groups.computer_group_name
+FROM computer_groups
+WHERE computer_groups.computer_group_id NOT IN ( 
+    SELECT target_id
+    FROM policy_deployment
+    WHERE policy_deployment.target_id = computer_groups.computer_group_id 
+    AND policy_deployment.target_type = "7" 
     )
-and computer_groups.computer_group_id not in ( 
-    select target_id
-    from os_x_configuration_profile_deployment
-    where os_x_configuration_profile_deployment.target_id = computer_groups.computer_group_id 
-    and os_x_configuration_profile_deployment.target_type = "7" 
+AND computer_groups.computer_group_id NOT IN ( 
+    SELECT target_id
+    FROM os_x_configuration_profile_deployment
+    WHERE os_x_configuration_profile_deployment.target_id = computer_groups.computer_group_id 
+    AND os_x_configuration_profile_deployment.target_type = "7" 
     );
 
 
 -- Empty Computer Groups
-select distinct computer_groups.computer_group_id, computer_groups.computer_group_name
-from computer_groups
-where computer_groups.computer_group_id not in ( 
-    select computer_group_id
-    from computer_group_memberships 
+SELECT DISTINCT computer_groups.computer_group_id, computer_groups.computer_group_name
+FROM computer_groups
+WHERE computer_groups.computer_group_id NOT IN ( 
+    SELECT computer_group_id
+    FROM computer_group_memberships 
     );
 
 
 -- Computer Groups with no defined Criteria
-select distinct computer_groups.computer_group_id, computer_groups.computer_group_name
-from computer_groups
-where computer_groups.is_smart_group = "1"
-and computer_groups.computer_group_id not in ( 
-    select computer_group_id
-    from smart_computer_group_criteria 
+SELECT DISTINCT computer_groups.computer_group_id, computer_groups.computer_group_name
+FROM computer_groups
+WHERE computer_groups.is_smart_group = "1"
+AND computer_groups.computer_group_id NOT IN ( 
+    SELECT computer_group_id
+    FROM smart_computer_group_criteria 
     );
 
 
@@ -46,36 +46,36 @@ and computer_groups.computer_group_id not in (
 -- Mobile Device Groups
 
 -- Unused Mobile Device Groups
-select distinct mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
-from mobile_device_groups
-where mobile_device_groups.mobile_device_group_id not in ( 
-    select target_id
-    from policy_deployment
-    where policy_deployment.target_id = mobile_device_groups.mobile_device_group_id 
-    and policy_deployment.target_type = "7" 
+SELECT DISTINCT mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
+FROM mobile_device_groups
+WHERE mobile_device_groups.mobile_device_group_id NOT IN ( 
+    SELECT target_id
+    FROM policy_deployment
+    WHERE policy_deployment.target_id = mobile_device_groups.mobile_device_group_id 
+    AND policy_deployment.target_type = "7" 
     )
-and mobile_device_groups.mobile_device_group_id not in ( 
-    select target_id
-    from mobile_device_configuration_profile_deployment
-    where mobile_device_configuration_profile_deployment.target_id = mobile_device_groups.mobile_device_group_id 
-    and mobile_device_configuration_profile_deployment.target_type = "7" 
+AND mobile_device_groups.mobile_device_group_id NOT IN ( 
+    SELECT target_id
+    FROM mobile_device_configuration_profile_deployment
+    WHERE mobile_device_configuration_profile_deployment.target_id = mobile_device_groups.mobile_device_group_id 
+    AND mobile_device_configuration_profile_deployment.target_type = "7" 
     );
 
 
 -- Empty Mobile Device Groups
-select distinct mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
-from mobile_device_groups
-where mobile_device_groups.mobile_device_group_id not in ( 
-    select mobile_device_group_id
-    from mobile_device_group_memberships 
+SELECT DISTINCT mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
+FROM mobile_device_groups
+WHERE mobile_device_groups.mobile_device_group_id NOT IN ( 
+    SELECT mobile_device_group_id
+    FROM mobile_device_group_memberships 
     );
 
 
 -- Mobile Device Groups with no defined Criteria
-select distinct mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
-from mobile_device_groups
-where mobile_device_groups.is_smart_group = "1"
-and mobile_device_groups.mobile_device_group_id not in ( 
-    select mobile_device_group_id
-    from smart_mobile_device_group_criteria 
+SELECT DISTINCT mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
+FROM mobile_device_groups
+WHERE mobile_device_groups.is_smart_group = "1"
+AND mobile_device_groups.mobile_device_group_id NOT IN ( 
+    SELECT mobile_device_group_id
+    FROM smart_mobile_device_group_criteria 
     );

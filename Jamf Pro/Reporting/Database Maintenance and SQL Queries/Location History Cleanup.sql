@@ -2,6 +2,10 @@
 -- # Clean up Location History #
 -- #############################
 
+-- NOTE: These really aren't required any more since Jamf added these tables to the automtaic 
+-- Flush Policy -- which I disagree with.
+--      (But you can disable that and then these my still be useful to you.)
+
 -- These are notes on performing maintenance on the locations and location_history tables within the Jamf Pro database.
 -- The actions in option one were incorporated within my jamf_db_maint.sh script.
 -- These are formatted for readability, just fyi.
@@ -16,41 +20,41 @@
 -- Stop Tomcat on all JPS servers
 
 -- Create a backup of the table affected tables
-create table location_history_backup like location_history;
-insert location_history_backup select * from location_history;
+CREATE TABLE location_history_backup LIKE location_history;
+INSERT location_history_backup SELECT * FROM location_history;
 
-create table locations_backup like locations;
-insert locations_backup select * from locations;
+CREATE TABLE locations_backup LIKE locations;
+INSERT locations_backup SELECT * FROM locations;
 
 -- Create a table with the empty location records
-create table empty_location_records (
-    select locations.location_id from locations where ( 
+CREATE TABLE empty_location_records (
+    SELECT locations.location_id FROM locations WHERE ( 
         locations.username = ""
-        and locations.realname = ""
-        and locations.room = ""
-        and locations.phone = ""
-        and locations.email = ""
-        and locations.position = ""
-        and locations.location_id not in ( 
-            select location_id from locations 
-                inner join computers_denormalized on computers_denormalized.last_location_id = locations.location_id 
+        AND locations.realname = ""
+        AND locations.room = ""
+        AND locations.phone = ""
+        AND locations.email = ""
+        AND locations.position = ""
+        AND locations.location_id NOT IN ( 
+            SELECT location_id FROM locations 
+                INNER JOIN computers_denormalized ON computers_denormalized.last_location_id = locations.location_id 
             )
     )
 );
 
 -- Delete empty location records
-delete locations_backup from locations_backup where location_id in ( 
-    select location_id from empty_location_records 
+DELETE locations_backup FROM locations_backup WHERE location_id IN ( 
+    SELECT location_id FROM empty_location_records 
     );
-delete location_history_backup from location_history_backup where location_id in ( 
-    select location_id from empty_location_records 
+DELETE location_history_backup FROM location_history_backup WHERE location_id IN ( 
+    SELECT location_id FROM empty_location_records 
     );
 
 -- Start Tomcat on master JPS that is admin facing and verify everything looks good with the modifications performed.
 
-drop table location_history_backup;
-drop table locations_backup;
-drop table empty_location_records;
+DROP TABLE location_history_backup;
+DROP TABLE locations_backup;
+DROP TABLE empty_location_records;
 
 -- Start remaining Tomcat nodes
 
@@ -63,49 +67,49 @@ drop table empty_location_records;
 
 -- To clear out Location_History information, excluding the most recent data
 
-create table location_history_new like location_history;
+CREATE TABLE location_history_new LIKE location_history;
 
-insert into location_history_new (
-    select * from location_history 
-        where computer_id = 0
+INSERT INTO location_history_new (
+    SELECT * FROM location_history 
+        WHERE computer_id = 0
     );
 
-insert into location_history_new (
-    select * from location_history 
-        where location_id in (
-            select last_location_id from computers_denormalized
+INSERT INTO location_history_new (
+    SELECT * FROM location_history 
+        WHERE location_id IN (
+            SELECT last_location_id FROM computers_denormalized
             )
     );
 
-rename table location_history to location_history_old;
+RENAME TABLE location_history TO location_history_old;
 
-rename table location_history_new to location_history;
+RENAME TABLE location_history_new TO location_history;
 
-drop table location_history_old;
+DROP TABLE location_history_old;
 
 -- To clear Locations information, excluding most recent data
 
-create table locations_new like locations;
+CREATE TABLE locations_new LIKE locations;
 
-insert into locations_new (
-    select * from locations 
-        where location_id in (
-            select last_location_id from computers_denormalized
+INSERT INTO locations_new (
+    SELECT * FROM locations 
+        WHERE location_id IN (
+            SELECT last_location_id FROM computers_denormalized
             )
     );
 
-insert into locations_new (
-    select * from locations 
-        where location_id in (
-            select last_location_id from mobile_devices_denormalized
+INSERT INTO locations_new (
+    SELECT * FROM locations 
+        WHERE location_id IN (
+            SELECT last_location_id FROM mobile_devices_denormalized
             )
     );
 
-rename table locations to locations_old;
+RENAME TABLE locations TO locations_old;
 
-rename table locations_new to locations;
+RENAME TABLE locations_new TO locations;
 
-drop table locations_old;
+DROP TABLE locations_old;
 
 -- Start Tomcat on master JPS that is admin facing and verify everything looks good with the modifications performed.
 -- Start remaining Tomcat nodes
