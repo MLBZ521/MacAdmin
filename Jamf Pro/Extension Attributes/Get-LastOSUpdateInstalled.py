@@ -2,7 +2,7 @@
 """
 Script Name:  Get-LastOSUpdateInstalled.py
 By:  Zack Thompson / Created:  8/23/2019
-Version:  1.7.0 / Updated:  5/24/2022 / By:  ZT
+Version:  1.8.0 / Updated:  10/27/2022 / By:  ZT
 
 Description:  A Jamf Pro Extension Attribute to pull the last operating system update installed.
 
@@ -130,7 +130,7 @@ def install_history():
         pattern_process_names = re.compile(
             "(?:installer)|(?:macOS Installer)|(?:OS X Installer)|(?:softwareupdated)")
         pattern_display_names = re.compile(
-            "(?:macOS .+ Beta)|(?:macOS 12.+)|(?:macOS 11.+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
+            "(?:macOS .+ Beta)|(?:macOS 1[1-3].+)|(?:macOS Catalina 10\.15\.\d)|(?:macOS 10\.14\.\d Update)|(?:Install macOS High Sierra)|(?:macOS Sierra Update)|(?:OS X El Capitan Update)|(?:Security Update \d\d\d\d-\d\d\d).*")
         pattern_package_identifiers = re.compile(
             "(?:com\.apple\.pkg\.macOSBrain)|(?:com\.apple\.pkg\.InstallAssistantMAS)")
         pattern_package_identifiers_ignore = re.compile(
