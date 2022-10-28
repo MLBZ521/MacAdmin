@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.2.0 / Updated:  6/6/2022 / By:  ZT
+# Version:  2.2.1 / Updated:  10/28/2022 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -352,8 +352,8 @@ esac
 
 # Check to see if device is already running the latest supported OS
 # If so, no reason to check further specifications
-if [[ "${version_string}" -eq "${current_os_major}" || 
-	  "${version_string}" == "${current_os_major}.${current_os_minor}" ]]; then
+if [[ "${version_string}" == "${current_os_major}.${current_os_minor}" || 
+	  "${version_string}" -eq "${current_os_major}"  ]]; then
 
 	echo "<result>${model_result}</result>"
 
