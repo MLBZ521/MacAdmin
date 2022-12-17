@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Setup-Xcode.sh
 # By:  Zack Thompson / Created:  3/29/2021
-# Version:  1.0.0 / Updated:  3/29/2021 / By:  ZT
+# Version:  1.0.1 / Updated:  7/13/2022 / By:  ZT
 #
 # Description:  This script customizes and sets up the Xcode environment for immediate use.
 #
@@ -25,9 +25,14 @@ include_version_in_app_name="${4}"
 #   null (no value) = do nothing
 set_developer_perms="${5}"
 launch_agent_label="${6}"
+
+if [[ -z "${launch_agent_label}" ]]; then
+    launch_agent_label="com.github.mlbz521.XcodeEnableDeveloper"
+fi
+
 launch_agent_location="/Library/LaunchAgents/${launch_agent_label}.plist"
 
-# Specify wether or not to edit the authorizationdb to allow any member of "_developer" group 
+# Specify wether or not to edit the authorizationdb to allow any member of "_developer" group
 # to be able to install Apple-provided software; options are:
 #   true:  edits the authorizationdb to allow any member of _developer to install Apple-provided software
 #   false:  does nothing
@@ -68,6 +73,10 @@ if [[ -d "${xcode_path}" ]]; then
         xcode_major_version=$( echo "${xcode_version}" | /usr/bin/awk -F '.' '{print $1}' )
         new_xcode_path="/Applications/Xcode ${xcode_major_version}.app"
 
+        if [[ -e "${new_xcode_path}" ]]; then
+            /bin/rm -Rf "${new_xcode_path}"
+        fi
+
         # Update the Xcode app name
         /bin/mv "${xcode_path}" "${new_xcode_path}"
 
@@ -82,14 +91,12 @@ if [[ -d "${xcode_path}" ]]; then
     fi
 
 else
-
     echo "ERROR:  Xcode is not in the expected location!"
     echo "*****  Setup Xcode Process:  FAILED  *****"
     exit 1
-
 fi
 
-# Change the authorization policies to allow members of the admin and _developer groups to be 
+# Change the authorization policies to allow members of the admin and _developer groups to be
 # able to authenticate to use the Apple-code-signed debugger or performance analysis tools
 /usr/sbin/DevToolsSecurity -enable
 
@@ -103,11 +110,9 @@ fi
 shopt -s nocasematch
 
 if [[ "${allow_devs_auth}" == "true" ]]; then
-
     echo "Editing the authorizationdb to allow members of \`_developer\` group to install Apple-provided software"
     # Allow any member of _developer to install Apple-provided software
     /usr/bin/security authorizationdb write system.install.apple-software authenticate-developer
-
 fi
 
 if [[ -z "${set_developer_perms}" ]]; then
@@ -169,7 +174,6 @@ EOF
                 if [[ $exit_code == 0 ]]; then
                     echo "Stopping agent:  ${launch_agent_location}"
                     /bin/launchctl bootout gui/"${console_uid}"/"${launch_agent_label}"
-
                 fi
 
                 echo "Starting agent:  ${launch_agent_location}"
@@ -184,7 +188,6 @@ EOF
                 if [[ $exit_code == 0 ]]; then
                     echo "Stopping agent:  ${launch_agent_location}"
                     /bin/launchctl asuser "${console_uid}"/bin/launchctl unload "${launch_agent_location}"
-
                 fi
 
                 echo "Starting agent:  ${launch_agent_location}"
