@@ -1,9 +1,9 @@
 #!/bin/bash
-
+# set -x
 ###################################################################################################
 # Script Name:  Setup-Xcode.sh
 # By:  Zack Thompson / Created:  3/29/2021
-# Version:  1.0.1 / Updated:  7/13/2022 / By:  ZT
+# Version:  1.1.0 / Updated:  12/17/2022 / By:  ZT
 #
 # Description:  This script customizes and sets up the Xcode environment for immediate use.
 #
@@ -39,7 +39,7 @@ launch_agent_location="/Library/LaunchAgents/${launch_agent_label}.plist"
 allow_devs_auth="${7}"
 
 # Default path
-xcode_path="/Applications/Xcode.app"
+xcode_path_default="/Applications/Xcode.app"
 
 # Get OS Version Details
 os_version=$( /usr/bin/sw_vers -productVersion )
@@ -53,63 +53,138 @@ console_user=$( /usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/
 console_uid=$( /usr/bin/id -u "${console_user}" )
 
 ##################################################
+# Functions
+
+get_app_bundle_version() {
+    # Get version of an app bundle
+    local path="${1}"
+    local app_version
+
+    app_version=$( /usr/bin/defaults read "${path}/Contents/Info.plist" CFBundleShortVersionString )
+    echo "${app_version}"
+}
+
+get_app_bundle_major_version() {
+    # Get the major version of an app bundle
+    local path="${1}"
+    local app_version
+    local app_major_version
+
+    app_version=$( get_app_bundle_version "${path}" )
+    app_major_version=$( echo "${app_version}" | /usr/bin/awk -F '.' '{print $1}' )
+    echo "${app_major_version}"
+
+}
+
+determine_newest_version() {
+    # Get the newest (largest) version of a passed set of app bundle locations
+    local array=("$@")
+    local path
+    local version_array
+    local newest
+    declare -a version_array
+
+    for path in "${array[@]}"; do
+        version_array+=( $( get_app_bundle_version "${path}" ) )
+    done
+
+    old_IFS=$IFS
+    IFS=$'\n'
+    newest=($( sort --version-sort --reverse <<< "${version_array[*]}" ))
+    IFS=$old_IFS
+
+    for i in "${!version_array[@]}"; do
+        [[ "${version_array[$i]}" == "${newest[0]}" ]] && break
+    done
+
+    echo "${array[${i}]}"
+}
+
+##################################################
 # Bits staged...
 
-if [[ -d "${xcode_path}" ]]; then
+if [[ -d "${xcode_path_default}" ]]; then
+    # Acting as if this is a "new" install...
 
-    # Remove quarantine bit just in case.
-    /usr/bin/xattr -dr com.apple.quarantine "${xcode_path}"
+    if [[ $include_version_in_app_name =~ [Tt][Rr][Uu][Ee] ]]; then
 
-    # Turn on case-insensitive pattern matching
-    shopt -s nocasematch
-
-    if [[ $include_version_in_app_name == "true" ]]; then
-
-        # Turn off case-insensitive pattern matching
-        shopt -u nocasematch
-
-        # Get the major version of the current Xcode app
-        xcode_version=$( /usr/bin/defaults read "${xcode_path}/Contents/Info.plist" CFBundleShortVersionString )
-        xcode_major_version=$( echo "${xcode_version}" | /usr/bin/awk -F '.' '{print $1}' )
+        xcode_major_version=$( get_app_bundle_major_version "${xcode_path_default}" )
         new_xcode_path="/Applications/Xcode ${xcode_major_version}.app"
 
         if [[ -e "${new_xcode_path}" ]]; then
+            echo "Deleting previous major version..."
             /bin/rm -Rf "${new_xcode_path}"
         fi
 
         # Update the Xcode app name
-        /bin/mv "${xcode_path}" "${new_xcode_path}"
-
-        # Specify the version of Xcode to use
-        /usr/bin/xcode-select --switch "${new_xcode_path}"
-
-    else
-
-        # Specify the version of Xcode to use
-        /usr/bin/xcode-select --switch "${xcode_path}"
+        echo "Renaming Xcode app bundle..."
+        /bin/mv "${xcode_path_default}" "${new_xcode_path}"
 
     fi
 
-else
-    echo "ERROR:  Xcode is not in the expected location!"
-    echo "*****  Setup Xcode Process:  FAILED  *****"
-    exit 1
+    xcode_path="${xcode_path_default}"
+
 fi
+
+# Determine the Xcode app bundle to work on...
+if [[ -z "${xcode_path}" ]]; then
+
+    # Find Xcode app bundles
+    app_paths=$( /usr/bin/find -E /Applications -iregex ".*/Xcode(.*)?[.]app" -type d -prune -maxdepth 1 )
+
+    # Verify that at least one app bundle version was found.
+    if [[ -z "${app_paths}" ]]; then
+
+        echo "ERROR:  Xcode is not in the expected location!"
+        echo "*****  Setup Xcode Process:  FAILED  *****"
+        exit 1
+
+    else
+
+        # If the machine has multiple app bundles Applications, loop through them...
+        declare -a app_path_array
+        while IFS=$'\n' read -r app_path; do
+            app_path_array+=("${app_path}")
+        done < <(echo "${app_paths}")
+
+        if [[ ${#app_path_array[@]} -gt 1 ]]; then
+            xcode_path=$( determine_newest_version "${app_path_array[@]}" )
+        else
+            xcode_path="${app_path_array[0]}"
+        fi
+
+    fi
+
+fi
+
+# Ensure an app bundle was identified
+if [[ -z "${xcode_path}" ]]; then
+    echo "ERROR:  Xcode could not be found!"
+    echo "*****  Setup Xcode Process:  FAILED  *****"
+    exit 2
+fi
+
+# Remove quarantine bit just in case
+/usr/bin/xattr -dr com.apple.quarantine "${xcode_path}"
+
+# Specify the version of Xcode to use
+echo "Selecting ${xcode_path} as the default for Xcode CMD Line Tools..."
+/usr/bin/xcode-select --switch "${xcode_path}"
 
 # Change the authorization policies to allow members of the admin and _developer groups to be
 # able to authenticate to use the Apple-code-signed debugger or performance analysis tools
+echo "Allowing the admin and developer groups to use Xcode tools..."
 /usr/sbin/DevToolsSecurity -enable
 
 # Accept the Xcode license
+echo "Accepting the Xcode license..."
 /usr/bin/xcodebuild -license accept
 
 # Install all additional components
+echo "Running Xcode first launch..."
 /usr/bin/xcodebuild -runFirstLaunch
 
-# Turn on case-insensitive pattern matching
-shopt -s nocasematch
-
-if [[ "${allow_devs_auth}" == "true" ]]; then
+if [[ "${allow_devs_auth}" =~ [Tt][Rr][Uu][Ee] ]]; then
     echo "Editing the authorizationdb to allow members of \`_developer\` group to install Apple-provided software"
     # Allow any member of _developer to install Apple-provided software
     /usr/bin/security authorizationdb write system.install.apple-software authenticate-developer
@@ -119,16 +194,13 @@ if [[ -z "${set_developer_perms}" ]]; then
 
     echo "Not configuring the developer permissions..."
 
-elif [[ "${set_developer_perms}" == "everyone" ]]; then
+elif [[ "${set_developer_perms}" =~ [Ee][Vv][Ee][Rr][Yy][Oo][Nn][Ee] ]]; then
 
     echo "Adding the \`everyone\` group as a member of the \`_developer\` group."
     # Add the "everyone" group as a member of "_developer" group
     /usr/sbin/dseditgroup -o edit -a everyone -t group _developer
 
-elif [[ "${set_developer_perms}" == "launchagent" ]]; then
-
-    # Turn off case-insensitive pattern matching
-    shopt -u nocasematch
+elif [[ "${set_developer_perms}" =~ [Ll][Aa][Uu][Nn][Cc][Hh][Aa][Gg][Ee][Nn][Tt] ]]; then
 
     echo "Creating LaunchAgent to manage the \`_developer\` group:  ${launch_agent_location}"
     # Create a LaunchAgent
