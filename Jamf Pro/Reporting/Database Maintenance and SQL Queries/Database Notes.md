@@ -41,9 +41,39 @@ Table:  policy_packages
 
 Table:  site_objects
   * object_type
-    * 1 = computers
-    * 3 = policy
-    * 21 = mobile devices
+    * 1 = Computer
+    * 2 = Licensed Software
+    * 3 = Policy
+    * 4 = Computer Configuration Profiles
+    * 5 = Restricted Software
+    * 7 = Computer Groups
+    * 9 = ?
+    * 12 = ?
+    * 21 = Mobile Device
+    * 22 = Mobile Device Configuration Profile
+    * 23 = Mobile Device Apps
+    * 25 = Mobile Device Groups
+    * 27 = Mobile Device Enrollment Profiles
+    * 28 = Mobile Device Classes
+    * 53 = User
+    * 54 = User Group
+    * 57 = Advanced Volume Purchasing Content Searches
+    * 70 = Advanced Computer Searches
+    * 71 = Advanced Mobile Device Searches
+    * 84 = Computers Enrollment Invitations
+    * 110 = Mobile Devices Enrollment Invitations
+    * 252 = VPP Tokens
+    * 253 = ?
+    * 256 = Users VPP Assignments?
+    * 270 = ?
+    * 310 = ADE Tokens
+    * 312 = Mobile Device PreStage Enrollment Profiles
+    * 313 = Computer PreStage Enrollment Profiles
+    * 315 = Enrollment customizations
+    * 350 = Computer Mac Apps
+    * 382 = ?
+    * 602 = Patch Management Patch Policies
+    * 604 = Patch Management Software Titles
   * object_id = computer_id/mobile_device_id/policy_id from their respected **table**
   * site_id = sites.site_id
 
@@ -56,13 +86,17 @@ Table:  sites
 Table:  policy_deployment
   * policy_id
   * target_type
-    * 1 =
-    * 7 = Computer Group?
-    * 42 =
-    * 51 = 
+    * 1 = Computer
+    * 7 = Computer Group
+    * 21 = Mobile Device
+    * 25 = Mobile Device Group
+    * 41 = Building
+    * 42 = Department
+    * 51 = LDAP/Local User
     * 52 = LDAP Group
-    * 53 = 
+    * 53 = User
     * 101 = All Computers
+    * 102 = All Mobile Devices
     * 106 = All Users
   * target_id
 
