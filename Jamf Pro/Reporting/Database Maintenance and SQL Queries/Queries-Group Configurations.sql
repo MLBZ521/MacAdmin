@@ -38,17 +38,35 @@ computer_groups.computer_group_name NOT IN (
 
 
 -- Empty Computer Groups
-SELECT DISTINCT computer_groups.computer_group_id, computer_groups.computer_group_name
+	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	computer_groups.computer_group_name AS "Name",
+	computer_groups.computer_group_id AS "ID",
+	IF(computer_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group",
 FROM computer_groups
+LEFT JOIN site_objects
+	ON computer_groups.computer_group_id = site_objects.object_id
+		AND site_objects.object_type = "7"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
+WHERE computer_groups.is_smart_group = "1"
 WHERE computer_groups.computer_group_id NOT IN (
 	SELECT computer_group_id
 	FROM computer_group_memberships
 	);
 
 
--- Computer Groups with no defined Criteria
-SELECT DISTINCT computer_groups.computer_group_id, computer_groups.computer_group_name
+-- Computer Smart Groups with no defined Criteria
+SELECT DISTINCT
+	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	computer_groups.computer_group_name AS "Name",
+	computer_groups.computer_group_id AS "ID",
+	IF(computer_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group"
 FROM computer_groups
+LEFT JOIN site_objects
+	ON computer_groups.computer_group_id = site_objects.object_id
+		AND site_objects.object_type = "7"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
 WHERE computer_groups.is_smart_group = "1"
 AND computer_groups.computer_group_id NOT IN (
 	SELECT computer_group_id
@@ -87,17 +105,35 @@ mobile_device_groups.mobile_device_group_name NOT IN (
 
 
 -- Empty Mobile Device Groups
-SELECT DISTINCT mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
+SELECT DISTINCT
+	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	mobile_device_groups.mobile_device_group_name AS "Name",
+	mobile_device_groups.mobile_device_group_id AS "ID",
+	IF(mobile_device_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group"
 FROM mobile_device_groups
+LEFT JOIN site_objects
+	ON mobile_device_groups.mobile_device_group_id = site_objects.object_id
+		AND site_objects.object_type = "25"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
 WHERE mobile_device_groups.mobile_device_group_id NOT IN (
 	SELECT mobile_device_group_id
 	FROM mobile_device_group_memberships
 	);
 
 
--- Mobile Device Groups with no defined Criteria
-SELECT DISTINCT mobile_device_groups.mobile_device_group_id, mobile_device_groups.mobile_device_group_name
+-- Mobile Device Smart Groups with no defined Criteria
+SELECT DISTINCT
+	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	mobile_device_groups.mobile_device_group_name AS "Name",
+	mobile_device_groups.mobile_device_group_id AS "ID",
+	IF(mobile_device_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group"
 FROM mobile_device_groups
+LEFT JOIN site_objects
+	ON mobile_device_groups.mobile_device_group_id = site_objects.object_id
+		AND site_objects.object_type = "25"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
 WHERE mobile_device_groups.is_smart_group = "1"
 AND mobile_device_groups.mobile_device_group_id NOT IN (
 	SELECT mobile_device_group_id
