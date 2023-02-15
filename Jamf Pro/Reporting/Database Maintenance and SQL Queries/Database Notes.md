@@ -13,12 +13,99 @@ Table:  <name_of_table>
 
 ## Common Values ##
 
-0 = disabled
-
-1 = enabled
+Boolean values:
+  * 0 = False/No/Disabled
+  * 1 = True/Yes/Enabled
 
 
 ## Tables ##
+
+Table:  computers
+  * auto_login_user
+    * Any value = True
+  * gatekeeper_status
+    * 0 = Not collected
+    * 1 = Off
+    * 2 = App Store and identified developers
+    * 3 = App Store only
+  * is_apple_silicon
+    * bool
+  * sip_status
+    * 0 = Not collected
+    * 1 = Not available
+    * 2 = Disabled
+    * 3 = Enabled
+
+
+Table:  computers_denormalized
+  * active_directory_status
+    * Any value = True
+  * file_vault_2_recovery_key_valid
+    * 1 = Valid
+    * 2 = Invalid
+    * 3 = Unknown
+  * file_vault_2_status
+    * All Partitions Encrypted
+    * Boot Partitions Encrypted
+    * No Partitions Encrypted
+    * N/A
+    * Some Partitions Encrypted
+  * gatekeeper_status
+    * 0 = Not collected
+    * 1 = Off
+    * 2 = App Store and identified developers
+    * 3 = App Store only
+  * secure_boot_level
+    * not supported
+    * unknown
+    * off
+    * full
+    * medium
+    * ""
+
+
+Table:  computer_groups
+  * computer_group_id
+  * computer_group_name
+  * is_smart_group
+    * 1 = Yes
+
+
+Table:  locations
+  * Description:  Holds the data for the submitted data
+
+
+Table:  location_history
+  * Description:  Holds each submitted record ID of location history, for the specific device, device type, and when it was submitted
+  * location_id = individual record of location data
+
+
+Table:  mobile_devices_denormalized
+  * data_protection
+    * bool
+  * device_type
+    * -1 = Other
+    * 0 = iPhone/iPad/iPod
+    * 1 = AppleTV
+  * mdm_profile_removable
+    * bool
+  * passcode_is_compliant
+    * 0 = Not Compliant
+    * 1 = Compliant
+  * passcode_is_compliant_with_profile
+    * 0 = Not Compliant
+    * 1 = Compliant
+  * passcode_present
+    * 0 = Not present
+    * 1 = Passcode Present
+  * system_integrity_state (Jailbreak Detected)
+    * 0 = No
+    * 1 = Yes
+    * -1 = Not reported
+
+Table:  mobile_device_management_commands
+  * client_management_id = [ computers.management_id or mobile_devices.management_id ]
+
 
 Table:  policies
   * policy_id
@@ -34,9 +121,32 @@ Table:  policies
   * self_service_description
 
 
+Table:  policy_deployment
+  * policy_id
+  * target_type
+    * 1 = Computer
+    * 7 = Computer Group
+    * 21 = Mobile Device
+    * 25 = Mobile Device Group
+    * 41 = Building
+    * 42 = Department
+    * 51 = LDAP/Local User
+    * 52 = LDAP Group
+    * 53 = User
+    * 101 = All Computers
+    * 102 = All Mobile Devices
+    * 106 = All Users
+  * target_id
+
+
 Table:  policy_packages
   * policy_id
   * package_id
+
+
+Table:  sites
+  * site_id
+  * site_name
 
 
 Table:  site_objects
@@ -78,47 +188,7 @@ Table:  site_objects
   * site_id = sites.site_id
 
 
-Table:  sites
-  * site_id
-  * site_name
-
-
-Table:  policy_deployment
-  * policy_id
-  * target_type
-    * 1 = Computer
-    * 7 = Computer Group
-    * 21 = Mobile Device
-    * 25 = Mobile Device Group
-    * 41 = Building
-    * 42 = Department
-    * 51 = LDAP/Local User
-    * 52 = LDAP Group
-    * 53 = User
-    * 101 = All Computers
-    * 102 = All Mobile Devices
-    * 106 = All Users
-  * target_id
-
-
-Table:  computer_groups
-  * computer_group_id
-  * computer_group_name
-  * is_smart_group
-    * 1 = Yes
-
-
 Table:  smart_computer_group_criteria
   * computer_group_id
   * search_field
     * "Enrollment Method: PreStage enrollment"
-
-
-Table:  location_history
-  * Description:  Holds each submitted record ID of location history, for the specific device, device type, and when it was submitted
-  * location_id = individual record of location data
-
-
-Table:  locations
-  * Description:  Holds the data for the submitted data
-
