@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  Run-BomgarSupportOnDemand.sh
 # By:  Zack Thompson / Created:  5/11/2020
-# Version:  1.3.0 / Updated:  5/12/2022 / By:  ZT
+# Version:  1.3.1 / Updated:  3/4/2023 / By:  ZT
 #
 # Description:  Utilizing the Bomgar API, downloads a Bomgar Support Client and assigns it to the
 #               supplied team's queue based on the passed parameters.
@@ -184,7 +184,7 @@ echo "Downloading client..."
 # Download the Support Application
 # Using a User Agent here that downloads a .dmg as I 
 # wasn't able get a .zip to extract via cli and work.
-exitStatus1=$( /usr/bin/su - "${consoleUser}" -c "/usr/bin/curl \
+exitStatus1=$( /usr/bin/su - "${consoleUser}" -c "cd ${temp_dir} && /usr/bin/curl \
 	--silent --show-error --fail --location --request POST \
 	--url \"https://${bomgarSiteURL}/api/start_session\" \
 	--header 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/601.5.17 (KHTML, like Gecko) Version/9.1 Safari/601.5.17' \
@@ -195,9 +195,9 @@ exitStatus1=$( /usr/bin/su - "${consoleUser}" -c "/usr/bin/curl \
 	--data-urlencode customer.details=\"${customerDetails}\" \
 	--compressed \
 	--remote-name \
-	--remote-header-name \
-	--output-dir \"${temp_dir}\""
+	--remote-header-name"
 )
+	# --output-dir \"${temp_dir}\""  # Only supported in 7.73.0+
 
 exitCode1=$?
 exitCheck $exitCode1 "${exitStatus1}" "Failed to download the Remote Support application!"
