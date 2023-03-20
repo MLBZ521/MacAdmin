@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.12.0 / Updated:  5/10/2022 / By:  ZT
+# Version:  2.12.1 / Updated:  10/28/2022 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -59,7 +59,7 @@ write_to_log() {
 
 		if [[ ! -e "${local_ea_history}" ]]; then
 
-			bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
+			/bin/mkdir -p "$( /usr/bin/dirname "${local_ea_history}" )"
 			/usr/bin/touch "${local_ea_history}"
 
 		fi
