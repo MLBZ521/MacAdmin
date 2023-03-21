@@ -8,7 +8,6 @@
 
 -- These are notes on performing maintenance on the locations and location_history tables within the Jamf Pro database.
 -- The actions in option one were incorporated within my jamf_db_maint.sh script.
--- These are formatted for readability, just fyi.
 
 -- ####################################################################################################
 -- Option one, this is what I wanted for my environment:
@@ -43,12 +42,11 @@ CREATE TABLE empty_location_records (
 );
 
 -- Delete empty location records
-DELETE locations_backup FROM locations_backup WHERE location_id IN (
-	SELECT location_id FROM empty_location_records
-	);
-DELETE location_history_backup FROM location_history_backup WHERE location_id IN (
-	SELECT location_id FROM empty_location_records
-	);
+DELETE locations_backup FROM locations_backup
+WHERE location_id IN ( SELECT location_id FROM empty_location_records );
+
+DELETE location_history_backup FROM location_history_backup
+WHERE location_id IN ( SELECT location_id FROM empty_location_records );
 
 -- Start Tomcat on master JPS that is admin facing and verify everything looks good with the modifications performed.
 
@@ -72,14 +70,14 @@ CREATE TABLE location_history_new LIKE location_history;
 INSERT INTO location_history_new (
 	SELECT * FROM location_history
 		WHERE computer_id = 0
-	);
+);
 
 INSERT INTO location_history_new (
 	SELECT * FROM location_history
 		WHERE location_id IN (
 			SELECT last_location_id FROM computers_denormalized
-			)
-	);
+		)
+);
 
 RENAME TABLE location_history TO location_history_old;
 
@@ -95,15 +93,15 @@ INSERT INTO locations_new (
 	SELECT * FROM locations
 		WHERE location_id IN (
 			SELECT last_location_id FROM computers_denormalized
-			)
-	);
+		)
+);
 
 INSERT INTO locations_new (
 	SELECT * FROM locations
 		WHERE location_id IN (
 			SELECT last_location_id FROM mobile_devices_denormalized
-			)
-	);
+		)
+);
 
 RENAME TABLE locations TO locations_old;
 
