@@ -1,10 +1,16 @@
 -- Queries on Computer Details
 
+-- Total number of Managed Computers
+SELECT count(*) AS "Total Managed Computers"
+FROM computers_denormalized
+WHERE is_managed = 1;
+
+
 -- ##################################################
 -- Software Details
 SELECT
 	computers.computer_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
@@ -112,8 +118,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "1"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-computers_denormalized.is_managed = 1
+WHERE computers_denormalized.is_managed = 1
 ;
 
 
@@ -121,7 +126,7 @@ computers_denormalized.is_managed = 1
 -- Hardware Details
 SELECT
 	computers.computer_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
@@ -142,16 +147,45 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "1"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-computers_denormalized.is_managed = 1
+WHERE computers_denormalized.is_managed = 1
 ;
+
+
+-- Count of each model family
+SELECT
+	SUM(IF(model LIKE "%MacBook%Pro%", 1, 0)) AS "MacBook Pro",
+	SUM(IF(model LIKE "MacBook%Air%", 1, 0)) AS "MacBook Air",
+	SUM(IF(model LIKE "iMac%", 1, 0)) AS "iMac",
+	SUM(IF(model LIKE "Mac%mini%", 1, 0)) AS "Mac Mini",
+	SUM(IF(model LIKE "MacPro%", 1, 0)) AS "MacPro",
+	SUM(IF(model LIKE "Mac Studio%", 1, 0)) AS "Mac Studio",
+	SUM(IF(model LIKE "MacBook (%", 1, 0)) AS "MacBook",
+	SUM(IF(model LIKE "%Xserve%", 1, 0)) AS "Xserve",
+	SUM(IF(
+		model LIKE "Mac1%" OR
+		model LIKE "VirtualMac%" OR
+		model = ""
+		, 1, 0)) AS "Unknown"
+FROM computers_denormalized
+WHERE computers_denormalized.is_managed = 1;
+
+
+-- Count of individual models
+SELECT
+	COUNT(*) AS "Total",
+	model AS "Model"
+FROM computers_denormalized
+WHERE is_managed = 1
+GROUP BY model
+ORDER BY "Total"
+DESC;
 
 
 -- ##################################################
 -- Management Health
 SELECT
 	computers.computer_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
@@ -244,8 +278,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "1"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-computers_denormalized.is_managed = 1
+WHERE computers_denormalized.is_managed = 1
 ;
 
 
@@ -253,7 +286,7 @@ computers_denormalized.is_managed = 1
 -- Security
 SELECT
 	computers.computer_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
@@ -346,8 +379,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "1"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-computers_denormalized.is_managed = 1
+WHERE computers_denormalized.is_managed = 1
 ;
 
 
@@ -355,7 +387,7 @@ computers_denormalized.is_managed = 1
 -- Computers that have enrolled <recently> and are not managed
 SELECT
 	computers.computer_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
@@ -369,9 +401,8 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-is_managed = 0
-AND
-UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
+	is_managed = 0 AND
+	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
 ;
 
 
@@ -398,7 +429,6 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-is_managed = 1
-AND
-sites.site_name IS NULL
+	is_managed = 1 AND
+	sites.site_name IS NULL
 ;

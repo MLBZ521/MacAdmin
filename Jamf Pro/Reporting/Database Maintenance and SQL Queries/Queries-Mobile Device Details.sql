@@ -1,10 +1,15 @@
 -- Queries on Mobile Device Details
 
+-- Total number of Managed Mobile Devices
+SELECT count(*) AS "Total Managed Mobile Devices"
+FROM mobile_devices_denormalized
+WHERE is_managed=1;
+
 -- ##################################################
 -- Software Details
 SELECT
 	mobile_devices.mobile_device_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
@@ -77,8 +82,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "21"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-mobile_devices_denormalized.is_managed = 1
+WHERE mobile_devices_denormalized.is_managed = 1
 ;
 
 
@@ -91,7 +95,7 @@ mobile_devices_denormalized.is_managed = 1
 -- Hardware Details
 SELECT
 	mobile_devices.mobile_device_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
@@ -114,16 +118,36 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "21"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-mobile_devices_denormalized.is_managed = 1
+WHERE mobile_devices_denormalized.is_managed = 1
 ;
+
+
+-- Count of each model family
+SELECT
+    SUM(IF(model LIKE "iPad%", 1, 0)) AS "iPad",
+    SUM(IF(model LIKE "iPhone%", 1, 0)) AS "iPhone",
+    SUM(IF(model LIKE "iPod%", 1, 0)) AS "iPod",
+    SUM(IF(model LIKE "%Apple%TV%", 1, 0)) AS "AppleTV"
+FROM mobile_devices_denormalized
+WHERE is_managed = 1;
+
+
+-- Count of individual models
+SELECT
+	COUNT(*) AS "Total",
+	model AS "Model"
+FROM mobile_devices_denormalized
+WHERE is_managed = 1
+GROUP BY model
+ORDER BY "Total"
+DESC;
 
 
 -- ##################################################
 -- Management Health
 SELECT
 	mobile_devices.mobile_device_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
@@ -156,8 +180,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "21"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-mobile_devices_denormalized.is_managed = 1
+WHERE mobile_devices_denormalized.is_managed = 1
 ;
 
 
@@ -165,7 +188,7 @@ mobile_devices_denormalized.is_managed = 1
 -- Security
 SELECT
 	mobile_devices.mobile_device_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
@@ -186,8 +209,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "21"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE
-mobile_devices_denormalized.is_managed = 1
+WHERE mobile_devices_denormalized.is_managed = 1
 ;
 
 
@@ -195,7 +217,7 @@ mobile_devices_denormalized.is_managed = 1
 -- Mobile Devices that have enrolled <recently> and are not managed
 SELECT
 	mobile_devices.mobile_device_id,
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
@@ -207,9 +229,8 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-is_managed = 0
-AND
-UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
+	is_managed = 0 AND
+	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
 ;
 
 
@@ -235,7 +256,6 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-mobile_devices.is_managed = 1
-AND
-sites.site_name IS NULL
+	mobile_devices.is_managed = 1 AND
+	sites.site_name IS NULL
 ;
