@@ -11,7 +11,7 @@
 
 -- Unused Computer Configuration Profiles
 SELECT DISTINCT
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	os_x_configuration_profiles.os_x_configuration_profile_id AS "ID",
 	os_x_configuration_profiles.display_name AS "Name"
 FROM os_x_configuration_profiles
@@ -24,12 +24,13 @@ WHERE
 	os_x_configuration_profiles.os_x_configuration_profile_id NOT IN (
 		SELECT os_x_configuration_profile_id FROM os_x_configuration_profile_deployment
 	)
-AND os_x_configuration_profiles.deleted = 0;
+	AND os_x_configuration_profiles.deleted = 0
+;
 
 
 -- Unused Mobile Device Configuration Profiles
 SELECT DISTINCT
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_device_configuration_profiles.mobile_device_configuration_profile_id AS "ID",
 	mobile_device_configuration_profiles.display_name AS "Name"
 FROM mobile_device_configuration_profiles
@@ -42,7 +43,8 @@ WHERE
 	mobile_device_configuration_profiles.mobile_device_configuration_profile_id NOT IN (
 		SELECT mobile_device_configuration_profile_id FROM mobile_device_configuration_profile_deployment
 	)
-AND mobile_device_configuration_profiles.deleted = 0;
+	AND mobile_device_configuration_profiles.deleted = 0
+;
 
 
 -- Unused Directory Bindings
