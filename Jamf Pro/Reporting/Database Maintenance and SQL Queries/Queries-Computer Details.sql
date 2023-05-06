@@ -94,13 +94,13 @@ SELECT
 FROM computers
 LEFT JOIN computers_denormalized
 	ON computers_denormalized.computer_id = computers.computer_id
-JOIN (
+LEFT JOIN (
 		SELECT computer_id, MAX(report_id) AS report_id, MAX(date_entered_epoch) AS date_entered_epoch
 		FROM reports
 		GROUP BY reports.computer_id
 	) AS r
 	ON r.computer_id = computers.computer_id
-INNER JOIN (
+LEFT JOIN (
 		SELECT
 			report_id,
 			MAX(CASE WHEN extension_attribute_id = 62 THEN value_on_client END) AS "academic_unit",
@@ -157,7 +157,7 @@ SELECT
 	SUM(IF(model LIKE "MacBook%Air%", 1, 0)) AS "MacBook Air",
 	SUM(IF(model LIKE "iMac%", 1, 0)) AS "iMac",
 	SUM(IF(model LIKE "Mac%mini%", 1, 0)) AS "Mac Mini",
-	SUM(IF(model LIKE "MacPro%", 1, 0)) AS "MacPro",
+	SUM(IF(model LIKE "MacPro%", 1, 0)) AS "Mac Pro",
 	SUM(IF(model LIKE "Mac Studio%", 1, 0)) AS "Mac Studio",
 	SUM(IF(model LIKE "MacBook (%", 1, 0)) AS "MacBook",
 	SUM(IF(model LIKE "%Xserve%", 1, 0)) AS "Xserve",
@@ -358,13 +358,13 @@ SELECT
 FROM computers
 LEFT JOIN computers_denormalized
 	ON computers_denormalized.computer_id = computers.computer_id
-JOIN (
+LEFT JOIN (
 		SELECT computer_id, MAX(report_id) AS report_id, MAX(date_entered_epoch) AS date_entered_epoch
 		FROM reports
 		GROUP BY reports.computer_id
 	) AS r
 	ON r.computer_id = computers.computer_id
-INNER JOIN (
+LEFT JOIN (
 		SELECT
 			report_id,
 			MAX(CASE WHEN extension_attribute_id = 58 THEN value_on_client END) AS "falcon_status",

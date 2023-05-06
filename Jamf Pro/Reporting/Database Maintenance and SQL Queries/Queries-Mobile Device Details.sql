@@ -59,13 +59,13 @@ SELECT
 FROM mobile_devices
 LEFT JOIN mobile_devices_denormalized
 	ON mobile_devices_denormalized.mobile_device_id = mobile_devices.mobile_device_id
-JOIN (
+LEFT JOIN (
 		SELECT mobile_device_id, MAX(report_id) AS report_id, MAX(date_entered_epoch) AS date_entered_epoch
 		FROM reports
 		GROUP BY reports.mobile_device_id
 	) AS r
 	ON r.mobile_device_id = mobile_devices.mobile_device_id
-INNER JOIN (
+LEFT JOIN (
 		SELECT
 			report_id,
 			MAX(CASE WHEN mobile_device_extension_attribute_id = 5 THEN value_on_client END) AS "academic_unit",
