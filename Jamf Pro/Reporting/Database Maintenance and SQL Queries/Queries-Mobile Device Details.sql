@@ -222,6 +222,7 @@ SELECT
 	mobile_devices.display_name AS "Mobile Device Name",
 	mobile_devices.serial_number AS "Serial Number",
 	mobile_devices.asset_tag AS "PCN",
+	DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
 	DATE(date_sub(FROM_unixtime(mobile_devices.initial_entry_date_epoch/1000), INTERVAL 1 DAY)) AS "Initial Enrollment"
 FROM mobile_devices
 LEFT JOIN site_objects
@@ -231,7 +232,7 @@ LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
 	is_managed = 0 AND
-	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
+	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < last_enrolled_date_epoch
 ;
 
 

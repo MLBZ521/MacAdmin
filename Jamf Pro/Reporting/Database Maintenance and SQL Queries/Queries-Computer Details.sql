@@ -392,6 +392,7 @@ SELECT
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
 	DATE(date_sub(FROM_unixtime(computers.initial_entry_date_epoch/1000), INTERVAL 1 DAY)) AS "Initial Enrollment"
 FROM computers
 LEFT JOIN computers_denormalized
@@ -403,7 +404,7 @@ LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
 	is_managed = 0 AND
-	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < initial_entry_date_epoch
+	UNIX_TIMESTAMP(NOW() - INTERVAL 365 DAY)*1000 < last_enrolled_date_epoch
 ;
 
 
