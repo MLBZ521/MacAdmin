@@ -155,6 +155,7 @@ SELECT
 	IF(mobile_devices.serial_number IN (
 				SELECT serial_number
 				FROM mobile_devices
+				WHERE mobile_devices_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
 				GROUP BY serial_number
 				HAVING COUNT(serial_number) > 1
 			), "True", "False") AS "Duplicate Serial Numbers",

@@ -193,6 +193,7 @@ SELECT
 	IF(computers_denormalized.serial_number IN (
 				SELECT serial_number
 				FROM computers_denormalized
+				WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
 				GROUP BY serial_number
 				HAVING COUNT(serial_number) > 1
 			), "True", "False") AS "Duplicate Serial Numbers",
