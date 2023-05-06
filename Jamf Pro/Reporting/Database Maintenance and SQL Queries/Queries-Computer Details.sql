@@ -197,7 +197,7 @@ SELECT
 				HAVING COUNT(serial_number) > 1
 			), "True", "False") AS "Duplicate Serial Numbers",
 	IF(
-		computers_denormalized.warranty_date_epoch = 0, "Never",
+		computers_denormalized.last_contact_time_epoch = 0, "Never",
 		DATE(date_sub(FROM_unixtime(computers_denormalized.last_contact_time_epoch/1000), INTERVAL 1 DAY))
 	) AS "Last Check-in",
 	DATE(date_sub(FROM_unixtime(computers_denormalized.last_report_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Inventory Update",
@@ -240,7 +240,7 @@ SELECT
 		ELSE "False"
 	END AS "User Approved MDM",
 	CASE
-		WHEN computer_security_info.bootstrap_token = 1 THEN "True"
+		WHEN computer_security_info.bootstrap_token IS NOT NULL THEN "True"
 		WHEN (
 			computers_denormalized.operating_system_version LIKE "10.9%" OR
 			computers_denormalized.operating_system_version LIKE "10.10%" OR
