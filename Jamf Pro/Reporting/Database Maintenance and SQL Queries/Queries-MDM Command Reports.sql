@@ -244,11 +244,26 @@ DESC;
 
 -- ##################################################
 -- Looping App installs on devices
--- Count and details on InstallApplication MDM Commands within last 24 hours when count is greater than one
+-- Count and details on "_*completed*_" InstallApplication MDM Commands within last 24 hours when count is greater than one
 -- Devices looping InstallApplication command (PI-004429)
 SELECT
     COUNT(*),
-    mdm_cmds.command,
+    mdm_c.client_type AS "Client Type",
+    CASE
+       WHEN (
+            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            AND sites_macs.site_name IS NOT NULL
+        ) THEN sites_macs.site_name
+       WHEN (
+            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            AND sites_mobiles.site_name IS NOT NULL
+        ) THEN sites_mobiles.site_name
+        ELSE "None"
+    END AS `Device Site`,
+    CASE
+        WHEN mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
+        WHEN mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
+    END AS "Device ID",
     CASE
        WHEN (
             mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
@@ -259,13 +274,8 @@ SELECT
             AND sites_mobile_apps.site_name IS NOT NULL
         ) THEN sites_mobile_apps.site_name
         ELSE "None"
-    END AS "Site",
-    mdm_c.client_type,
-    CASE
-        WHEN mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
-        WHEN mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
-    END AS "Device ID",
-    mdm_cmds.profile_id AS "app id",
+    END AS `App Site`,
+    mdm_cmds.profile_id AS "App ID",
     CASE
         WHEN (
             mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
@@ -301,6 +311,16 @@ LEFT JOIN sites as sites_mac_apps
     ON sites_mac_apps.site_id = site_objs_mac_apps.site_id
 LEFT JOIN sites as sites_mobile_apps
     ON sites_mobile_apps.site_id = site_objs_mobile_apps.site_id
+LEFT JOIN site_objects as site_objs_macs
+    ON mac_denorm.computer_id = site_objs_macs.object_id
+        AND site_objs_macs.object_type = "1"
+LEFT JOIN sites as sites_macs
+    ON sites_macs.site_id = site_objs_macs.site_id
+LEFT JOIN site_objects as site_objs_mobiles
+    ON mobile_denorm.mobile_device_id = site_objs_mobiles.object_id
+        AND site_objs_mobiles.object_type = "21"
+LEFT JOIN sites as sites_mobiles
+    ON sites_mobiles.site_id = site_objs_mobiles.site_id
 WHERE
     mdm_cmds.command = "InstallApplication"
     AND mdm_cmds.date_completed_epoch > unix_timestamp(date_sub(now(), INTERVAL 24 HOUR))*1000
@@ -311,7 +331,8 @@ GROUP BY
     mac_denorm.computer_id,
     mdm_cmds.apns_result_status,
     mdm_cmds.error_localized_description,
-    Site
+    `App Site`,
+    `Device Site`
 HAVING COUNT(*) > 1
 ORDER BY COUNT(*)
 DESC;
