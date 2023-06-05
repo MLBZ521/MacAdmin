@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.2.1 / Updated:  10/28/2022 / By:  ZT
+# Version:  2.3.0 / Updated:  6/5/2023 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -14,7 +14,7 @@
 #	System Requirements can be found here:
 #		Full List - https://support.apple.com/en-us/HT211683
 #		Ventura (Preview) - https://www.apple.com/macos/macos-ventura-preview/
-#		Monterey - https://support.apple.com/en-us/HT212735
+#		Monterey - https://support.apple.com/en-us/HT212551
 #		Big Sur - https://support.apple.com/en-us/HT211238 / https://support.apple.com/kb/sp833
 #			* If running Mountain Lion 10.8, device will need to upgrade to El Capitan 10.11 first.
 #			  first.  See:
@@ -29,6 +29,17 @@
 ####################################################################################################
 
 ##################################################
+# Define organization's environment values
+
+# Locally log EA value which can be collected with a simple `defaults read` allowing this script 
+# to be ran from a Policy or other method, instead of an actual EA.
+# Supported actions:
+#   true - Do locally Log
+#   false - Do not log locally
+locally_log="true"
+local_inventory="/opt/ManagedFrameworks/Inventory.plist"
+
+##################################################
 # Define Regex Strings to exclude Mac Models that *do not support* each OS Version
 not_elcapitan_or_older_regex="^((MacPro|Macmini|MacBookPro)[1-2],[0-9]|iMac[1-6],[0-9]|MacBook[1-4],[0-9]|MacBookAir1,[0-9])$"
 not_highsierra_regex="^(MacPro[1-4],[0-9]|iMac[1-9],[0-9]|Macmini[1-3],[0-9]|(MacBook|MacBookPro)[1-5],[0-9]|MacBookAir[1-2],[0-9])$"
@@ -40,6 +51,30 @@ not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBook
 
 ##################################################
 # Setup Functions
+
+write_to_ea_history() {
+
+	# Arguments
+	# $1 = (str) Plist key that the message value will be assigned too
+	# $2 = (str) Message that will be assigned to the key
+
+	local key="${1}"
+	local value="${2}"
+
+	if [[ "${locally_log}" == "true" ]]; then
+
+		if [[ ! -e "${local_inventory}" ]]; then
+
+			/bin/mkdir -p "$( /usr/bin/dirname "${local_inventory}" )"
+			/usr/bin/touch "${local_inventory}"
+
+		fi
+
+		/usr/bin/defaults write "${local_inventory}" "${key}" "${value}"
+
+	fi
+
+}
 
 model_check() {
 	# $1 = Mac Model Identifier
@@ -356,6 +391,7 @@ if [[ "${version_string}" == "${current_os_major}.${current_os_minor}" ||
 	  "${version_string}" -eq "${current_os_major}"  ]]; then
 
 	echo "<result>${model_result}</result>"
+	write_to_ea_history "latest_os_supported" "${model_result}"
 
 else
 
@@ -364,6 +400,7 @@ else
 	storage_check_results=$( storage_check "${os_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
 
 	echo "<result>${ram_check_results}${storage_check_results}</result>"
+	write_to_ea_history "latest_os_supported" "${ram_check_results}${storage_check_results}"
 
 fi
 
