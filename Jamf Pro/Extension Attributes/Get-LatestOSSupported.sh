@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.3.0 / Updated:  6/5/2023 / By:  ZT
+# Version:  2.4.0 / Updated:  6/5/2023 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -13,7 +13,10 @@
 #
 #	System Requirements can be found here:
 #		Full List - https://support.apple.com/en-us/HT211683
-#		Ventura (Preview) - https://www.apple.com/macos/macos-ventura-preview/
+#		Sonoma (Preview) - https://www.apple.com/macos/sonoma-preview/
+#		Ventura - https://support.apple.com/en-us/HT213265 / https://support.apple.com/en-us/HT213264
+#			* Apple has never publicly posted storage requirements for Ventura, which is why this 
+#			  script identifies Ventura support with an asterisk, e.g. `Ventura*`
 #		Monterey - https://support.apple.com/en-us/HT212551
 #		Big Sur - https://support.apple.com/en-us/HT211238 / https://support.apple.com/kb/sp833
 #			* If running Mountain Lion 10.8, device will need to upgrade to El Capitan 10.11 first.
@@ -32,7 +35,8 @@
 # Define organization's environment values
 
 # Locally log EA value which can be collected with a simple `defaults read` allowing this script 
-# to be ran from a Policy or other method, instead of an actual EA.
+# to be ran from a Policy or other method, instead of an actual EA.  Also allows the reported 
+# value to be collected and used within other scripts/workflows.
 # Supported actions:
 #   true - Do locally Log
 #   false - Do not log locally
@@ -48,6 +52,7 @@ not_catalina_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0
 not_bigsur_regex="^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macmini[1-6],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-5],[0-9]|MacBookPro([1-9]|10),[0-9])$"
 not_monterey_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
 not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
+not_sonoma_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[\d,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
 
 ##################################################
 # Setup Functions
@@ -95,8 +100,10 @@ model_check() {
 		echo "Big Sur"
 	elif [[ $model =~ $not_ventura_regex ]]; then
 		echo "Monterey"
-	else
+	elif [[ $model =~ $not_sonoma_regex ]]; then
 		echo "Ventura*"
+	else
+		echo "Sonoma*"
 	fi
 }
 
@@ -111,8 +118,11 @@ os_check() {
 	local os_patch="${4}"
 
 	if [[ ! "${mac_model}" =~ ^MacPro.*$ ]]; then
+		# For ***non*** MacPro models:
 
-		if [[ "${validate_os}" == "Ventura*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		if [[ "${validate_os}" == "Sonoma*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+			echo "Sonoma*"
+		elif [[ "${validate_os}" == "Ventura*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
 			echo "Ventura*"
 		elif [[ "${validate_os}" == "Monterey" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
 			echo "Monterey"
@@ -140,8 +150,8 @@ os_check() {
 	else
 		# Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to the original "simplistic" logic in this script.
 
-		if [[ "${validate_os}" == "Ventura*" ]]; then
-			echo "Ventura*"
+		if [[ $validate_os =~ (Sonoma|Ventura)\* ]]; then
+			echo "${validate_os}"
 
 		elif [[ "${validate_os}" == "Monterey" ]]; then
 			# Any MacPro model that is compatible with Monterey based on model identifier alone, is 100% compatible with Monterey,
@@ -184,7 +194,7 @@ os_check() {
 
 check_ram_upgradeable() {
 	ram_upgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs 2&> /dev/null )
-	# M1 Macs don't return the "Upgradeable Memory:" attribute as of early 2022
+	# ARM Macs do not return the "Upgradeable Memory:" attribute as of early 2022
 	if [[ -z ${ram_upgradeable} ]]; then
 		ram_upgradeable="No"
 	fi
@@ -203,8 +213,10 @@ ram_check() {
 	# Get RAM Info
 	system_ram=$(( $( /usr/sbin/sysctl -n hw.memsize ) / bytes_in_gigabytes ))
 
-	if [[ "${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|Ventura*)$ ]]; then
+	if [[ "${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|(Sonoma|Ventura)\*)$ ]]; then
 		# OS version requires 4GB RAM minimum
+		# For Ventura and Sonoma, value's are inherited from Monterey, Apple has 
+		# not yet defined these requirements.
 
 		if [[ $system_ram -lt $minimum_ram_catalina_and_newer ]]; then
 			# Based on RAM, device does not have enough to support Catalina or newer
@@ -270,7 +282,15 @@ storage_check() {
 	
 	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
+		"Sonoma*" )
+			# Value's inherited from Monterey, Apple has not defined these requirements
+			required_free_space_newer="27917287424" # 26GB if Sierra or later
+			os_newer="10.12.0"
+			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
+			os_older="10.11.0"
+		;;
 		"Ventura*" )
+			# Value's inherited from Monterey, Apple has not defined these requirements
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
 			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
@@ -359,6 +379,9 @@ mac_model=$( /usr/sbin/sysctl -n hw.model )
 model_result=$( model_check "${mac_model}" )
 
 case "${model_result}" in
+	"Sonoma*" )
+		version_string="14"
+	;;
 	"Ventura*" )
 		version_string="13"
 	;;
