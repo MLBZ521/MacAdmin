@@ -21,39 +21,42 @@ SELECT
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$" THEN "iOS 10"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad4,[0-7]|iPhone[6-7],[0-9])$" THEN "iOS 12"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$" THEN "iOS 15"
-		-- WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad([6-9]|1[0-9]),[0-9]|iPhone1[0-9],[0-9])$" THEN "iOS 16"
-		ELSE "iOS 16"
-	END AS "Lastest Major OS Supported",
+		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad([7-9]|1[0-9]),[0-9]|iPhone1[1-9],[0-9])$" THEN "iOS 16"
+		ELSE "iOS 17"
+	END AS "Latest Major OS Supported",
 	CASE
 		WHEN (
 			mobile_devices_denormalized.model_identifier REGEXP "^(iPod5,[0-9]|iPad2,[5-6]|iPad3,[0-9]|iPhone4,[0-9])$"
 			AND mobile_devices_denormalized.os_version LIKE "9.%"
 			OR
-			mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$"
-			AND mobile_devices_denormalized.os_version LIKE "10.%"
+				mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$"
+				AND mobile_devices_denormalized.os_version LIKE "10.%"
 			OR
-			mobile_devices_denormalized.model_identifier REGEXP "^(iPad4,[0-7]|iPhone[6-7],[0-9])$"
-			AND mobile_devices_denormalized.os_version LIKE "12.%"
+				mobile_devices_denormalized.model_identifier REGEXP "^(iPad4,[0-7]|iPhone[6-7],[0-9])$"
+				AND mobile_devices_denormalized.os_version LIKE "12.%"
 			OR
-			mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$"
-			AND mobile_devices_denormalized.os_version LIKE "15.%"
+				mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$"
+				AND mobile_devices_denormalized.os_version LIKE "15.%"
 			OR
-			mobile_devices_denormalized.os_version LIKE "16.%"
+				mobile_devices_denormalized.model_identifier REGEXP "^(iPad([7-9]|1[0-9]),[0-9]|iPhone1[1-9],[0-9])$"
+				AND mobile_devices_denormalized.os_version LIKE "17.%"
+			OR
+				mobile_devices_denormalized.os_version LIKE "17.%"
 		) THEN "True"
 		ELSE "False"
-	END AS "Running Lastest Major OS",
+	END AS "Running Latest Major OS",
 	IF(
 		mobile_devices_denormalized.last_report_date_epoch = 0, "Never",
 		DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.last_report_date_epoch/1000), INTERVAL 1 DAY))
 	) AS "Last Inventory Update",
-	ea.academic_unit AS "Academic Unit",
+	ea.unit AS "Unit",
 	mobile_devices_denormalized.department_name AS "Department",
 	ea.internal_department AS "Internal Department",
 	mobile_devices_denormalized.realname AS "Assigned User",
 	mobile_devices_denormalized.username AS "Username",
 	mobile_devices_denormalized.position AS "Position",
 	ea.device_type AS "Device Type",
-	ea.primary_campus AS "Primary Campus",
+	ea.primary_location AS "Primary Location",
 	mobile_devices_denormalized.building_name AS "Building",
 	mobile_devices_denormalized.room AS "Room"
 FROM mobile_devices
@@ -68,10 +71,10 @@ LEFT JOIN (
 LEFT JOIN (
 		SELECT
 			report_id,
-			MAX(CASE WHEN mobile_device_extension_attribute_id = 5 THEN value_on_client END) AS "academic_unit",
+			MAX(CASE WHEN mobile_device_extension_attribute_id = 5 THEN value_on_client END) AS "unit",
 			MAX(CASE WHEN mobile_device_extension_attribute_id = 3 THEN value_on_client END) AS "device_type",
 			MAX(CASE WHEN mobile_device_extension_attribute_id = 4 THEN value_on_client END) AS "internal_department",
-			MAX(CASE WHEN mobile_device_extension_attribute_id = 2 THEN value_on_client END) AS "primary_campus"
+			MAX(CASE WHEN mobile_device_extension_attribute_id = 2 THEN value_on_client END) AS "primary_location"
 		FROM mobile_device_extension_attribute_values
 		WHERE mobile_device_extension_attribute_id in (5, 3, 4, 2)
 		GROUP BY report_id

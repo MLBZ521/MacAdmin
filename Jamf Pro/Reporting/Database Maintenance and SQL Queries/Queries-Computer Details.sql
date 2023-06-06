@@ -25,32 +25,36 @@ SELECT
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macmini[1-6],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-5],[0-9]|MacBookPro([1-9]|10),[0-9])$" THEN "Catalina"
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$" THEN "Big Sur"
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$" THEN "Monterey"
-		ELSE "Ventura"
-	END AS "Lastest Major OS Supported",
+		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[\d,]+|MacBookPro([1-9]|1[0-4]),[0-9])$" THEN "Ventura"
+		ELSE "Sonoma"
+	END AS "Latest Major OS Supported",
 	CASE
 		WHEN (
 			computers_denormalized.model_identifier REGEXP "^(MacPro[1-4],[0-9]|iMac[1-9],[0-9]|Macmini[1-3],[0-9]|(MacBook|MacBookPro)[1-5],[0-9]|MacBookAir[1-2],[0-9])$"
 			AND computers_denormalized.operating_system_version LIKE "10.11%"
 			OR
-			computers_denormalized.model_identifier REGEXP "^(MacPro[1-4],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-4],[0-9]|MacBookPro[1-8],[0-9])$"
-			AND computers_denormalized.operating_system_version LIKE "10.13%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-4],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-4],[0-9]|MacBookPro[1-8],[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "10.13%"
 			OR
-			computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-4],[0-9]|MacBookPro[1-8],[0-9])$"
-			AND computers_denormalized.operating_system_version LIKE "10.14%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-2]),[0-9]|Macmini[1-5],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-4],[0-9]|MacBookPro[1-8],[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "10.14%"
 			OR
-			computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macmini[1-6],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-5],[0-9]|MacBookPro([1-9]|10),[0-9])$"
-			AND computers_denormalized.operating_system_version LIKE "10.15%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macmini[1-6],[0-9]|MacBook[1-7],[0-9]|MacBookAir[1-5],[0-9]|MacBookPro([1-9]|10),[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "10.15%"
 			OR
-			computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
-			AND computers_denormalized.operating_system_version LIKE "11.%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
+				AND computers_denormalized.operating_system_version LIKE "11.%"
 			OR
-			computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
-			AND computers_denormalized.operating_system_version LIKE "12.%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "12.%"
 			OR
-			computers_denormalized.operating_system_version LIKE "13.%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[\d,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "13.%"
+			OR
+				computers_denormalized.operating_system_version LIKE "14.%"
 		) THEN "True"
 		ELSE "False"
-	END AS "Running Lastest Major OS",
+	END AS "Running Latest Major OS",
 	IF(
 		(
 			computers_denormalized.computer_id IN (
@@ -78,17 +82,17 @@ SELECT
 						computers_denormalized.operating_system_version LIKE "13.%" and patch_software_titles.id = 54
 					)
 			)
-		), "True", "False") AS "Running Lastest Patch",
+		), "True", "False") AS "Running Latest Patch",
 	ea.last_os_update_installed AS "Last OS Update Installed",
 	computers_denormalized.active_directory_status AS "Active Directory Status",
-	ea.academic_unit AS "Academic Unit",
+	ea.unit AS "Unit",
 	computers_denormalized.department_name AS "Department",
 	ea.internal_department AS "Internal Department",
 	computers_denormalized.realname AS "Assigned User",
 	computers_denormalized.username AS "Username",
 	computers_denormalized.position AS "Position",
 	ea.device_type AS "Device Type",
-	ea.primary_campus AS "Primary Campus",
+	ea.location AS "Primary Location",
 	computers_denormalized.building_name AS "Building",
 	computers_denormalized.room AS "Room"
 FROM computers
@@ -103,10 +107,10 @@ LEFT JOIN (
 LEFT JOIN (
 		SELECT
 			report_id,
-			MAX(CASE WHEN extension_attribute_id = 62 THEN value_on_client END) AS "academic_unit",
+			MAX(CASE WHEN extension_attribute_id = 62 THEN value_on_client END) AS "unit",
 			MAX(CASE WHEN extension_attribute_id = 63 THEN value_on_client END) AS "device_type",
 			MAX(CASE WHEN extension_attribute_id = 64 THEN value_on_client END) AS "internal_department",
-			MAX(CASE WHEN extension_attribute_id = 65 THEN value_on_client END) AS "primary_campus",
+			MAX(CASE WHEN extension_attribute_id = 65 THEN value_on_client END) AS "primary_location",
 			MAX(CASE WHEN extension_attribute_id = 71 THEN value_on_client END) AS "last_os_update_installed"
 		FROM extension_attribute_values
 		WHERE extension_attribute_id in (62, 63, 64, 65, 71)
