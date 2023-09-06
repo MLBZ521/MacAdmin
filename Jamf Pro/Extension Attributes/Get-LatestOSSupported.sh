@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.5.0 / Updated:  7/6/2023 / By:  Nic Wendlowsky
+# Version:  2.5.1 / Updated:  9/6/2023 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -18,14 +18,14 @@
 #
 #	Courtesy of Nic Wendlowsky (@hkystar35)
 #
-# Updates:  For each OS version released, a new Regex string and each function will need to be 
+# Updates:  For each OS version released, a new Regex string and each function will need to be
 #			updated.
 #
 #	System Requirements can be found here:
 #		Full List - https://support.apple.com/en-us/HT211683
 #		Sonoma (Preview) - https://www.apple.com/macos/sonoma-preview/
 #		Ventura - https://support.apple.com/en-us/HT213265 / https://support.apple.com/en-us/HT213264
-#			* Apple has never publicly posted storage requirements for Ventura, which is why this 
+#			* Apple has never publicly posted storage requirements for Ventura, which is why this
 #			  script identifies Ventura support with an asterisk, e.g. `Ventura*`
 #		Monterey - https://support.apple.com/en-us/HT212551
 #		Big Sur - https://support.apple.com/en-us/HT211238 / https://support.apple.com/kb/sp833
@@ -45,7 +45,7 @@
 # Define test values
 
 # Allow for specifying a Model and OS Version to the script to validate regex.
-# If these values are passed, the write_to_ea_history function is ignored so that incorrect 
+# If these values are passed, the write_to_ea_history function is ignored so that incorrect
 # information is not written to the test computer.
 # Supported actions:
 # 	TEST_MODEL - example: "MacBookPro13,3"
@@ -57,8 +57,8 @@ TEST_OS="${2}"
 ##################################################
 # Define organization's environment values
 
-# Locally log EA value which can be collected with a simple `defaults read` allowing this script 
-# to be ran from a Policy or other method, instead of an actual EA.  Also allows the reported 
+# Locally log EA value which can be collected with a simple `defaults read` allowing this script
+# to be ran from a Policy or other method, instead of an actual EA.  Also allows the reported
 # value to be collected and used within other scripts/workflows.
 # Supported actions:
 #   true - Do locally Log
@@ -238,7 +238,7 @@ ram_check() {
 
 	if [[ "${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|(Sonoma|Ventura)\*)$ ]]; then
 		# OS version requires 4GB RAM minimum
-		# For Ventura and Sonoma, value's are inherited from Monterey, Apple has 
+		# For Ventura and Sonoma, value's are inherited from Monterey, Apple has
 		# not yet defined these requirements.
 
 		if [[ $system_ram -lt $minimum_ram_catalina_and_newer ]]; then
@@ -296,13 +296,46 @@ storage_check() {
 	local os_patch="${4}"
 
 	# Get free space on the boot disk
-	storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
+	# storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
+	storage_free_space=$( /usr/bin/osascript -l "JavaScript" -e '
+
+		ObjC.import("Foundation");
+		var freeSpaceBytesRef=Ref();
+
+		$.NSURL.fileURLWithPath("/").getResourceValueForKeyError(
+			freeSpaceBytesRef,
+			"NSURLVolumeAvailableCapacityForImportantUsageKey",
+			null
+		);
+
+		Math.round(
+			ObjC.unwrap(
+				freeSpaceBytesRef[0]
+			)
+		)
+	')
 
 	# Workaround for NSURLVolumeAvailableCapacityForImportantUsageKey returning 0 if no user is logged in - use NSURLVolumeAvailableCapacityKey instead
 	if [[ ${storage_free_space} -eq 0 ]]; then
-		storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
+		storage_free_space=$( /usr/bin/osascript -l "JavaScript" -e '
+
+			ObjC.import("Foundation");
+			var freeSpaceBytesRef=Ref();
+
+			$.NSURL.fileURLWithPath("/").getResourceValueForKeyError(
+				freeSpaceBytesRef,
+				"NSURLVolumeAvailableCapacityKey",
+				null
+			);
+
+			Math.round(
+				ObjC.unwrap(
+					freeSpaceBytesRef[0]
+				)
+			)
+		')
 	fi
-	
+
 	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
 		"Sonoma*" )
@@ -358,7 +391,7 @@ storage_check() {
 		older_os_patch=$( echo "${os_older}" | /usr/bin/awk -F '.' '{print $3}' )
 
 		# Check newer
-		if [[ "${os_major}" -gt "${newer_os_major}" || 
+		if [[ "${os_major}" -gt "${newer_os_major}" ||
 			( "${os_major}" -eq "${newer_os_major}" &&
 			  "${os_minor}" -ge "${newer_os_minor}" &&
 			  "${os_patch}" -ge "${newer_os_patch}" ) ]]; then
@@ -366,7 +399,7 @@ storage_check() {
 			required_free_space=$required_free_space_newer
 
 		# Check older
-		elif [[ "${os_major}" -gt "${older_os_major}" || 
+		elif [[ "${os_major}" -gt "${older_os_major}" ||
 			  ( "${os_major}" -eq "${older_os_major}" &&
 				"${os_minor}" -ge "${older_os_minor}" &&
 				"${os_patch}" -ge "${older_os_patch}" ) ]]; then
@@ -442,20 +475,25 @@ case "${model_result}" in
 	;;
 esac
 
-# Check to see if device is running an OS version newer than what it supports.
-# If so, no reason to check further specifications.
-if [[ "${current_os_major}" -gt "${version_string}" ]]; then
+if [[ "${version_string}" =~ 10.+ ]]; then
+	test_running_unsupported="${current_os_major}.${current_os_minor}"
+else
+	test_running_unsupported="${current_os_major}"
+fi
 
-	echo "<result>${model_result} (Model doesn't support current OS version)</result>"
-	write_to_ea_history "latest_os_supported" "${model_result}"
+if [[ $( /usr/bin/bc <<< "${test_running_unsupported} >= ${version_string}" ) -eq 1 ]]; then
+	# Check to see if device is running an OS version newer than what it supports.
+	# If so, no reason to check further specifications.
+	report_result="${model_result} (Model doesn't support current OS version)"
 
-# Check to see if device is already running the latest supported OS.
-# If so, no reason to check further specifications.
-elif [[ "${version_string}" == "${current_os_major}.${current_os_minor}" || 
-	  "${version_string}" -eq "${current_os_major}"  ]]; then
+elif [[
+		"${version_string}" == "${current_os_major}.${current_os_minor}" ||
+		"${version_string}" == "${current_os_major}"
+	]]; then
+	# Check to see if device is already running the latest supported OS.
+	# If so, no reason to check further specifications.
 
-	echo "<result>${model_result}</result>"
-	write_to_ea_history "latest_os_supported" "${model_result}"
+	report_result="${model_result}"
 
 else
 
@@ -463,9 +501,11 @@ else
 	ram_check_results=$( ram_check "${os_result}" )
 	storage_check_results=$( storage_check "${os_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
 
-	echo "<result>${ram_check_results}${storage_check_results}</result>"
-	write_to_ea_history "latest_os_supported" "${ram_check_results}${storage_check_results}"
+	report_result="${ram_check_results}${storage_check_results}"
+	model_result="${ram_check_results}${storage_check_results}"
 
 fi
 
+echo "<result>${report_result}</result>"
+write_to_ea_history "latest_os_supported" "${model_result}"
 exit 0
