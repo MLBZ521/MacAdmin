@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.5.1 / Updated:  9/6/2023 / By:  ZT
+# Version:  2.5.2 / Updated:  9/6/2023 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -338,42 +338,42 @@ storage_check() {
 
 	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
-		"Sonoma*" )
+		"Sonoma*"* )
 			# Value's inherited from Monterey, Apple has not defined these requirements
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
 			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
 			os_older="10.11.0"
 		;;
-		"Ventura*" )
+		"Ventura*"* )
 			# Value's inherited from Monterey, Apple has not defined these requirements
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
 			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
 			os_older="10.11.0"
 		;;
-		"Monterey" )
+		"Monterey"* )
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
 			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
 			os_older="10.11.0"
 		;;
-		"Big Sur" )
+		"Big Sur"* )
 			required_free_space_newer="38117834752" # 35.5GB if Sierra or later
 			os_newer="10.12.0"
 			required_free_space_older="47781511168" # 44.5GB if El Capitan or earlier
 			os_older="10.11.0"
 		;;
-		"Catalina"|"Mojave" )
+		"Catalina"*|"Mojave"* )
 			required_free_space_newer="13421772800" # 12.5GB if El Capitan 10.11.5 or later
 			os_newer="10.11.5"
 			required_free_space_older="19864223744" # 18.5GB if Yosemite or earlier
 			os_older="10.10.0"
 		;;
-		"High Sierra" )
+		"High Sierra"* )
 			required_free_space="15354508084" # 14.3GB
 		;;
-		"Sierra"|"El Capitan"* )
+		"Sierra"*|"El Capitan"* )
 			required_free_space="9448928052" # 8.8GB
 		;;
 		* )
