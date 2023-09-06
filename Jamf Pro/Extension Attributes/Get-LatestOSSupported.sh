@@ -4,9 +4,19 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.4.1 / Updated:  6/5/2023 / By:  ZT
+# Version:  2.5.0 / Updated:  7/6/2023 / By:  Nic Wendlowsky
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
+#
+# New Feature:  When running as standalone script, you can pass a Model number and OS version
+# 				to the script to validate regex.
+# 	EXAMPLE
+# 		$ bash ./Get-LatestOSSupported.sh "MacBookPro13,3" "12.0"
+# 		Test OS value: 12.0
+# 		Test Model value: MacBookPro13,3
+# 		<result>Monterey</result>
+#
+#	Courtesy of Nic Wendlowsky (@hkystar35)
 #
 # Updates:  For each OS version released, a new Regex string and each function will need to be 
 #			updated.
@@ -30,6 +40,19 @@
 #		El Capitan - https://support.apple.com/kb/sp728
 #
 ####################################################################################################
+
+##################################################
+# Define test values
+
+# Allow for specifying a Model and OS Version to the script to validate regex.
+# If these values are passed, the write_to_ea_history function is ignored so that incorrect 
+# information is not written to the test computer.
+# Supported actions:
+# 	TEST_MODEL - example: "MacBookPro13,3"
+# 	TEST_OS - example: "14.0"
+
+TEST_MODEL="${1}"
+TEST_OS="${2}"
 
 ##################################################
 # Define organization's environment values
@@ -66,7 +89,7 @@ write_to_ea_history() {
 	local key="${1}"
 	local value="${2}"
 
-	if [[ "${locally_log}" == "true" ]]; then
+	if [[ "${locally_log}" == "true" && -z "${TEST_OS}" && -z "${TEST_MODEL}" ]]; then
 
 		if [[ ! -e "${local_inventory}" ]]; then
 
@@ -367,13 +390,24 @@ storage_check() {
 bytes_in_gigabytes="1073741824" # $((1024 * 1024 * 1024)) # Transforms one gigabyte into bytes
 
 # Get the current OS version
-os_version=$( /usr/bin/sw_vers -productVersion )
+if [[ -z "${TEST_OS}" ]]; then
+	os_version=$( /usr/bin/sw_vers -productVersion )
+else
+	os_version="${TEST_OS}"
+	echo "Test OS value: ${TEST_OS}"
+fi
+
 current_os_major=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $1}' )
 current_os_minor=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $2}' )
 current_os_patch=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $3}' )
 
 # Get the Model Type
-mac_model=$( /usr/sbin/sysctl -n hw.model )
+if [[ -z "${TEST_MODEL}" ]]; then
+	mac_model=$( /usr/sbin/sysctl -n hw.model )
+else
+	mac_model="${TEST_MODEL}"
+	echo "Test Model value: ${TEST_MODEL}"
+fi
 
 # Check for compatibility
 model_result=$( model_check "${mac_model}" )
