@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  jamf_Patcher.py
 # By:  Zack Thompson / Created:  7/10/2019
-# Version:  1.0.1 / Updated:  10/22/2021 / By:  ZT
+# Version:  1.1.0 / Updated:  9/20/2023 / By:  ZT
 #
 # Description:  This script handles patching of applications with user notifications.
 #
@@ -21,289 +21,473 @@ try:
 except ImportError:
     from urllib import request as urllib  # For Python 3
 
-def runUtility(command,  errorAction='continue'):
+
+def run_utility(command,  continue_on_error=True):
     """A helper function for subprocess.
     Args:
-        command:  String containing the commands and arguments that will be passed to a shell.
+        command (str):  String containing the commands and
+            arguments that will be passed to a shell.
+        continue_on_error (bool):  Whether to continue on error or not
     Returns:
         stdout:  output of the command
     """
-    if errorAction == 'continue':
-        try:
-            process = subprocess.check_output(command, shell=True)
-        except:
-            process = "continue"
-    else:
-        try:
-            process = subprocess.check_output(command, shell=True)
-        except subprocess.CalledProcessError as error:
-            print ('Error code:  {}'.format(error.returncode))
-            print ('Error:  {}'.format(error))
-            process = "error"
 
-    return process
+    try:
+        return subprocess.check_output(command, shell=True)
 
-def plistReader(plistFile):
-    """A helper function to get the contents of a Property List.
+    except subprocess.CalledProcessError as error:
+
+        if continue_on_error:
+            return "continue"
+
+        print(f"Error code:  {error.returncode}\nError:  {error}")
+        return "error"
+
+
+def plist_reader(plist_file):
+    """A helper function to get the contents of a Property List file.
     Args:
-        plistFile:  A .plist file to read in.
+        plist_file (str):  A .plist file path to read in.
     Returns:
         stdout:  Returns the contents of the plist file.
     """
 
-    if os.path.exists(plistFile):
-        # print('Reading {}...'.format(plistFile))
+    if os.path.exists(plist_file):
+        # print(f"Reading {plist_file}...")
 
         try:
-            plist_Contents = plistlib.load(plistFile)
+            plist_contents = plistlib.load(plist_file)
         except Exception:
-            file_cmd = '/usr/bin/file --mime-encoding {}'.format(plistFile)
-            file_response = runUtility(file_cmd)
-            file_type = file_response.split(': ')[1].strip()
-            # print('File Type:  {}'.format(file_type))
+            file_cmd = f"/usr/bin/file --mime-encoding {plist_file}"
+            file_response = run_utility(file_cmd)
+            file_type = file_response.split(": ")[1].strip()
+            # print(f"File Type:  {file_type}")
 
-            if file_type == 'binary':
-                # print('Converting plist...')
-                plutil_cmd = '/usr/bin/plutil -convert xml1 {}'.format(plistFile)
-                plutil_response = runUtility(plutil_cmd)
+            if file_type == "binary":
+                # print("Converting plist...")
+                plutil_cmd = f"/usr/bin/plutil -convert xml1 {plist_file}"
+                _ = run_utility(plutil_cmd)
 
-            plist_Contents = plistlib.load(plistFile)
+            plist_contents = plistlib.load(plist_file)
     else:
-        print('Something\'s terribly wrong here...')
+        print("Something's terribly wrong here...")
 
-    return plist_Contents
+    return plist_contents
 
-def promptToPatch(**parameters):
+
+def prompt_to_patch(**parameters):
+    """Uses Jamf Helper to prompt a user to patch a software title,
+    optionally allowing them to delay the patch.
+
+    Args:
+        parameters (kwargs):  Key word arguments
+    """
 
     # Prompt user to quit app.
-    prompt = '"{}" -windowType "{}" -title "{}" -icon "/private/tmp/{}Icon.png" -heading "{}" -description "{}" -button1 OK -timeout 3600 -countdown -countdownPrompt "If you wish to delay this patch, please make a selection in " -alignCountdown center -lockHUD -showDelayOptions ", 600, 3600, 86400"'.format(parameters.get('jamfHelper'), parameters.get('windowType'), parameters.get('title'), parameters.get('applicationName'), parameters.get('heading'), parameters.get('description'))
-    selection = runUtility(prompt)
-    print('SELECTION:  {}'.format(selection))
+    prompt = f"""\
+        '{parameters.get("jamf_helper")}' \
+            -window_type '{parameters.get("window_type")}' \
+            -title '{parameters.get("title")}' \
+            -icon '{parameters.get("icon")}' \
+            -heading '{parameters.get("heading")}' \
+            -description '{parameters.get("description")}' \
+            -button1 OK \
+            -timeout 3600 \
+            -countdown \
+            -countdownPrompt 'If you wish to delay this patch, please make a selection in ' \
+            -alignCountdown center \
+            -lockHUD \
+            -showDelayOptions ', 600, 3600, 86400' \
+    """
+
+    selection = run_utility(prompt)
+    print(f"SELECTION:  {selection}")
 
     if selection == "1":
-        print('User selected to patch now.')
-        killAndInstall(**parameters)
+        print("User selected to patch now.")
+        kill_and_install(**parameters)
 
     elif selection[:-1] == "600":
-        print('DELAY:  600 seconds')
-        delayDaemon(delayTime=600, **parameters)
+        print("DELAY:  600 seconds")
+        create_delay_daemon(delayTime=600, **parameters)
 
     elif selection[:-1] == "3600":
-        print('DELAY:  3600 seconds')
-        delayDaemon(delayTime=3600, **parameters)
+        print("DELAY:  3600 seconds")
+        create_delay_daemon(delayTime=3600, **parameters)
 
     elif selection[:-1] == "86400":
-        print('DELAY:  86400 seconds')
-        delayDaemon(delayTime=86400, **parameters)
+        print("DELAY:  86400 seconds")
+        create_delay_daemon(delayTime=86400, **parameters)
 
     elif selection == "243":
-        print('TIMED OUT:  user did not make a selection')
-        killAndInstall(**parameters)
+        print("TIMED OUT:  user did not make a selection")
+        kill_and_install(**parameters)
 
     else:
-        print('Unknown action was taken at prompt.')
-        killAndInstall(**parameters)
+        print("Unknown action was taken at prompt.")
+        kill_and_install(**parameters)
 
-def killAndInstall(**parameters):
+
+def kill_and_install(**parameters):
+    """Kills the application by PID, if running and then executes
+    the Jamf Pro Policy to update the application.
+
+    Args:
+        parameters (kwargs):  Key word arguments
+    """
 
     try:
-        print('Attempting to close app if it\'s running...')
+        print("Attempting to close app if it's running...")
         # Get PID of the application
-        print('Process ID:  {}'.format(parameters.get('status').split(' ')[0]))
-        pid = int(parameters.get('status').split(' ')[0])
-
+        pid = int(parameters.get("status").split(" ")[0])
+        print(f"Process ID:  {pid}")
         # Kill PID
         os.kill(pid, signal.SIGTERM) #or signal.SIGKILL
-    except:
-        print('Unable to terminate app, assuming it was manually closed...')
+    except Exception:
+        print("Unable to terminate app, assuming it was manually closed...")
 
-    print('Performing install...')
+    print("Performing install...")
 
     # Run Policy
-    runUtility(parameters.get('installPolicy'))
-    # print('Test run, don\'t run policy!')
+    run_utility(parameters.get("install_policy"))
+    # print("Test run, don't run policy!")
 
-    prompt = '"{}" -windowType "{}" -title "{}" -icon "/private/tmp/{}Icon.png" -heading "{}" -description "{}" -button1 OK -timeout 60 -alignCountdown center -lockHUD'.format(parameters.get('jamfHelper'), parameters.get('windowType'), parameters.get('title'), parameters.get('applicationName'), parameters.get('heading'), parameters.get('descriptionComplete'))
-    runUtility(prompt)
+    prompt = f"""\
+        '{parameters.get("jamf_helper")}' \
+            -window_type '{parameters.get("window_type")}' \
+            -title '{parameters.get("title")}' \
+            -icon '{parameters.get("icon")}' \
+            -heading '{parameters.get("heading")}' \
+            -description '{parameters.get("description_complete")}' \
+            -button1 OK \
+            -timeout 60 \
+            -alignCountdown center \
+            -lockHUD \
+    """
 
-def delayDaemon(**parameters):
+    run_utility(prompt)
+
+
+def create_delay_daemon(**parameters):
+    """Creates a LaunchDaemon based on the user selected delay time
+    which will the call a "Delayed Patch" Policy in Jamf Pro.
+
+    Args:
+        parameters (kwargs):  Key word arguments
+    """
+
+    application_name = parameters.get("application_name")
+    launch_daemon_label = parameters.get('launch_daemon_label')
+    launch_daemon_location = parameters.get("launch_daemon_location")
+    os_minor_version = parameters.get("os_minor_version")
+    patch_plist = parameters.get("patch_plist")
 
     # Configure for delay.
-    if os.path.exists(parameters.get('patchPlist')):
-        patchPlist_contents = plistReader(parameters.get('patchPlist'))
-        patchPlist_contents.update( { parameters.get('applicationName') : "Delayed" } )
-        plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
+    if os.path.exists(patch_plist):
+        patch_plist_contents = plist_reader(patch_plist)
+        patch_plist_contents.update( { application_name : "Delayed" } )
     else:
-        patchPlist_contents = { parameters.get('applicationName') : "Delayed" }
-        plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
+        patch_plist_contents = { application_name : "Delayed" }
 
-    print('Creating the Patcher launchDaemon...')
+    plistlib.dump(patch_plist_contents, patch_plist)
 
-    launchDaemon_plist = {
-    "Label" : "com.github.mlbz521.jamf.patcher",
-    'ProgramArguments' : ["/usr/local/jamf/bin/jamf", "policy", "-id", "{}".format(parameters.get('patchID'))],
-    'StartInterval' : parameters.get('delayTime'),
-    'AbandonProcessGroup' : True
+    print("Creating the Patcher LaunchDaemon...")
+
+    launch_daemon_plist = {
+        "Label": "com.github.mlbz521.jamf.patcher",
+        "ProgramArguments": [
+            "/usr/local/jamf/bin/jamf",
+            "policy",
+            "-id",
+            f"{parameters.get('patch_id')}",
+        ],
+        "StartInterval": parameters.get("delayTime"),
+        "AbandonProcessGroup": True,
     }
 
-    plistlib.dump(launchDaemon_plist, parameters.get('launchDaemonLocation'))
+    plistlib.dump(launch_daemon_plist, launch_daemon_location)
 
-    if os.path.exists(parameters.get('launchDaemonLocation')):
+    if os.path.exists(launch_daemon_location):
+        # Start the LaunchDaemon
+        start_daemon(os_minor_version, launch_daemon_label, launch_daemon_location)
 
-        # Check if the LaucnhDaemon is running, if so restart it in case a change was made to the plist file.
-        # Determine proper launchctl syntax based on OS Version
-        if parameters.get('osMinorVersion') >= 11:
-            launchctl_print = '/bin/launchctl print system/{} > /dev/null 2>&1; echo $?'.format(parameters.get('launchDaemonLabel'))
-            exitCode = runUtility(launchctl_print)
-            # print('exitCode:  {}'.format(exitCode))
 
-            if int(exitCode) == 0:
-                print('Patcher launchDaemon is currently started; stopping now...')
-                launchctl_bootout = '/bin/launchctl bootout system/{}'.format(parameters.get('launchDaemonLabel'))
-                runUtility(launchctl_bootout)
+def clean_up(**parameters):
+    """Cleans up a configured delay for the application
+    and stops and deletes the delay LaunchDaemon.
 
-            print('Loading Patcher launchDaemon...')
-            launchctl_bootstrap = '/bin/launchctl bootstrap system {}'.format(parameters.get('launchDaemonLocation'))
-            runUtility(launchctl_bootstrap)
+    Args:
+        parameters (kwargs):  Key word arguments
+    """
 
-            launchctl_enable = '/bin/launchctl enable system/{}'.format(parameters.get('launchDaemonLabel'))
-            runUtility(launchctl_enable)
+    print("Performing cleanup...")
 
-        elif parameters.get('osMinorVersion') <= 10:
-            launchctl_list = '/bin/launchctl list {} > /dev/null 2>&1; echo $?'.format(parameters.get('launchDaemonLabel'))
-            exitCode = runUtility(launchctl_list)
+    application_name = parameters.get("application_name")
+    launch_daemon_label = parameters.get('launch_daemon_label')
+    launch_daemon_location = parameters.get("launch_daemon_location")
+    os_minor_version = parameters.get("os_minor_version")
+    patch_plist = parameters.get("patch_plist")
 
-            if  int(exitCode) == 0:
-                print('Patcher launchDaemon is currently started; stopping now...')
-                launchctl_unload = '/bin/launchctl unload {}'.format(parameters.get('launchDaemonLocation'))
-                runUtility(launchctl_unload)
+    # Clean up patch_plist.
+    if os.path.exists(patch_plist):
+        patch_plist_contents = plist_reader(patch_plist)
 
-            print('Loading Patcher launchDaemon...')
-            launchctl_enable = '/bin/launchctl load {}'.format(parameters.get('launchDaemonLocation'))
-            runUtility(launchctl_enable)
-
-def cleanUp(**parameters):
-    print('Performing cleanup...')
-
-    # Clean up patchPlist.
-    if os.path.exists(parameters.get('patchPlist')):
-        patchPlist_contents = plistReader(parameters.get('patchPlist'))
-
-        if patchPlist_contents.get(parameters.get('applicationName')):
-            patchPlist_contents.pop(parameters.get('applicationName'), None)
-            print('Removing previously delayed app:  {}'.format(parameters.get('applicationName')))
-            plistlib.dump(patchPlist_contents, parameters.get('patchPlist'))
+        if patch_plist_contents.get(application_name):
+            patch_plist_contents.pop(application_name, None)
+            print(f"Removing previously delayed app:  {application_name}")
+            plistlib.dump(patch_plist_contents, patch_plist)
         else:
-            print('App not listed in patchPlist:  {}'.format(parameters.get('applicationName')))
+            print(f"App not listed in patch_plist:  {application_name}")
+
+    # Stop LaunchDaemon before deleting it
+    stop_daemon(os_minor_version, launch_daemon_label, launch_daemon_location)
+
+    if os.path.exists(launch_daemon_location):
+        os.remove(launch_daemon_location)
+
+
+def execute_launchctl(sub_cmd, service_target, exit_code_only=False):
+    """A helper function to run launchctl.
+
+    Args:
+        sub_cmd (str): A launchctl subcommand (option)
+        service_target (str): A launchctl service target (parameter)
+        exit_code_only (bool, optional): Whether to report only success or failure.
+            Defaults to False.
+
+    Returns:
+        bool | str: Depending on `exit_code_only`, returns either a bool or
+            the output from launchctl
+    """
+
+    launchctl_cmd = f"/bin/launchctl {sub_cmd} {service_target}"
+
+    if exit_code_only:
+        launchctl_cmd = f"{launchctl_cmd} > /dev/null 2>&1; echo $?"
+
+    return run_utility(launchctl_cmd)
+
+
+def is_daemon_running(os_minor_version, launch_daemon_label):
+    """Checks if the daemon is running.
+
+    Args:
+        os_minor_version (int): Used to determines the proper launchctl
+            syntax based on OS Version of the device
+        launch_daemon_label (str): The LaunchDaemon's Label
+
+    Returns:
+        bool: True or False whether or not the LaunchDaemon is running
+    """
+
+    if os_minor_version >= 11:
+        return execute_launchctl("print", f"system/{launch_daemon_label}", exit_code_only=True)
+
+    elif os_minor_version <= 10:
+        return execute_launchctl("list", launch_daemon_label, exit_code_only=True)
+
+
+def start_daemon(os_minor_version, launch_daemon_label, launch_daemon_location):
+    """Starts a daemon, if it is running, it will be restarted in
+    case a change was made to the plist file.
+
+    Args:
+        os_minor_version (int): Used to determines the proper launchctl
+            syntax based on OS Version of the device
+        launch_daemon_label (str): The LaunchDaemon's Label
+        launch_daemon_location (str): The file patch to the LaunchDaemon
+
+    """
+
+    restart_daemon(os_minor_version, launch_daemon_label, launch_daemon_location)
+
+    print("Loading LaunchDaemon...")
+
+    if os_minor_version >= 11:
+        execute_launchctl("bootstrap", f"system {launch_daemon_location}")
+        execute_launchctl("enable", f"system/{launch_daemon_label}")
+
+    elif os_minor_version <= 10:
+        execute_launchctl("load", launch_daemon_location)
+
+
+def restart_daemon(os_minor_version, launch_daemon_label, launch_daemon_location):
+    """Restarts a daemon if it is running.
+
+    Args:
+        os_minor_version (int): Used to determines the proper launchctl
+            syntax based on OS Version of the device
+        launch_daemon_label (str): The LaunchDaemon's Label
+        launch_daemon_location (str): The file patch to the LaunchDaemon
+
+    """
 
     # Check if the LaunchDaemon is running.
-    # Determine proper launchctl syntax based on OS Version.
-    if parameters.get('osMinorVersion') >= 11:
-        launchctl_print = '/bin/launchctl print system/{} > /dev/null 2>&1; echo $?'.format(parameters.get('launchDaemonLabel'))
-        exitCode = runUtility(launchctl_print)
+    exit_code = is_daemon_running(os_minor_version, launch_daemon_label)
 
-        if int(exitCode) == 0:
-            print('Stopping the Patcher launchDaemon...')
-            launchctl_bootout = '/bin/launchctl bootout system/{}'.format(parameters.get('launchDaemonLabel'))
-            runUtility(launchctl_bootout)
+    if int(exit_code) == 0:
+        print("LaunchDaemon is currently started; stopping now...")
 
-    elif parameters.get('osMinorVersion') <= 10:
-        launchctl_list = '/bin/launchctl list {} > /dev/null 2>&1; echo $?'.format(parameters.get('launchDaemonLabel'))
-        exitCode = runUtility(launchctl_list)
+        if os_minor_version >= 11:
+            execute_launchctl("bootout", f"system/{launch_daemon_label}")
 
-        if int(exitCode) == 0:
-            print('Stopping the Patcher launchDaemon...')
-            launchctl_unload = '/bin/launchctl unload {}'.format(parameters.get('launchDaemonLabel'))
-            runUtility(launchctl_unload)
+        elif os_minor_version <= 10:
+            execute_launchctl("unload", launch_daemon_location)
 
-    if os.path.exists(parameters.get('launchDaemonLocation')):
-        os.remove(parameters.get('launchDaemonLocation'))
+
+def stop_daemon(os_minor_version, launch_daemon_label, launch_daemon_location):
+    """Stops a daemon.
+
+    Args:
+        os_minor_version (int): Used to determines the proper launchctl
+            syntax based on OS Version of the device
+        launch_daemon_label (str): The LaunchDaemon's Label
+        launch_daemon_location (str): The file patch to the LaunchDaemon
+
+    """
+
+    # Check if the LaunchDaemon is running.
+    exit_code = is_daemon_running(os_minor_version, launch_daemon_label)
+
+    if int(exit_code) == 0:
+        print("Stopping the LaunchDaemon...")
+
+        if os_minor_version >= 11:
+            execute_launchctl("bootout", f"system/{launch_daemon_label}")
+        elif os_minor_version <= 10:
+            execute_launchctl("unload", launch_daemon_location)
+
+    else:
+        print("LaunchDaemon not running")
+
 
 def main():
-    print('*****  jamf_Patcher process:  START  *****')
+    print("*****  jamf_Patcher process:  START  *****")
 
     ##################################################
     # Define Script Parameters
-    print('All args:  {}'.format(sys.argv))
-    departmentName = sys.argv[4] # "My Organization Technology Office"
-    applicationName = sys.argv[5] # "zoom"
-    iconID = sys.argv[6] # "https://jps.server.com:8443/icon?id=49167"
-    patchID = sys.argv[7]
-    policyID = sys.argv[8]
+    print(f"All args:  {sys.argv}")
+    department_name = sys.argv[4] # "<Organization's> Technology Office"
+    application_name = sys.argv[5] # "zoom.us"
+    icon_id = sys.argv[6] # "https://jps.server.com:8443/icon?id=49167"
+    patch_id = sys.argv[7]
+    policy_id = sys.argv[8]
 
     ##################################################
     # Define Variables
-    jamfPS = plistReader('/Library/Preferences/com.jamfsoftware.jamf.plist')['jss_url']
-    patchPlist = '/Library/Preferences/com.github.mlbz521.jamf.patcher.plist'
-    jamfHelper = '/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper'
-    launchDaemonLabel = 'com.github.mlbz521.jamf.patcher.{}'.format(applicationName)
-    launchDaemonLocation = '/Library/LaunchDaemons/{}.plist'.format(launchDaemonLabel)
-    osMinorVersion = platform.mac_ver()[0].split('.')[1]
-    installPolicy = '/usr/local/jamf/bin/jamf policy -id {}'.format(policyID)
+    jamf_pro_server = plist_reader("/Library/Preferences/com.jamfsoftware.jamf.plist")["jss_url"]
+    patch_plist = "/Library/Preferences/com.github.mlbz521.jamf.patcher.plist"
+    jamf_helper = "/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
+    launch_daemon_label = f"com.github.mlbz521.jamf.patcher.{application_name}"
+    launch_daemon_location = f"/Library/LaunchDaemons/{launch_daemon_label}.plist"
+    os_minor_version = platform.mac_ver()[0].split(".")[1]
+    install_policy = f"/usr/local/jamf/bin/jamf policy -id {policy_id}"
 
     ##################################################
     # Define jamfHelper window values
     title="Security Patch Notification"
-    windowType="hud"
-    description = '{name} will be updated to patch a security vulnerability.  Please quit {name} to apply this update.\n\nIf you have questions, please contact your deskside support group.'.format(name=applicationName)
-    descriptionForce = '{name} will be updated to patch a security vulnerability.  Please quit {name} within the allotted time to apply this update.\n\nIf you have questions, please contact your deskside support group.'.format(name=applicationName)
-    descriptionComplete = '{} has been patched!\n\n.'.format(applicationName)
-    icon = '/private/tmp/{}Icon.png'.format(applicationName)
+    window_type="hud"
+    description = f"{application_name} will be updated to patch a security vulnerability.  \
+        Please quit {application_name} to apply this update.\n\nIf you have questions, \
+        please contact your deskside support group."
+    description_force = f"{application_name} will be updated to patch a security vulnerability.  \
+        Please quit {application_name} within the allotted time to apply this update.\n\n\
+        If you have questions, please contact your deskside support group."
+    description_complete = f"{application_name} has been patched!\n\n."
+    local_icon_path = f"/private/tmp/{application_name}_icon.png"
 
-    if departmentName:
-        heading = 'My Organization - {}'.format(departmentName)
+    if department_name:
+        heading = f"My Organization - {department_name}"
     else:
-        heading = 'My Organization'
+        heading = "My Organization"
 
     ##################################################
     # Bits staged...
 
-    psCheck = '/bin/ps -ax -o pid,command | /usr/bin/grep -E "/Applications/{}" | /usr/bin/grep -v "grep" 2> /dev/null'.format(applicationName)
-    status = runUtility(psCheck)
-    print('APP STATUS:  {}'.format(status))
+    process_check = f"/bin/ps -ax -o pid,command | \
+        /usr/bin/grep -E '/Applications/{application_name}' | \
+        /usr/bin/grep -v 'grep' 2> /dev/null"
+    status = run_utility(process_check)
+    print(f"APP STATUS:  {status}")
+
+    parameters = {
+        "application_name": application_name,
+        "patch_plist": patch_plist,
+        "launch_daemon_label": launch_daemon_label,
+        "launch_daemon_location": launch_daemon_location,
+        "os_minor_version": os_minor_version,
+        "patch_id": patch_id,
+        "status": status,
+        "install_policy": install_policy
+    }
+
+    jamf_helper_parameters = {
+        "jamf_helper": jamf_helper,
+        "window_type": window_type,
+        "title": title,
+        "heading": heading,
+        "description": description,
+        "description_complete": description_complete,
+        "icon": local_icon_path
+    }
 
     if status == "continue":
-        print('{} is not running, installing now...'.format(applicationName))
-        runUtility(installPolicy)
-        # print('Test run, don\'t run policy!')
+        print(f"{application_name} is not running, installing now...")
+        run_utility(install_policy)
+        # print("Test run, don't run policy!")
 
-        cleanUp(applicationName=applicationName, patchPlist=patchPlist, launchDaemonLabel=launchDaemonLabel, launchDaemonLocation=launchDaemonLocation, osMinorVersion=osMinorVersion)
+        clean_up(**parameters)
 
     else:
-        print('{} is running...'.format(applicationName))
+        print(f"{application_name} is running...")
 
         # Download the icon from the JPS
-        iconURL = '{}icon?id={}'.format(jamfPS, iconID)
+        icon_url = f"{jamf_pro_server}icon?id={icon_id}"
+
         try:
-            iconImage = requests.get(iconURL)
-            open('/private/tmp/{}Icon.png'.format(applicationName), 'wb').write(iconImage.content)
-        except:
+            downloaded_icon = requests.get(icon_url)
+            open(local_icon_path, "wb").write(downloaded_icon.content)
+        except Exception:
             sys.exc_clear()
-            urllib.urlretrieve(iconURL, filename='/private/tmp/{}Icon.png'.format(applicationName))
+            urllib.urlretrieve(icon_url, filename=local_icon_path)
 
-        if os.path.exists(patchPlist):
-            patchPlist_contents = plistReader(patchPlist)
-            delayCheck = patchPlist_contents.get(applicationName)
+        if os.path.exists(patch_plist):
+            patch_plist_contents = plist_reader(patch_plist)
 
-            if delayCheck:
-                print('STATUS:  Patch has already been delayed; forcing upgrade.')
+            # Delay Check
+            if patch_plist_contents.get(application_name):
+                print("STATUS:  Patch has already been delayed; forcing upgrade.")
 
                 # Prompt user with one last warning.
-                prompt = '"{}" -windowType "{}" -title "{}" -icon "/private/tmp/{}Icon.png" -heading "{}" -description "{}" -button1 OK -timeout 600 -countdown -countdownPrompt \'{} will be force closed in \' -alignCountdown center -lockHUD > /dev/null 2>&1'.format(jamfHelper, windowType, title, applicationName, heading, descriptionForce, applicationName)
-                runUtility(prompt)
+                prompt = f"\
+                    '{jamf_helper}' \
+                    -window_type '{window_type}' \
+                    -title '{title}' \
+                    -icon '{local_icon_path}' \
+                    -heading '{heading}' \
+                    -description '{description_force}' \
+                    -button1 OK \
+                    -timeout 600 \
+                    -countdown \
+                    -countdownPrompt '{application_name} will be force closed in ' \
+                    -alignCountdown center \
+                    -lockHUD \
+                    > /dev/null 2>&1 \
+                "
 
-                killAndInstall(status=status, installPolicy=installPolicy, applicationName=applicationName, jamfHelper=jamfHelper, windowType=windowType, title=title, heading=heading, descriptionComplete=descriptionComplete)
- 
-                cleanUp(applicationName=applicationName, patchPlist=patchPlist, launchDaemonLabel=launchDaemonLabel, launchDaemonLocation=launchDaemonLocation, osMinorVersion=osMinorVersion, patchPlist_contents=patchPlist_contents)
+                run_utility(prompt)
+                kill_and_install(**parameters, **jamf_helper_parameters)
+                clean_up(patch_plist_contents=patch_plist_contents, **parameters)
 
             else:
-                print('STATUS:  Patch has not been delayed; prompting user.')
-                promptToPatch(applicationName=applicationName, patchID=patchID, patchPlist=patchPlist, jamfHelper=jamfHelper, windowType=windowType, title=title, heading=heading, description=description, descriptionComplete=descriptionComplete, launchDaemonLabel=launchDaemonLabel, launchDaemonLocation=launchDaemonLocation, osMinorVersion=osMinorVersion, status=status, installPolicy=installPolicy)
-        else:
-            print('STATUS:  Patch has not been delayed; prompting user.')
-            promptToPatch(applicationName=applicationName, patchID=patchID, patchPlist=patchPlist, jamfHelper=jamfHelper, windowType=windowType, title=title, heading=heading, description=description, descriptionComplete=descriptionComplete, launchDaemonLabel=launchDaemonLabel, launchDaemonLocation=launchDaemonLocation, osMinorVersion=osMinorVersion, status=status, installPolicy=installPolicy)
+                print("STATUS:  Patch has not been delayed; prompting user.")
+                prompt_to_patch(**parameters, **jamf_helper_parameters)
 
-    print('*****  jamf_Patcher process:  SUCCESS  *****')
+        else:
+            print("STATUS:  Patch has not been delayed; prompting user.")
+            prompt_to_patch(**parameters, **jamf_helper_parameters)
+
+    print("*****  jamf_Patcher process:  SUCCESS  *****")
 
 if __name__ == "__main__":
     main()
