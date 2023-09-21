@@ -3,7 +3,7 @@
 ####################################################################################################
 # Script Name:  jamf_Patcher.py
 # By:  Zack Thompson / Created:  7/10/2019
-# Version:  1.2.0 / Updated:  9/20/2023 / By:  ZT
+# Version:  1.3.0 / Updated:  9/20/2023 / By:  ZT
 #
 # Description:  This script handles patching of applications with user notifications.
 #
@@ -213,7 +213,8 @@ def kill_and_install(**parameters):
 	log.info("Performing install...")
 
 	# Run Policy
-	execute_process(parameters.get("install_policy"))
+	if not parameters.get("testing"):
+		execute_process(parameters.get("install_policy"))
 
 	prompt = (
 		f"'{parameters.get('jamf_helper')}' "
@@ -418,6 +419,24 @@ def get_major_minor_os_version():
 	return float(os_version)
 
 
+def value_to_bool(value):
+	"""Checks if the the value is true or false.
+
+	Args:
+		value (str):  The value that will be checked for true/false
+
+	Returns:
+		True or false based on the value
+	"""
+
+	if re.match(r"^[Yy]([Ee][Ss])?|[Tt]([Rr][Uu][Ee])?$", value):
+		return True
+	elif re.match(r"^[Nn]([Oo])?|[Ff]([Aa][Ll][Ss][Ee])?$", value):
+		return False
+	else:
+		log.warning(f"An invalid value was passed for the testing parameter:  {value}")
+
+
 def main():
 	log.info("*****  jamf_Patcher process:  START  *****")
 
@@ -430,6 +449,10 @@ def main():
 	patch_id = sys.argv[7]
 	policy_id = sys.argv[8]
 	log_level = sys.argv[9]
+	testing = sys.argv[10]
+
+	if testing:
+		testing = value_to_bool(testing)
 
 	for handler in log.handlers:
 		match log_level:
@@ -500,7 +523,10 @@ def main():
 
 	if not app_running:
 		log.info(f"{application_name} is not running, installing now...")
-		execute_process(install_policy)
+
+		if not testing:
+			execute_process(install_policy)
+
 		clean_up(**parameters)
 
 	else:
