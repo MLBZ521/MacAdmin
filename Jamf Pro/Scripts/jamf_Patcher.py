@@ -3,7 +3,7 @@
 ####################################################################################################
 # Script Name:  jamf_Patcher.py
 # By:  Zack Thompson / Created:  7/10/2019
-# Version:  1.3.0 / Updated:  9/20/2023 / By:  ZT
+# Version:  1.3.1 / Updated:  9/20/2023 / By:  ZT
 #
 # Description:  This script handles patching of applications with user notifications.
 #
@@ -454,12 +454,13 @@ def main():
 	if testing:
 		testing = value_to_bool(testing)
 
-	for handler in log.handlers:
-		match log_level:
-			case "DEBUG":
-				handler.setLevel(logging.DEBUG)
-			case "INFO":
-				handler.setLevel(logging.INFO)
+	if log_level:
+		for handler in log.handlers:
+			match log_level:
+				case "DEBUG":
+					handler.setLevel(logging.DEBUG)
+				case "INFO":
+					handler.setLevel(logging.INFO)
 
 	##################################################
 	# Define Variables
@@ -499,7 +500,8 @@ def main():
 		"launch_daemon_location": launch_daemon_location,
 		"os_version": os_version,
 		"patch_id": patch_id,
-		"install_policy": install_policy
+		"install_policy": install_policy,
+		"testing": testing
 	}
 
 	jamf_helper_parameters = {
@@ -535,8 +537,7 @@ def main():
 		# Get PID of the application
 		for value in app_running[0].split(" "):
 			if pid := re.match(r"(\d)+", value):
-				# pid = int(pid[0])
-				log.debug(f"Process ID:  {pid}")
+				log.debug(f"Process ID:  {pid[0]}")
 				parameters |= {"pid": int(pid[0])}
 				break
 
