@@ -80,6 +80,8 @@ SELECT
 						computers_denormalized.operating_system_version LIKE "12.%" and patch_software_titles.id = 48
 						or
 						computers_denormalized.operating_system_version LIKE "13.%" and patch_software_titles.id = 54
+						or
+						computers_denormalized.operating_system_version LIKE "14.%" and patch_software_titles.id = 57
 					)
 			)
 		), "True", "False") AS "Latest Patch Installed",
