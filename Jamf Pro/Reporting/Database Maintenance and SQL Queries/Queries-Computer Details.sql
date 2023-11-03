@@ -54,7 +54,7 @@ SELECT
 				computers_denormalized.operating_system_version LIKE "14.%"
 		) THEN "True"
 		ELSE "False"
-	END AS "Running Latest Major OS",
+	END AS "Latest Major OS Installed",
 	IF(
 		(
 			computers_denormalized.computer_id IN (
@@ -82,7 +82,7 @@ SELECT
 						computers_denormalized.operating_system_version LIKE "13.%" and patch_software_titles.id = 54
 					)
 			)
-		), "True", "False") AS "Running Latest Patch",
+		), "True", "False") AS "Latest Patch Installed",
 	ea.last_os_update_installed AS "Last OS Update Installed",
 	computers_denormalized.active_directory_status AS "Active Directory Status",
 	ea.unit AS "Unit",
@@ -113,7 +113,7 @@ LEFT JOIN (
 			MAX(CASE WHEN extension_attribute_id = 65 THEN value_on_client END) AS "primary_location",
 			MAX(CASE WHEN extension_attribute_id = 71 THEN value_on_client END) AS "last_os_update_installed"
 		FROM extension_attribute_values
-		WHERE extension_attribute_id in (62, 63, 64, 65, 71)
+		WHERE extension_attribute_id IN (62, 63, 64, 65, 71)
 		GROUP BY report_id
 	) AS ea
 	ON ea.report_id = r.report_id
@@ -200,7 +200,8 @@ SELECT
 				WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
 				GROUP BY serial_number
 				HAVING COUNT(serial_number) > 1
-			), "True", "False") AS "Duplicate Serial Numbers",
+			), "True", "False"
+	) AS "Duplicate Serial Numbers",
 	IF(
 		computers_denormalized.last_contact_time_epoch = 0, "Never",
 		DATE(date_sub(FROM_unixtime(computers_denormalized.last_contact_time_epoch/1000), INTERVAL 1 DAY))
@@ -375,7 +376,7 @@ LEFT JOIN (
 			MAX(CASE WHEN extension_attribute_id = 58 THEN value_on_client END) AS "falcon_status",
 			MAX(CASE WHEN extension_attribute_id = 57 THEN value_on_client END) AS "falcon_version"
 		FROM extension_attribute_values
-		WHERE extension_attribute_id in (57, 58)
+		WHERE extension_attribute_id IN (57, 58)
 		GROUP BY report_id
 	) AS ea
 	ON ea.report_id = r.report_id

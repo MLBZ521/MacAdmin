@@ -49,11 +49,11 @@ SELECT
     mdm_cmds.apns_result_status AS "Result",
 	CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_mac.site_name IS NOT NULL
         ) THEN sites_mac.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobile.site_name IS NOT NULL
         ) THEN sites_mobile.site_name
         ELSE "None"
@@ -61,7 +61,7 @@ SELECT
     mdm_c.client_type AS "Client Type",
     CASE
         WHEN mdm_c.client_type = "COMPUTER" THEN mac_denorm.computer_id
-        WHEN mdm_c.client_type in ("MOBILE_DEVICE", "TV") THEN mobile_denorm.mobile_device_id
+        WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "TV") THEN mobile_denorm.mobile_device_id
         WHEN mdm_c.client_type = "COMPUTER_USER" THEN cupt.computer_id
         WHEN mdm_c.client_type = "MOBILE_DEVICE_USER" THEN pushtoken.device_management_id
     END AS "Device ID",
@@ -72,19 +72,19 @@ SELECT
     mdm_cmds.profile_id AS "ID",
     CASE
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
         ) THEN mac_cp.display_name
 		WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
         ) THEN mobile_cp.display_name
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mac_apps.app_name
         WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mobile_apps.app_name
     END AS "Name"
@@ -152,18 +152,18 @@ DESC;
 
 -- ##################################################
 -- MDM Commands that result in an Error
--- Count and results for MDM Commmands that resulted in an Error in last 24 hours
+-- Count and results for MDM Commands that resulted in an Error in last 24 hours
 SELECT
     COUNT(mdm_cmds.apns_result_status) AS "Total",
     mdm_cmds.command AS "Command",
     mdm_cmds.error_localized_description AS "Description",
     CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_mac.site_name IS NOT NULL
         ) THEN sites_mac.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobile.site_name IS NOT NULL
         ) THEN sites_mobile.site_name
         ELSE "None"
@@ -172,19 +172,19 @@ SELECT
     mdm_cmds.profile_id AS "ID",
     CASE
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
         ) THEN mac_cp.display_name
 		WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
         ) THEN mobile_cp.display_name
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mac_apps.app_name
         WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mobile_apps.app_name
     END AS "Name"
@@ -252,26 +252,26 @@ SELECT
     mdm_c.client_type AS "Client Type",
     CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_macs.site_name IS NOT NULL
         ) THEN sites_macs.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobiles.site_name IS NOT NULL
         ) THEN sites_mobiles.site_name
         ELSE "None"
     END AS `Device Site`,
     CASE
-        WHEN mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
-        WHEN mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
+        WHEN mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
+        WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
     END AS "Device ID",
     CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_mac_apps.site_name IS NOT NULL
         ) THEN sites_mac_apps.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobile_apps.site_name IS NOT NULL
         ) THEN sites_mobile_apps.site_name
         ELSE "None"
@@ -279,11 +279,11 @@ SELECT
     mdm_cmds.profile_id AS "App ID",
     CASE
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mac_apps.app_name
         WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mobile_apps.app_name
     END AS "Name",
@@ -339,33 +339,33 @@ ORDER BY COUNT(*)
 DESC;
 
 
--- Count and details on InstallApplication MDM Commands when count is greater than one, reardless of status
+-- Count and details on InstallApplication MDM Commands when count is greater than one, regardless of status
 -- App Store Apps that Jamf Pro keeps trying to install on devices
 SELECT
     COUNT(*),
     mdm_c.client_type AS "Client Type",
     CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_macs.site_name IS NOT NULL
         ) THEN sites_macs.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobiles.site_name IS NOT NULL
         ) THEN sites_mobiles.site_name
         ELSE "None"
     END AS `Device Site`,
     CASE
-        WHEN mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
-        WHEN mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
+        WHEN mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
+        WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
     END AS "Device ID",
     CASE
        WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER")
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
             AND sites_mac_apps.site_name IS NOT NULL
         ) THEN sites_mac_apps.site_name
        WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
             AND sites_mobile_apps.site_name IS NOT NULL
         ) THEN sites_mobile_apps.site_name
         ELSE "None"
@@ -373,11 +373,11 @@ SELECT
     mdm_cmds.profile_id AS "App ID",
     CASE
         WHEN (
-            mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND
+            mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mac_apps.app_name
         WHEN (
-            mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+            mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
             mdm_cmds.command REGEXP "^(Install|Remove)Application$"
         ) THEN mobile_apps.app_name
     END AS "Name",
@@ -419,9 +419,9 @@ LEFT JOIN sites as sites_mobiles
 WHERE
     mdm_cmds.command = "InstallApplication"
     AND (
-        mdm_c.client_type in ("COMPUTER", "COMPUTER_USER") AND mac_denorm.is_managed = 1
+        mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND mac_denorm.is_managed = 1
         OR 
-        mdm_c.client_type in ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND mobile_denorm.is_managed
+        mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND mobile_denorm.is_managed
     )
 GROUP BY
     mdm_c.client_type,
