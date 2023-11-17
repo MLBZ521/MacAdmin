@@ -3,9 +3,9 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.7.0 / Updated:  11/17/2023 By:  ZT
+Version:  1.7.1 / Updated:  11/17/2023 By:  ZT
 
-Description:  This script allows you to upload a compressed 
+Description:  This script allows you to upload a compressed
     zip of specified files to a computers' inventory record.
 
 """
@@ -53,7 +53,7 @@ def execute_process(command, input=None):
     A helper function for subprocess.
 
     Args:
-        command (str):  The command line level syntax that would be written in a 
+        command (str):  The command line level syntax that would be written in a
             shell script or a terminal window
 
     Returns:
@@ -68,13 +68,13 @@ def execute_process(command, input=None):
     command = shlex.split(command)
 
     # Run the command
-    process = subprocess.Popen( 
-        command, 
-        stdin=subprocess.PIPE, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.PIPE, 
-        shell=False, 
-        universal_newlines=True 
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        universal_newlines=True
     )
 
     if input:
@@ -101,14 +101,14 @@ def dbTableWriter(database, table):
         file:  Returns the abspath of the file.
     """
 
-    file_name = "/private/tmp/{}.csv".format(table)
+    file_name = f"/private/tmp/{table}.csv"
 
     # Setup database connection
     db_connect = sqlite3.connect(database)
     database = db_connect.cursor()
 
     # Execute query
-    database.execute("select * from {}".format(table))
+    database.execute(f"select * from {table}")
 
     # Write to file
     with open(file_name,"w") as table_csv:
@@ -139,8 +139,8 @@ def get_system_info():
 
     IOKit_bundle = NSBundle.bundleWithIdentifier_("com.apple.framework.IOKit")
     functions = [
-        ("IORegistryEntryCreateCFProperty", b"@I@@I"), 
-        ("IOServiceGetMatchingService", b"II@"), 
+        ("IORegistryEntryCreateCFProperty", b"@I@@I"),
+        ("IOServiceGetMatchingService", b"II@"),
         ("IOServiceMatching", b"@*")
     ]
     objc.loadBundleFunctions(IOKit_bundle, globals(), functions)
@@ -148,7 +148,8 @@ def get_system_info():
     def io_key(key_name, service_name="IOPlatformExpertDevice"):
         service = IOServiceMatching(service_name.encode("utf-8"))
         key = NSString.stringWithString_(key_name)
-        return IORegistryEntryCreateCFProperty(IOServiceGetMatchingService(0, service), key, None, 0)
+        return IORegistryEntryCreateCFProperty(
+            IOServiceGetMatchingService(0, service), key, None, 0)
 
     def get_hardware_uuid():
         return io_key("IOPlatformUUID")
@@ -166,14 +167,14 @@ def get_system_info():
     #     return bytes(io_key("model")).decode().rstrip("\x00")
 
     # def lookup_model(lookup_code):
-    #     xml = requests.get("https://support-sp.apple.com/sp/product?cc={}".format(lookup_code)).text
+    #     xml = requests.get(f"https://support-sp.apple.com/sp/product?cc={lookup_code}").text
 
     #     try:
     #         tree = ElementTree.fromstringlist(xml)
     #         return tree.find(".//configCode").text
 
     #     except ElementTree.ParseError as err:
-    #         print("Failed to retrieve model name:  {}".format(err.strerror))
+    #         print(f"Failed to retrieve model name:  {err.strerror}")
     #         return ""
 
 
@@ -184,8 +185,8 @@ def get_system_info():
     # if sn_length == 10:
     #     results = execute_process("/usr/sbin/ioreg -arc IOPlatformDevice -k product-name")
 
-    #     if results["success"]:
-    #         plist_contents = plistlib.loads(results["stdout"].encode())
+    #     if results.get("success"):
+    #         plist_contents = plistlib.loads(results.get("stdout").encode())
     #         model = plist_contents[0].get("product-name").decode().rstrip("\x00")
 
     # elif sn_length == 12:
@@ -194,7 +195,7 @@ def get_system_info():
     # elif sn_length == 11:
     #     model = lookup_model(serial_number[-3:])
 
-    return { 
+    return {
         # "serial_number": serial_number,
         "uuid": get_hardware_uuid(),
         # "board_id": get_board_id(),
@@ -204,8 +205,8 @@ def get_system_info():
 
 
 def apiGET(**parameters):
-    """A helper function that performs a GET to the Jamf API.  
-    Attempts to first use the Python `requests` library, 
+    """A helper function that performs a GET to the Jamf API.
+    Attempts to first use the Python `requests` library,
     but if that fails, falls back to the system curl.
 
     Args:
@@ -225,7 +226,7 @@ def apiGET(**parameters):
         if parameters.get("verbose"):
             print("Trying `requests`...")
         headers = {
-            "Accept": "application/json", 
+            "Accept": "application/json",
             "Authorization": "Basic {}".format(parameters.get("jps_credentials"))
             }
         response = requests.get(url, headers=headers)
@@ -252,8 +253,8 @@ def apiGET(**parameters):
 
 
 def apiPOST(**parameters):
-    """A helper function that performs a POST to the Jamf API.  
-    Attempts to first use the python `requests` library, 
+    """A helper function that performs a POST to the Jamf API.
+    Attempts to first use the python `requests` library,
     but if that fails, falls back to the system curl.
 
     Args:
@@ -283,7 +284,7 @@ def apiPOST(**parameters):
 
         # body, content_type = requests.models.RequestEncodingMixin._encode_files(files, {})
         # headers = {
-        #     "Authorization": "Basic {}".format(parameters.get("jps_credentials")), 
+        #     "Authorization": "Basic {}".format(parameters.get("jps_credentials")),
         #     "Content-Type": content_type
         # }
         # response = requests.post(url, data=body, headers=headers)
@@ -301,7 +302,7 @@ def apiPOST(**parameters):
         'statusCode:%{{http_code}}' --location --header 'Accept: application/json' \
         --header 'Authorization: Basic {jps_credentials}' --url {url} --request POST \
         --form name=@{file_to_upload}".format(
-            jps_credentials=parameters.get("jps_credentials"), url=url, 
+            jps_credentials=parameters.get("jps_credentials"), url=url,
             file_to_upload=parameters.get("file_to_upload")
         )
 
@@ -322,7 +323,7 @@ def archiver(path, archive, mode="a", verbose=True):
     """
 
     if verbose:
-        print("Archiving:  {}".format(os.path.abspath(path)))
+        print(f"Archiving:  {os.path.abspath(path)}")
 
     if os.path.exists(path):
 
@@ -335,9 +336,9 @@ def archiver(path, archive, mode="a", verbose=True):
                     for file in files:
 
                         zip_file.write(
-                            os.path.join(root, file), 
+                            os.path.join(root, file),
                             os.path.relpath(
-                                os.path.join(root, file), 
+                                os.path.join(root, file),
                                 os.path.join(path, '..')
                             )
                         )
@@ -351,7 +352,7 @@ def archiver(path, archive, mode="a", verbose=True):
 
 
 def main():
-    # print("All calling args:  {}\n".format(sys.argv))
+    # print(f"All calling args:  {sys.argv}\n")
 
     parse_args = []
 
@@ -365,7 +366,7 @@ def main():
             else:
                 parse_args.append(arg)
 
-    # print("Parsed args:  {}\n".format(parse_args))
+    # print(f"Parsed args:  {parse_args}\n")
 
     ##################################################
     # Define Script Parameters
@@ -373,50 +374,48 @@ def main():
     parser = argparse.ArgumentParser(
         description="This script allows you to upload a compressed zip \
             of specified files to a computers' inventory record")
-    parser.add_argument("--api-username", "-u", 
+    parser.add_argument("--api-username", "-u",
         help="Provide the encrypted string for the API Username.", required=True)
-    parser.add_argument("--api-password", "-p", 
+    parser.add_argument("--api-password", "-p",
         help="Provide the encrypted string for the API Password.", required=True)
     parser.add_argument("--secret", "-s", help="Provide the encrypted secret.", required=True)
-    parser.add_argument("--defaults", default=True, 
+    parser.add_argument("--defaults", default=True,
         help="Collects the default files.", required=False)
     parser.add_argument("--file", "-f", metavar="/path/to/file", type=str, nargs="*",
         help="Specify specific file path(s) to collect.  Multiple file paths can be passed.",
         required=False
     )
-    parser.add_argument("--directory", "-d", metavar="/path/to/directory/", type=str, nargs="*", 
-        help="Specify a specific directory(ies) to collect.  Multiple directories can be passed.", 
+    parser.add_argument("--directory", "-d", metavar="/path/to/directory/", type=str, nargs="*",
+        help="Specify a specific directory(ies) to collect.  Multiple directories can be passed.",
         required=False
     )
-    parser.add_argument("--quiet", "-q", action="store_true", 
+    parser.add_argument("--quiet", "-q", action="store_true",
         help="Do not print verbose messages.", required=False)
 
     args = parser.parse_known_args(args=parse_args)
     args = args[0]
 
-    print("Argparse args:  {}".format(args))
+    print(f"Argparse args:  {args}")
     # sys.exit(0)
 
     if len(sys.argv) > 1:
         upload_items = []
 
         if args.file:
-            for file in args.file:
-                upload_items.append((file).strip())
+            upload_items.extend((file).strip() for file in args.file)
 
         if args.directory:
-            for folder in args.directory:
-                upload_items.append((folder).strip())
+            upload_items.extend((folder).strip() for folder in args.directory)
 
         if args.defaults:
             upload_items.extend(
                 [
-                    "/private/var/log/jamf.log", 
-                    "/private/var/log/install.log", 
-                    "/private/var/log/system.log", 
-                    "/private/var/log/jamf_RecoveryAgent.log", 
-                    "/private/var/log/jamf_ReliableEnrollment.log", 
-                    "/private/var/log/32bitApps_inventory.log", 
+                    "/private/var/log/jamf.log",
+                    "/private/var/log/install.log",
+                    "/private/var/log/system.log",
+                    "/private/var/log/jamf_RecoveryAgent.log",
+                    "/private/var/log/jamf_ReliableEnrollment.log",
+                    "/private/var/log/32bitApps_inventory.log",
                     "/opt/ManagedFrameworks/EA_History.log"
                 ]
             )
@@ -424,8 +423,12 @@ def main():
             # Setup databases that we want to collect info from
             db_kext = {}
             database_items = []
-            db_kext["database"] = "/var/db/SystemPolicyConfiguration/KextPolicy"
-            db_kext["tables"] = [ "kext_policy_mdm", "kext_policy" ]
+
+            db_kext |= {
+                "database": "/var/db/SystemPolicyConfiguration/KextPolicy",
+                "tables": [ "kext_policy_mdm", "kext_policy" ]
+            }
+
             database_items.append(db_kext)
 
         if args.quiet:
@@ -444,10 +447,11 @@ def main():
     JPS_API_PASSWORD = decrypt_string(args.secret.strip(), args.api_password.strip()).strip()
     jps_credentials = (
         base64.b64encode(
-            "{}:{}".format(JPS_API_USER, JPS_API_PASSWORD).encode() 
-        )).decode()
+            f"{JPS_API_USER}:{JPS_API_PASSWORD}".encode()
+        )
+    ).decode()
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    archive_file = "/private/tmp/{}_logs.zip".format(time_stamp)
+    archive_file = f"/private/tmp/{time_stamp}_logs.zip"
     archive_max_size = 50000000 # 50MB
 
     # Get the systems' Jamf Pro Server
@@ -455,10 +459,10 @@ def main():
         with open(jamf_plist, "rb") as plist:
             jamf_plist_contents = plistlib.load(plist)
 
-        jps_url = jamf_plist_contents["jss_url"]
+        jps_url = jamf_plist_contents.get("jss_url")
 
         if verbose:
-            print("Jamf Pro Server URL:  {}".format(jps_url))
+            print(f"Jamf Pro Server URL:  {jps_url}")
     else:
         print("ERROR:  Missing the Jamf Pro configuration file!")
         sys.exit(1)
@@ -466,29 +470,30 @@ def main():
     # Get the system's UUID
     hw_UUID = get_system_info().get("uuid")
     if verbose:
-        print("System UUID:  {}".format(hw_UUID))
+        print(f"System UUID:  {hw_UUID}")
 
     ##################################################
     # Bits staged...
 
     if verbose:
-        print("Requested files:  {}".format(upload_items))
+        print(f"Requested files:  {upload_items}")
         if database_items:
-            print("Requested databases:  {}".format(database_items))
+            print(f"Requested databases:  {database_items}")
 
     for upload_item in upload_items:
         archiver(upload_item, archive=archive_file, verbose=verbose)
 
     for database_item in database_items:
-        if os.path.exists(database_item["database"]):
+        if os.path.exists(database_item.get("database")):
             if verbose:
                 print(
-                    "Archiving tables from database:  {}".format(
-                        os.path.abspath(database_item["database"])))
-            for table in database_item["tables"]:
+                    "Archiving tables from database:  "
+                    f"{os.path.abspath(database_item['database'])}"
+                )
+            for table in database_item.get("tables"):
                 if verbose:
-                    print("Creating csv and archiving table:  {}".format(table))
-                file_name = dbTableWriter(database_item["database"], table)
+                    print(f"Creating csv and archiving table:  {table}")
+                file_name = dbTableWriter(database_item.get("database"), table)
 
                 archiver(os.path.abspath(file_name), archive=archive_file, verbose=verbose)
         else:
@@ -497,8 +502,8 @@ def main():
     archive_size = os.path.getsize(archive_file)
 
     if verbose:
-        print("Archive name:  {}".format(archive_file))
-        print("Archive size:  {}".format(archive_size))
+        print(f"Archive name:  {archive_file}")
+        print(f"Archive size:  {archive_size}")
 
     if archive_size > archive_max_size:
         print("Aborting:  File size is larger than allowed!")
@@ -506,34 +511,33 @@ def main():
 
     # Query the API to get the computer ID
     status_code, json_data = apiGET(
-        jps_url=jps_url, 
-        jps_credentials=jps_credentials, 
-        endpoint="/computers/udid/{uuid}".format(uuid=hw_UUID), 
+        jps_url=jps_url,
+        jps_credentials=jps_credentials,
+        endpoint=f"/computers/udid/{hw_UUID}",
         verbose=verbose
     )
 
     if int(status_code) == 200:
         computer_id = json_data.get("computer").get("general").get("id")
         if verbose:
-            print("Computer ID:  {}".format(computer_id))
+            print(f"Computer ID:  {computer_id}")
     else:
         print("ERROR:  Failed to retrieve devices\' computer ID!")
         sys.exit(5)
 
     # Upload file via the API
     status_code, content = apiPOST(
-        jps_url=jps_url, 
-        jps_credentials=jps_credentials, 
-        endpoint="/fileuploads/computers/id/{id}".format(id=computer_id), 
-        file_to_upload=archive_file, 
-        archive_size=archive_size, 
+        jps_url=jps_url,
+        jps_credentials=jps_credentials,
+        endpoint=f"/fileuploads/computers/id/{computer_id}",
+        file_to_upload=archive_file,
+        archive_size=archive_size,
         verbose=verbose
     )
 
     if int(status_code) == 204:
-        if content:
-            if verbose:
-                print("Response:  {}".format(content))
+        if content and verbose:
+            print(f"Response:  {content}")
         print("Upload complete!")
     else:
         print("ERROR:  Failed to upload file to the JPS!")
