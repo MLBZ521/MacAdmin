@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.6.1 / Updated:  5/2/2022 By:  ZT
+Version:  1.7.0 / Updated:  11/17/2023 By:  ZT
 
 Description:  This script allows you to upload a compressed 
     zip of specified files to a computers' inventory record.
@@ -24,20 +24,28 @@ import subprocess
 import sys
 import zipfile
 
-from Foundation import NSBundle, NSString
 import objc
 import requests
 
+from cryptography.fernet import Fernet
+from Foundation import NSBundle, NSString
 
-# Jamf Function to obfuscate credentials.
-def DecryptString(inputString, salt, passphrase):
+
+def decrypt_string(key, encrypted_string):
     """
-    Usage: >>> DecryptString("Encrypted String", "Salt", "Passphrase")
+    A helper function to decrypt a string with a given secret key.
+
+    Args:
+        key:  Secret key used to decrypt the passed string.  (str)
+        string:  String to decrypt. (str)
+    Returns:
+        The unencrypted string as a str.
     """
 
-    return execute_process(
-        "/usr/bin/openssl enc -aes256 -d -a -A -S '{salt}' -k '{passphrase}'".format(
-            salt=salt, passphrase=passphrase), input=inputString)["stdout"]
+    f = Fernet(key.encode())
+    decrypted_string = f.decrypt(encrypted_string.encode())
+
+    return decrypted_string.decode()
 
 
 def execute_process(command, input=None):
@@ -366,9 +374,10 @@ def main():
         description="This script allows you to upload a compressed zip \
             of specified files to a computers' inventory record")
     parser.add_argument("--api-username", "-u", 
-        help="Provide the encrypted string for the API Username", required=True)
+        help="Provide the encrypted string for the API Username.", required=True)
     parser.add_argument("--api-password", "-p", 
-        help="Provide the encrypted string for the API Password", required=True)
+        help="Provide the encrypted string for the API Password.", required=True)
+    parser.add_argument("--secret", "-s", help="Provide the encrypted secret.", required=True)
     parser.add_argument("--defaults", default=True, 
         help="Collects the default files.", required=False)
     parser.add_argument("--file", "-f", metavar="/path/to/file", type=str, nargs="*",
@@ -431,23 +440,11 @@ def main():
     # Define Variables
 
     jamf_plist = "/Library/Preferences/com.jamfsoftware.jamf.plist"
-    jps_api_user = (
-        DecryptString(
-            (args.api_username).strip(), 
-            "<SALT>", 
-            "<PASSPHRASE>"
-        )
-    ).strip()
-    jps_api_password = (
-        DecryptString(
-            (args.api_password).strip(), 
-            "<SALT>", 
-            "<PASSPHRASE>"
-        )
-    ).strip()
+    JPS_API_USER = decrypt_string(args.secret.strip(), args.api_username.strip()).strip()
+    JPS_API_PASSWORD = decrypt_string(args.secret.strip(), args.api_password.strip()).strip()
     jps_credentials = (
         base64.b64encode(
-            "{}:{}".format(jps_api_user, jps_api_password).encode() 
+            "{}:{}".format(JPS_API_USER, JPS_API_PASSWORD).encode() 
         )).decode()
     time_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     archive_file = "/private/tmp/{}_logs.zip".format(time_stamp)
