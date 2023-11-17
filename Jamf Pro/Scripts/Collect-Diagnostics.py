@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.6.0 / Updated:  5/2/2022 By:  ZT
+Version:  1.6.1 / Updated:  5/2/2022 By:  ZT
 
 Description:  This script allows you to upload a compressed 
     zip of specified files to a computers' inventory record.
@@ -371,10 +371,14 @@ def main():
         help="Provide the encrypted string for the API Password", required=True)
     parser.add_argument("--defaults", default=True, 
         help="Collects the default files.", required=False)
-    parser.add_argument("--file", "-f", type=str, nargs="*", 
-        help="Specify specific file to collect.", required=False)
+    parser.add_argument("--file", "-f", metavar="/path/to/file", type=str, nargs="*",
+        help="Specify specific file path(s) to collect.  Multiple file paths can be passed.",
+        required=False
+    )
     parser.add_argument("--directory", "-d", metavar="/path/to/directory/", type=str, nargs="*", 
-        help="Specify a specific directory to collect.", required=False)
+        help="Specify a specific directory(ies) to collect.  Multiple directories can be passed.", 
+        required=False
+    )
     parser.add_argument("--quiet", "-q", action="store_true", 
         help="Do not print verbose messages.", required=False)
 
@@ -438,7 +442,7 @@ def main():
         DecryptString(
             (args.api_password).strip(), 
             "<SALT>", 
-            "<PASSPHRASE>")
+            "<PASSPHRASE>"
         )
     ).strip()
     jps_credentials = (
