@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.7.3 / Updated:  11/17/2023 By:  ZT
+Version:  1.8.0 / Updated:  11/17/2023 By:  ZT
 
 Description:  This script allows you to upload a compressed
 	zip of specified files to a computers' inventory record.
@@ -11,10 +11,11 @@ Description:  This script allows you to upload a compressed
 """
 
 import argparse
-import base64
 import csv
 import datetime
 import json
+import logging
+import mimetypes
 import os
 import plistlib
 import re
@@ -24,11 +25,55 @@ import subprocess
 import sys
 import zipfile
 
+from typing import Union
+
 import objc
 import requests
 
 from cryptography.fernet import Fernet
 from Foundation import NSBundle, NSString
+
+
+CLASSIC_API_ENDPOINTS = {
+	"computers_by_udid": "JSSResource/computers/udid",
+}
+
+PRO_API_ENDPOINTS = {
+	"auth_details": "api/v1/auth",
+	"auth_token": "api/v1/auth/token",
+	"computer_attachments": "api/v1/computers-inventory/{id}/attachments"
+}
+
+
+####################################################################################################
+# Common Helper Functions
+
+
+def log_setup(name):
+	"""Setup logging"""
+
+	# Create logger
+	logger = logging.getLogger(name)
+	logger.setLevel(logging.DEBUG)
+	# Create file handler which logs even debug messages
+	# file_handler = logging.FileHandler("/var/log/JamfPatcher.log")
+	# file_handler.setLevel(logging.INFO)
+	# Create console handler with a higher log level
+	console_handler = logging.StreamHandler()
+	console_handler.setLevel(logging.INFO)
+	# Create formatter and add it to the handlers
+	formatter = logging.Formatter(
+		"%(asctime)s | %(levelname)s | %(name)s:%(lineno)s - %(funcName)20s() | %(message)s")
+	# file_handler.setFormatter(formatter)
+	console_handler.setFormatter(formatter)
+	# Add the handlers to the logger
+	# logger.addHandler(file_handler)
+	logger.addHandler(console_handler)
+	return logger
+
+
+# Initialize logging
+log = log_setup(name="CollectDiagnostics")
 
 
 def decrypt_string(key, encrypted_string):
@@ -206,130 +251,20 @@ def get_system_info():
 	}
 
 
-def apiGET(**parameters):
-	"""A helper function that performs a GET to the Jamf API.
-	Attempts to first use the Python `requests` library,
-	but if that fails, falls back to the system curl.
-
-	Args:
-		jps_url:  Jamf Pro Server URL
-		jps_credentials:  base64 encoded credentials
-		endpoint:  API Endpoint
-	Returns:
-		stdout:  json data from the response contents
-	"""
-
-	url = "{}JSSResource{}".format(parameters.get("jps_url"), parameters.get("endpoint"))
-
-	if parameters.get("verbose"):
-		print("API URL:  {}".format(url))
-
-	try:
-		if parameters.get("verbose"):
-			print("Trying `requests`...")
-		headers = {
-			"Accept": "application/json",
-			"Authorization": "Basic {}".format(parameters.get("jps_credentials"))
-			}
-		response = requests.get(url, headers=headers)
-		statusCode = response.status_code
-		json_response = response.json()
-
-	except Exception as error:
-		print("Requests error:\n{}".format(error))
-		# If `requests` fails, resort to using curl.
-
-		if parameters.get("verbose"):
-			print("Trying curl...")
-
-		# Build the command.
-		curl_cmd = "/usr/bin/curl --silent --show-error --no-buffer --fail --write-out \
-			'statusCode:%{{http_code}}' --location --header 'Accept: application/json' \
-			--header 'Authorization: Basic {jps_credentials}' --url {url} --request GET".format(
-				jps_credentials=parameters.get("jps_credentials"), url=url)
-		response = execute_process(curl_cmd)['stdout']
-		json_content, statusCode = response.split("statusCode:")
-		json_response = json.loads(json_content)
-
-	return statusCode, json_response
-
-
-def apiPOST(**parameters):
-	"""A helper function that performs a POST to the Jamf API.
-	Attempts to first use the python `requests` library,
-	but if that fails, falls back to the system curl.
-
-	Args:
-		jps_url:  Jamf Pro Server URL
-		jps_credentials:  base64 encoded credentials
-		endpoint:  API Endpoint
-		file_to_upload:  A file to upload
-		archive_size = size of the archive
-	Returns:
-		stdout:  the response contents
-	"""
-
-	url = "{}JSSResource{}".format(parameters.get("jps_url"), parameters.get("endpoint"))
-
-	if parameters.get("verbose"):
-		print("API URL:  {}".format(url))
-		print("Uploading file:  {}".format(parameters.get("file_to_upload")))
-
-	# try:
-		##### Unable to get requests nor urllib to work...
-		# if parameters.get("verbose"):
-		#     print("Trying `requests`...")
-
-		# files = {
-		#     "name": (None, open(parameters.get("file_to_upload"), "rb"))
-		# }
-
-		# body, content_type = requests.models.RequestEncodingMixin._encode_files(files, {})
-		# headers = {
-		#     "Authorization": "Basic {}".format(parameters.get("jps_credentials")),
-		#     "Content-Type": content_type
-		# }
-		# response = requests.post(url, data=body, headers=headers)
-		# statusCode = response.status_code
-		# content = response.text
-
-	# except Exception:
-		# If urllib fails, resort to using curl.
-
-	if parameters.get("verbose"):
-		print("Trying curl...")
-
-	# Build the command.
-	curl_cmd = "/usr/bin/curl --silent --show-error --no-buffer --fail --write-out \
-		'statusCode:%{{http_code}}' --location --header 'Accept: application/json' \
-		--header 'Authorization: Basic {jps_credentials}' --url {url} --request POST \
-		--form name=@{file_to_upload}".format(
-			jps_credentials=parameters.get("jps_credentials"), url=url,
-			file_to_upload=parameters.get("file_to_upload")
-		)
-
-	response = execute_process(curl_cmd)['stdout']
-	content, statusCode = response.split("statusCode:")
-
-	return statusCode, content
-
-
-def archiver(path, archive, mode="a", verbose=True):
+def archiver(path, archive, mode="a"):
 	"""A Context Manager for creating or modifying a compressed archive.
 
 	Args:
 		path (str): Path to a file or directory to include in the archive
 		archive (str): Path to the archive file; will be created if it does not exist
 		mode (str, optional): The mode that will be used to open the archive. Defaults to "a".
-		verbose (bool, optional): Print verbose messages. Defaults to True.
 	"""
 
-	if verbose:
-		print(f"Archiving:  {os.path.abspath(path)}")
+	log.info(f"Archiving:  {os.path.abspath(path)}")
 
 	if os.path.exists(path):
 
-		with zipfile.ZipFile(archive, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+		with zipfile.ZipFile(archive, mode, zipfile.ZIP_DEFLATED) as zip_file:
 
 			if os.path.isdir(path):
 
@@ -350,11 +285,163 @@ def archiver(path, archive, mode="a", verbose=True):
 				zip_file.write(os.path.abspath(path), compress_type=zipfile.ZIP_DEFLATED)
 
 	else:
-		print("WARNING:  Unable to locate the specified file!")
+		log.warning("Unable to locate the specified file!")
 
 
+##################################################
+# Jamf Pro Helper Functions
+
+def jamf_pro_url():
+	"""
+	Helper function to return the Jamf Pro URL the device is enrolled with
+	"""
+
+	# Define Variables
+	jamf_plist = "/Library/Preferences/com.jamfsoftware.jamf.plist"
+
+	# Get the systems' Jamf Pro Server
+	if os.path.exists(jamf_plist):
+
+		with open(jamf_plist, "rb") as jamf_plist_file:
+			jamf_plist_contents = plistlib.load(jamf_plist_file)
+
+		jps_url = jamf_plist_contents.get("jss_url")
+		log.debug(f"Jamf Pro Server URL:  {jps_url}")
+		return jps_url
+
+	else:
+		log.error("Missing the Jamf Pro configuration file!")
+		sys.exit(1)
+
+
+JPS_URL = jamf_pro_url()
+
+
+def jamf_pro_api(api_account: dict, method: str, endpoint: str,
+	receive_content_type: str = "json", send_content_type = "xml",
+	data: Union[str, dict, None] = None, **kwargs):
+	"""Helper function to interact with the Jamf Pro API(s).
+
+	Args:
+		api_account (dict): Dict contain the username and password to use
+			when interacting with the Jamf Pro API.
+		method (str): HTTP Method that should be used.
+		endpoint (str): The API's endpoint URL
+		receive_content_type (str, optional): The content type to request the API to
+			respond with. Defaults to "json".
+		send_content_type (str, optional): The content type that will be sent to the API.
+			Defaults to "xml".
+		data (str | dict | None, optional): A data payload that will be sent to the API.
+			Defaults to None.
+
+	Returns:
+		requests.response: A request.response object
+	"""
+
+	if not api_account.get("api_token"):
+		api_account |= get_token(
+			api_account.get("username"),
+			api_account.get("password")
+		)
+
+	# Setup API URL and Headers
+	url = f"{JPS_URL}{endpoint}"
+	headers = {
+		"Authorization": f"jamf-token {api_account.get('api_token')}",
+		"Accept": f"application/{receive_content_type}",
+		"Content-Type": f"application/{send_content_type}"
+	}
+
+	if kwargs.get("headers"):
+		headers |= kwargs.get("headers")
+
+	try:
+
+		if method == "get":
+
+			return requests.get(url=url, headers=headers)
+
+		elif method in { "post", "create" }:
+
+			if upload_file := kwargs.get("file"):
+
+				content_type = mimetypes.guess_type(upload_file)[0]
+				headers.pop("Content-Type")
+
+				file = {
+					"file": (
+						upload_file,
+						open(upload_file, "rb"),
+						content_type
+					)
+				}
+
+				return requests.post(
+					url = url,
+					headers = headers,
+					files = file
+				)
+
+
+			return requests.post(
+				url = url,
+				headers = headers,
+				data = data
+			)
+
+		elif method in { "put", "update" }:
+
+			return requests.put(
+				url = url,
+				headers = headers,
+				data = data
+			)
+
+		elif method == "delete":
+
+			return requests.delete(
+				url = url,
+				headers = headers
+			)
+
+	except Exception:
+
+		log.error("Failed to connect to the Jamf Pro Server.")
+
+
+def get_token(username: str, password: str):
+	"""A helper function use to obtain a Jamf Pro API Token.
+
+	Args:
+		username (str): Username for a Jamf Pro account
+		password (str): Password for a Jamf Pro account
+
+	Returns:
+		dict: Results of the API Token request
+	"""
+
+	try:
+
+		# Create a token based on user provided credentials
+		response_get_token = requests.post(
+			url = f"{JPS_URL}/{PRO_API_ENDPOINTS.get('auth_token')}",
+			auth = (username, password)
+		)
+
+		if response_get_token.status_code == 200:
+			return {
+				"api_token": response_get_token.json().get("token"),
+			}
+
+		return { "error": "ERROR:  Failed to authenticate with the Jamf Pro Server." }
+
+	except Exception:
+		return { "error": "ERROR:  Failed to connect to the Jamf Pro Server." }
+
+
+####################################################################################################
 def main():
-	# print(f"All calling args:  {sys.argv}\n")
+	# log.debug(f"All calling args:  {sys.argv}\n")
 
 	parse_args = []
 
@@ -368,7 +455,7 @@ def main():
 			else:
 				parse_args.append(arg)
 
-	# print(f"Parsed args:  {parse_args}\n")
+	# log.debug(f"Parsed args:  {parse_args}\n")
 
 	##################################################
 	# Define Script Parameters
@@ -392,157 +479,140 @@ def main():
 		required=False
 	)
 	parser.add_argument("--quiet", "-q", action="store_true",
-		help="Do not print verbose messages.", required=False)
+		help="Do not print verbose/debugging messages.", required=False)
 
-	args = parser.parse_known_args(args=parse_args)
-	args = args[0]
-
-	print(f"Argparse args:  {args}")
+	args, _ = parser.parse_known_args(parse_args)
+	log.info(f"Argparse args:  {args}")
 	# sys.exit(0)
 
-	if len(sys.argv) > 1:
-		upload_items = []
-
-		if args.file:
-			upload_items.extend((file).strip() for file in args.file)
-
-		if args.directory:
-			upload_items.extend((folder).strip() for folder in args.directory)
-
-		if args.defaults:
-			upload_items.extend(
-				[
-					"/private/var/log/jamf.log",
-					"/private/var/log/install.log",
-					"/private/var/log/system.log",
-					"/private/var/log/jamf_RecoveryAgent.log",
-					"/private/var/log/jamf_ReliableEnrollment.log",
-					"/private/var/log/32bitApps_inventory.log",
-					"/opt/ManagedFrameworks/EA_History.log",
-				]
-			)
-
-			# Setup databases that we want to collect info from
-			db_kext = {}
-			database_items = []
-
-			db_kext |= {
-				"database": "/var/db/SystemPolicyConfiguration/KextPolicy",
-				"tables": [ "kext_policy_mdm", "kext_policy" ]
-			}
-
-			database_items.append(db_kext)
-
-		if args.quiet:
-			verbose = False
-		else:
-			verbose = True
-	else:
+	if len(sys.argv) < 1:
 		parser.print_help()
 		sys.exit(0)
+
+	# Set the desired log level
+	for handler in log.handlers:
+		if args.quiet:
+			handler.setLevel(logging.INFO)
+		else:
+			handler.setLevel(logging.DEBUG)
+
+	upload_items = []
+
+	if args.file:
+		upload_items.extend((file).strip() for file in args.file)
+
+	if args.directory:
+		upload_items.extend((folder).strip() for folder in args.directory)
+
+	if args.defaults:
+		upload_items.extend(
+			[
+				"/private/var/log/jamf.log",
+				"/private/var/log/install.log",
+				"/private/var/log/system.log",
+				"/private/var/log/jamf_RecoveryAgent.log",
+				"/private/var/log/jamf_ReliableEnrollment.log",
+				"/private/var/log/32bitApps_inventory.log",
+				"/opt/ManagedFrameworks/Inventory.plist",
+				"/opt/ManagedFrameworks/EA_History.log",
+				"/opt/ManagedFrameworks/pkg_install.log"
+			]
+		)
+
+		# Setup databases that we want to collect info from
+		db_kext = {}
+		database_items = []
+
+		db_kext |= {
+			"database": "/var/db/SystemPolicyConfiguration/KextPolicy",
+			"tables": [ "kext_policy_mdm", "kext_policy" ]
+		}
+
+		database_items.append(db_kext)
 
 	##################################################
 	# Define Variables
 
-	jamf_plist = "/Library/Preferences/com.jamfsoftware.jamf.plist"
-	JPS_API_USER = decrypt_string(args.secret.strip(), args.api_username.strip()).strip()
-	JPS_API_PASSWORD = decrypt_string(args.secret.strip(), args.api_password.strip()).strip()
-	jps_credentials = (
-		base64.b64encode(
-			f"{JPS_API_USER}:{JPS_API_PASSWORD}".encode()
-		)
-	).decode()
+	jps_credentials = {
+		"username": decrypt_string(args.secret.strip(), args.api_username.strip()).strip(),
+		"password": decrypt_string(args.secret.strip(), args.api_password.strip()).strip()
+	}
+
 	time_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 	archive_file = f"/private/tmp/{time_stamp}_logs.zip"
 	archive_max_size = 50000000 # 50MB
 
-	# Get the systems' Jamf Pro Server
-	if os.path.exists(jamf_plist):
-		with open(jamf_plist, "rb") as plist:
-			jamf_plist_contents = plistlib.load(plist)
-
-		jps_url = jamf_plist_contents.get("jss_url")
-
-		if verbose:
-			print(f"Jamf Pro Server URL:  {jps_url}")
-	else:
-		print("ERROR:  Missing the Jamf Pro configuration file!")
-		sys.exit(1)
-
 	# Get the system's UUID
 	hw_UUID = get_system_info().get("uuid")
-	if verbose:
-		print(f"System UUID:  {hw_UUID}")
+	log.debug(f"System UUID:  {hw_UUID}")
 
 	##################################################
 	# Bits staged...
 
-	if verbose:
-		print(f"Requested files:  {upload_items}")
-		if database_items:
-			print(f"Requested databases:  {database_items}")
+	log.debug(f"Requested files:  {upload_items}")
+	if database_items:
+		log.debug(f"Requested databases:  {database_items}")
 
 	for upload_item in upload_items:
-		archiver(upload_item, archive=archive_file, verbose=verbose)
+		archiver(upload_item, archive=archive_file)
 
 	for database_item in database_items:
-		if os.path.exists(database_item.get("database")):
-			if verbose:
-				print(
-					"Archiving tables from database:  "
-					f"{os.path.abspath(database_item['database'])}"
-				)
-			for table in database_item.get("tables"):
-				if verbose:
-					print(f"Creating csv and archiving table:  {table}")
-				file_name = db_table_writer(database_item.get("database"), table)
 
-				archiver(os.path.abspath(file_name), archive=archive_file, verbose=verbose)
+		if os.path.exists(database_item.get("database")):
+			log.info(
+				f"Archiving tables from database:  {os.path.abspath(database_item['database'])}")
+
+			for table in database_item.get("tables"):
+				log.info(f"Creating csv and archiving table:  {table}")
+				file_name = db_table_writer(database_item.get("database"), table)
+				archiver(os.path.abspath(file_name), archive=archive_file)
+
 		else:
-			print("WARNING:  Unable to locate the specified database!")
+			log.warning("Unable to locate the specified database!")
 
 	archive_size = os.path.getsize(archive_file)
-
-	if verbose:
-		print(f"Archive name:  {archive_file}")
-		print(f"Archive size:  {archive_size}")
+	log.debug(f"Archive name:  {archive_file}")
+	log.debug(f"Archive size:  {archive_size}")
 
 	if archive_size > archive_max_size:
-		print("Aborting:  File size is larger than allowed!")
+		log.error("Aborting:  File size is larger than allowed!")
 		sys.exit(2)
 
 	# Query the API to get the computer ID
-	status_code, json_data = apiGET(
-		jps_url=jps_url,
-		jps_credentials=jps_credentials,
-		endpoint=f"/computers/udid/{hw_UUID}",
-		verbose=verbose
+	response_computer_details = jamf_pro_api(
+		api_account = jps_credentials,
+		method = "get",
+		endpoint = f"{CLASSIC_API_ENDPOINTS.get('computers_by_udid')}/{hw_UUID}"
 	)
 
-	if int(status_code) == 200:
-		computer_id = json_data.get("computer").get("general").get("id")
-		if verbose:
-			print(f"Computer ID:  {computer_id}")
+	if int(response_computer_details.status_code) == 200:
+		computer_id = response_computer_details.json().get("computer").get("general").get("id")
+		log.debug(f"Computer ID:  {computer_id}")
 	else:
-		print("ERROR:  Failed to retrieve devices\' computer ID!")
+		log.error("Failed to retrieve devices' computer ID!\n"
+			f"API Status Code:  {response_computer_details.status_code}\n"
+			f"API Response:  {response_computer_details.json()}"
+		)
 		sys.exit(5)
 
 	# Upload file via the API
-	status_code, content = apiPOST(
-		jps_url=jps_url,
-		jps_credentials=jps_credentials,
-		endpoint=f"/fileuploads/computers/id/{computer_id}",
-		file_to_upload=archive_file,
-		archive_size=archive_size,
-		verbose=verbose
+	response_upload_file = jamf_pro_api(
+		api_account = jps_credentials,
+		method = "post",
+		endpoint = f"{PRO_API_ENDPOINTS.get('computer_attachments')}".format(id=computer_id),
+		receive_content_type = "json",
+		file = archive_file
 	)
 
-	if int(status_code) == 204:
-		if content and verbose:
-			print(f"Response:  {content}")
-		print("Upload complete!")
+	if int(response_upload_file.status_code) == 201:
+		if result := response_upload_file.content.decode():
+			result = json.loads(result)
+			log.debug(f"Uploaded file attachment id:  {result.get('id')}")
+		log.info("Successfully upload the archive!")
 	else:
-		print("ERROR:  Failed to upload file to the JPS!")
+		log.error("Failed to upload file to the JPS!\n"
+			f"API Response:  {response_upload_file.content.decode()}"
+		)
 		sys.exit(6)
 
 
