@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.7.2 / Updated:  11/17/2023 By:  ZT
+Version:  1.7.3 / Updated:  11/17/2023 By:  ZT
 
 Description:  This script allows you to upload a compressed
 	zip of specified files to a computers' inventory record.
@@ -91,9 +91,11 @@ def execute_process(command, input=None):
 	}
 
 
-# Modified from:  https://stackoverflow.com/a/36211470
-def dbTableWriter(database, table):
+def db_table_writer(database, table):
 	"""A helper function read the contents of a database table and write to a csv.
+
+	Borrowed and modified from:  https://stackoverflow.com/a/36211470
+
 	Args:
 		database:  A database that can be opened with sqlite
 		table:  A table in the database to select
@@ -115,7 +117,7 @@ def dbTableWriter(database, table):
 		csv_out = csv.writer(table_csv)
 		# Write header
 		csv_out.writerow([description[0] for description in database.description])
-		# write data
+		# Write data
 		for result in database:
 			csv_out.writerow(result)
 
@@ -155,27 +157,27 @@ def get_system_info():
 		return io_key("IOPlatformUUID")
 
 	# def get_hardware_serial():
-	#     return io_key("IOPlatformSerialNumber")
+	# 	return io_key("IOPlatformSerialNumber")
 
 	# def get_board_id():
-	#     try:
-	#         return bytes(io_key("board-id")).decode().rstrip("\x00")
-	#     except TypeError:
-	#         return ""
+	# 	try:
+	# 		return bytes(io_key("board-id")).decode().rstrip("\x00")
+	# 	except TypeError:
+	# 		return ""
 
 	# def get_model_id():
-	#     return bytes(io_key("model")).decode().rstrip("\x00")
+	# 	return bytes(io_key("model")).decode().rstrip("\x00")
 
 	# def lookup_model(lookup_code):
-	#     xml = requests.get(f"https://support-sp.apple.com/sp/product?cc={lookup_code}").text
+	# 	xml = requests.get(f"https://support-sp.apple.com/sp/product?cc={lookup_code}").text
 
-	#     try:
-	#         tree = ElementTree.fromstringlist(xml)
-	#         return tree.find(".//configCode").text
+	# 	try:
+	# 		tree = ElementTree.fromstringlist(xml)
+	# 		return tree.find(".//configCode").text
 
-	#     except ElementTree.ParseError as err:
-	#         print(f"Failed to retrieve model name:  {err.strerror}")
-	#         return ""
+	# 	except ElementTree.ParseError as err:
+	# 		log.info(f"Failed to retrieve model name:  {err.strerror}")
+	# 		return ""
 
 
 	# serial_number = get_hardware_serial()
@@ -183,17 +185,17 @@ def get_system_info():
 	# model = ""
 
 	# if sn_length == 10:
-	#     results = execute_process("/usr/sbin/ioreg -arc IOPlatformDevice -k product-name")
+	# 	results = execute_process("/usr/sbin/ioreg -arc IOPlatformDevice -k product-name")
 
-	#     if results.get("success"):
-	#         plist_contents = plistlib.loads(results.get("stdout").encode())
-	#         model = plist_contents[0].get("product-name").decode().rstrip("\x00")
+	# 	if results.get("success"):
+	# 		plist_contents = plistlib.loads(results.get("stdout").encode())
+	# 		model = plist_contents[0].get("product-name").decode().rstrip("\x00")
 
 	# elif sn_length == 12:
-	#     model = lookup_model(serial_number[-4:])
+	# 	model = lookup_model(serial_number[-4:])
 
 	# elif sn_length == 11:
-	#     model = lookup_model(serial_number[-3:])
+	# 	model = lookup_model(serial_number[-3:])
 
 	return {
 		# "serial_number": serial_number,
@@ -493,7 +495,7 @@ def main():
 			for table in database_item.get("tables"):
 				if verbose:
 					print(f"Creating csv and archiving table:  {table}")
-				file_name = dbTableWriter(database_item.get("database"), table)
+				file_name = db_table_writer(database_item.get("database"), table)
 
 				archiver(os.path.abspath(file_name), archive=archive_file, verbose=verbose)
 		else:
