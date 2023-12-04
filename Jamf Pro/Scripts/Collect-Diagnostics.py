@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.9.0 / Updated:  11/18/2023 By:  ZT
+Version:  1.10.0 / Updated:  12/4/2023 By:  ZT
 
 Description:  This script allows you to upload a compressed
 	zip of specified files to a computers' inventory record.
@@ -482,6 +482,11 @@ def main():
 	parser.add_argument("--secret", "-s", help="Provide the encrypted secret.", required=True)
 	parser.add_argument("--defaults", default=True,
 		help="Collects the default files.", required=False)
+	parser.add_argument("--name", "-n",
+		help=("Provide a custom name to tag the resulting archive file with.  This can help to "
+		"differentiate what each log file was intending to collect."), required=False)
+	parser.add_argument("--maxsize", "-m", type=int, default=50000000, required=False,
+		help="Provide a custom max size to override the archive's default 50MB max size.")
 	parser.add_argument("--file", "-f", metavar="/path/to/file", type=str, nargs="*",
 		help="Specify specific file path(s) to collect.  Multiple file paths can be passed.",
 		required=False
@@ -508,6 +513,13 @@ def main():
 		else:
 			handler.setLevel(logging.DEBUG)
 
+	if args.name:
+		custom_name_tag = re.sub(r'\s', '_', args.name)
+		custom_name_tag = f"_{custom_name_tag}"
+	else:
+		custom_name_tag = ""
+
+	archive_max_size = args.maxsize
 	upload_items = []
 
 	if args.file:
@@ -548,8 +560,7 @@ def main():
 	}
 
 	time_stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-	archive_file = f"/private/tmp/{time_stamp}_logs.zip"
-	archive_max_size = 50000000 # 50MB
+	archive_file = f"/private/tmp/{time_stamp}{custom_name_tag}_logs.zip"
 
 	# Get the system's UUID
 	hw_UUID = get_system_info().get("uuid")
