@@ -3,7 +3,7 @@
 """
 Script Name:  Collect-Diagnostics.py
 By:  Zack Thompson / Created:  8/22/2019
-Version:  1.8.0 / Updated:  11/17/2023 By:  ZT
+Version:  1.9.0 / Updated:  11/18/2023 By:  ZT
 
 Description:  This script allows you to upload a compressed
 	zip of specified files to a computers' inventory record.
@@ -288,6 +288,18 @@ def archiver(path, archive, mode="a"):
 		log.warning("Unable to locate the specified file!")
 
 
+def write_to_file(file, data):
+	"""A simple helper function to write data to a file.
+
+	Args:
+		file (str): Path to where the file should be written
+		data (str): Contents that will be written to the file
+	"""
+
+	with open(file, "w") as file_object:
+		file_object.write(data)
+
+
 ##################################################
 # Jamf Pro Helper Functions
 
@@ -515,20 +527,17 @@ def main():
 				"/private/var/log/32bitApps_inventory.log",
 				"/opt/ManagedFrameworks/Inventory.plist",
 				"/opt/ManagedFrameworks/EA_History.log",
-				"/opt/ManagedFrameworks/pkg_install.log"
+				"/opt/ManagedFrameworks/pkg_install.log",
+				"/private/tmp/installed_profiles.xml",
+				"/private/tmp/apns_status.txt"
 			]
 		)
 
-		# Setup databases that we want to collect info from
-		db_kext = {}
-		database_items = []
-
-		db_kext |= {
+		db_kext = {
 			"database": "/var/db/SystemPolicyConfiguration/KextPolicy",
-			"tables": [ "kext_policy_mdm", "kext_policy" ]
+			"tables": ["kext_policy_mdm", "kext_policy"],
 		}
-
-		database_items.append(db_kext)
+		database_items = [db_kext]
 
 	##################################################
 	# Define Variables
@@ -552,6 +561,24 @@ def main():
 	log.debug(f"Requested files:  {upload_items}")
 	if database_items:
 		log.debug(f"Requested databases:  {database_items}")
+
+	# Get installed Configuration Profiles
+	installed_profiles = execute_process('/usr/bin/profiles show -cached --output "stdout-xml"')
+
+	if installed_profiles.get("success"):
+		write_to_file("/private/tmp/installed_profiles.xml", installed_profiles.get("stdout"))
+	else:
+		log.warning("Failed to get locally installed profiles!")
+
+	# Get APNS stats
+	apns_stats = execute_process(
+		'/System/Library/PrivateFrameworks/ApplePushService.framework/apsctl status'
+	)
+
+	if apns_stats.get("success"):
+		write_to_file("/private/tmp/apns_status.txt", apns_stats.get("stdout"))
+	else:
+		log.warning("Failed to get APNS stats!")
 
 	for upload_item in upload_items:
 		archiver(upload_item, archive=archive_file)
