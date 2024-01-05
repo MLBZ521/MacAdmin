@@ -43,12 +43,12 @@ UNION ALL
 UNION ALL
 	SELECT icon_attachment_id AS id
 	FROM self_service_plugins
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_mobile_device_app_license_app
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_assets
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_mobile_device_app_license_app
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_assets
 UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM os_x_configuration_profiles
@@ -62,12 +62,12 @@ UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
-UNION ALL
-	SELECT deprecated_branding_icon_id AS id
-	FROM self_service
-UNION ALL
-	SELECT deprecated_branding_image_id AS id
-	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_icon_id AS id
+-- 	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_image_id AS id
+-- 	FROM self_service
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
@@ -95,12 +95,12 @@ UNION ALL
 UNION ALL
 	SELECT icon_attachment_id AS id
 	FROM self_service_plugins
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_mobile_device_app_license_app
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_assets
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_mobile_device_app_license_app
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_assets
 UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM os_x_configuration_profiles
@@ -114,12 +114,12 @@ UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
-UNION ALL
-	SELECT deprecated_branding_icon_id AS id
-	FROM self_service
-UNION ALL
-	SELECT deprecated_branding_image_id AS id
-	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_icon_id AS id
+-- 	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_image_id AS id
+-- 	FROM self_service
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
@@ -166,12 +166,12 @@ INSERT INTO icons_ids_inuse SELECT id FROM icons WHERE icons.icon_id IN
 	UNION ALL
 		SELECT icon_attachment_id AS id
 		FROM self_service_plugins
-	UNION ALL
-		SELECT icon_id AS id
-		FROM vpp_mobile_device_app_license_app
-	UNION ALL
-		SELECT icon_id AS id
-		FROM vpp_assets
+	-- UNION ALL
+	-- 	SELECT icon_id AS id
+	-- 	FROM vpp_mobile_device_app_license_app
+	-- UNION ALL
+	-- 	SELECT icon_id AS id
+	-- 	FROM vpp_assets
 	UNION ALL
 		SELECT self_service_icon_id AS id
 		FROM os_x_configuration_profiles
@@ -185,12 +185,12 @@ INSERT INTO icons_ids_inuse SELECT id FROM icons WHERE icons.icon_id IN
 		SELECT profile_id AS id
 		FROM mobile_device_management_commands
 		WHERE command="Wallpaper"
-	UNION ALL
-		SELECT deprecated_branding_icon_id AS id
-		FROM self_service
-	UNION ALL
-		SELECT deprecated_branding_image_id AS id
-		FROM self_service
+	-- UNION ALL
+	-- 	SELECT deprecated_branding_icon_id AS id
+	-- 	FROM self_service
+	-- UNION ALL
+	-- 	SELECT deprecated_branding_image_id AS id
+	-- 	FROM self_service
 	UNION ALL
 		SELECT icon_id AS id
 		FROM ss_ios_branding_settings
@@ -286,12 +286,12 @@ UNION ALL
 UNION ALL
 	SELECT icon_attachment_id AS id
 	FROM self_service_plugins
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_mobile_device_app_license_app
-UNION ALL
-	SELECT icon_id AS id
-	FROM vpp_assets
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_mobile_device_app_license_app
+-- UNION ALL
+-- 	SELECT icon_id AS id
+-- 	FROM vpp_assets
 UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM os_x_configuration_profiles
@@ -305,12 +305,12 @@ UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
-UNION ALL
-	SELECT deprecated_branding_icon_id AS id
-	FROM self_service
-UNION ALL
-	SELECT deprecated_branding_image_id AS id
-	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_icon_id AS id
+-- 	FROM self_service
+-- UNION ALL
+-- 	SELECT deprecated_branding_image_id AS id
+-- 	FROM self_service
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
