@@ -340,3 +340,89 @@ UNION ALL
 )
 AND ( icons.filename REGEXP "^([0-9]+x[0-9]+bb|[0-9]+)[.](png|jpg)$");
 
+
+-- ####################################################################################################
+-- Find duplicate icons
+
+-- Get count of each duplicate icons and it's filename
+SELECT COUNT(contents_original), filename
+FROM icons
+GROUP BY contents_original, filename
+HAVING COUNT(contents_original) > 1;
+
+-- Find records that match a specific record
+SELECT icon_id, filename
+FROM icons
+WHERE contents_original IN (
+	SELECT contents_original
+		FROM icons
+		WHERE icon_id = 225473
+);
+
+
+-- Get a list of all records with duplicate image contents
+SELECT icon_id, filename
+FROM icons
+WHERE contents_original IN (
+	SELECT contents_original
+		FROM icons
+		GROUP BY contents_original
+		HAVING COUNT(contents_original) > 1
+);
+
+
+-- ####################################################################################################
+-- Find where duplicate icons are used
+
+-- Create a icon table to store found duplicates
+CREATE TABLE icons_duplicates LIKE icons;
+
+-- Insert duplicate icons into table
+INSERT icons_duplicates
+SELECT *
+FROM icons
+WHERE contents_original IN (
+	SELECT contents_original
+		FROM icons
+		GROUP BY contents_original
+		HAVING COUNT(contents_original) > 1
+);
+
+-- Find where duplicate icons are being used
+-- Optionally search for App Store Apps, but "fixing" this is likely a wasted effort
+--   as they're just going to resync a duplicate icon
+SELECT "ibooks", icon_attachment_id, ibook_id, ibook_name
+	FROM ibooks
+	WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates )
+/* UNION ALL
+SELECT "mobile_device_apps", icon_attachment_id, mobile_device_app_id, app_name
+	FROM mobile_device_apps WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates ) */
+UNION ALL
+	SELECT "mobile_device_configuration_profiles", icon_attachment_id, mobile_device_configuration_profile_id, display_name
+	FROM mobile_device_configuration_profiles WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates )
+/* UNION ALL
+	SELECT "mac_apps", icon_attachment_id, mac_app_id, app_name
+	FROM mac_apps WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates ) */
+UNION ALL
+	SELECT "os_x_configuration_profiles", icon_attachment_id, os_x_configuration_profile_id, display_name
+	FROM os_x_configuration_profiles WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "self_service_plugins", icon_attachment_id, self_service_plugin_id, display_name
+	FROM self_service_plugins WHERE icon_attachment_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "os_x_configuration_profiles", self_service_icon_id, os_x_configuration_profile_id, display_name
+	FROM os_x_configuration_profiles WHERE self_service_icon_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "patch_policies", self_service_icon_id, id, name
+	FROM patch_policies WHERE self_service_icon_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "policies", self_service_icon_id, policy_id, name
+	FROM policies WHERE self_service_icon_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "ss_ios_branding_settings", icon_id, id, branding_name
+	FROM ss_ios_branding_settings WHERE icon_id IN ( SELECT icon_id FROM icons_duplicates )
+UNION ALL
+	SELECT "ss_macos_branding_settings", icon_id, id, branding_name
+	FROM ss_macos_branding_settings WHERE icon_id IN ( SELECT icon_id FROM icons_duplicates )
+;
+
