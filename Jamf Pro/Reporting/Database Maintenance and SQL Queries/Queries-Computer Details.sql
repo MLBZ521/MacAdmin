@@ -195,6 +195,7 @@ SELECT
 	computers.computer_name AS "Computer Name",
 	computers_denormalized.serial_number AS "Serial Number",
 	computers.asset_tag AS "PCN",
+	IF(computers_denormalized.is_managed = 1, "True", "False") AS "Managed",
 	IF(computers_denormalized.serial_number IS NULL, "True", "False") AS "Missing Serial Number",
 	IF(computers_denormalized.serial_number IN (
 			SELECT serial_number
@@ -211,6 +212,35 @@ SELECT
 	DATE(date_sub(FROM_unixtime(computers_denormalized.last_report_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Inventory Update",
 	DATE(date_sub(FROM_unixtime(computers_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
 	DATE(date_sub(FROM_unixtime(computers.initial_entry_date_epoch/1000), INTERVAL 1 DAY)) AS "Initial Enrollment",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.device_certificate_expiration/1000), INTERVAL 1 DAY)) AS "Device Certificate Expires",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.mdm_certificate_expiration/1000), INTERVAL 1 DAY)) AS "MDM Certificate Expires",
+	IF(computers_denormalized.last_contact_time_epoch != 0
+		AND
+		computers_denormalized.last_contact_time_epoch > computers_denormalized.mdm_certificate_expiration,
+		"True", "False"
+	) AS "Checked-In After MDM Profile Expired",
+	IF(computers_denormalized.computer_id IN (
+		SELECT mac_denorm.computer_id
+		FROM mobile_device_management_commands AS mdm_cmds
+		LEFT OUTER JOIN computers_denormalized AS mac_denorm
+			ON mdm_cmds.client_management_id = mac_denorm.management_id
+		LEFT OUTER JOIN computer_user_pushtokens AS cupt
+			ON mdm_cmds.client_management_id = cupt.management_id
+		LEFT OUTER JOIN mdm_client AS mdm_c
+			ON mdm_cmds.client_management_id = mdm_c.management_id
+		LEFT JOIN site_objects AS site_objs_macs
+			ON mac_denorm.computer_id = site_objs_macs.object_id
+				AND site_objs_macs.object_type = "1"
+		LEFT JOIN sites AS sites_macs
+			ON sites_macs.site_id = site_objs_macs.site_id
+		WHERE
+			profile_id = -20
+			AND
+			apns_result_status = "Error"
+			AND
+			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
+		), "True", "False"
+	) AS "Failed to Renew MDM Profile",
 	CASE
 		WHEN computers_denormalized.is_supervised = 1 THEN "True"
 		WHEN (
@@ -286,7 +316,6 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "1"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE computers_denormalized.is_managed = 1
 ;
 
 
