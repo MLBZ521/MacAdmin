@@ -59,6 +59,9 @@ UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM policies
 UNION ALL
+	SELECT icon_id AS id
+	FROM wallpaper_auto_management_settings
+UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
@@ -71,9 +74,11 @@ UNION ALL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
+	WHERE icon_id != NULL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_macos_branding_settings
+	WHERE icon_id != NULL
 );
 
 -- Count the number of unused icon_id's that are from VPP Apps
@@ -111,6 +116,9 @@ UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM policies
 UNION ALL
+	SELECT icon_id AS id
+	FROM wallpaper_auto_management_settings
+UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
@@ -123,13 +131,15 @@ UNION ALL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
+	WHERE icon_id != NULL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_macos_branding_settings
+	WHERE icon_id != NULL
 )
 AND ( icons.filename REGEXP "^([0-9]+x[0-9]+bb|[0-9]+)[.](png|jpg)$");
 
--- Above regex matches or could be substituded with:
+-- Above regex matches or could be substituted with:
 -- AND ( filename IN ( 100x100bb.jpg, 100x100bb.png, 1024x1024bb.png, 512x512bb.png ) OR filename REGEXP "^[0-9]+.(png|jpg)$");
 
 -- ####################################################################################################
@@ -182,6 +192,9 @@ INSERT INTO icons_ids_inuse SELECT id FROM icons WHERE icons.icon_id IN
 		SELECT self_service_icon_id AS id
 		FROM policies
 	UNION ALL
+		SELECT icon_id AS id
+		FROM wallpaper_auto_management_settings
+	UNION ALL
 		SELECT profile_id AS id
 		FROM mobile_device_management_commands
 		WHERE command="Wallpaper"
@@ -194,9 +207,11 @@ INSERT INTO icons_ids_inuse SELECT id FROM icons WHERE icons.icon_id IN
 	UNION ALL
 		SELECT icon_id AS id
 		FROM ss_ios_branding_settings
+		WHERE icon_id != NULL
 	UNION ALL
 		SELECT icon_id AS id
 		FROM ss_macos_branding_settings
+		WHERE icon_id != NULL
 )
 AND id != -1 AND id != 0;
 
@@ -302,6 +317,9 @@ UNION ALL
 	SELECT self_service_icon_id AS id
 	FROM policies
 UNION ALL
+	SELECT icon_id AS id
+	FROM wallpaper_auto_management_settings
+UNION ALL
 	SELECT profile_id AS id
 	FROM mobile_device_management_commands
 	WHERE command="Wallpaper"
@@ -314,9 +332,11 @@ UNION ALL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_ios_branding_settings
+	WHERE icon_id != NULL
 UNION ALL
 	SELECT icon_id AS id
 	FROM ss_macos_branding_settings
+	WHERE icon_id != NULL
 )
 AND ( icons.filename REGEXP "^([0-9]+x[0-9]+bb|[0-9]+)[.](png|jpg)$");
 
