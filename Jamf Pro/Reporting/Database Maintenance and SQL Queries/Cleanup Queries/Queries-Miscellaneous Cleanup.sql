@@ -56,3 +56,31 @@ WHERE report_id NOT IN (
 
 -- Get new total count
 SELECT COUNT(*) FROM mobile_device_extension_attribute_values;
+
+
+-- ##################################################
+-- Fix mismatch number of records
+-- If select count(*) from computers (or computers_denormalized) do not return the same number of
+--   records, the below queries should be ran to fix that.  (Adjust for the correct tables.)
+
+SELECT computer_id, computer_name
+FROM computers_denormalized
+WHERE
+	computer_id NOT IN (
+		SELECT computer_id FROM computers
+	)
+;
+
+SELECT computer_id, computer_name
+FROM computers
+WHERE
+	computer_id NOT IN (
+		SELECT computer_id FROM computers_denormalized
+	)
+;
+
+INSERT INTO computers_denormalized
+	(computer_id, udid, mac_address, alt_mac_address, computer_name)
+	SELECT computer_id, udid, mac_address, alt_mac_address, computer_name
+	FROM computers
+	WHERE computer_id = 7873;
