@@ -82,7 +82,7 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "350"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE 
+WHERE
 	mac_apps.assign_vpp_device_based_licenses = 0
 	AND mac_apps.deleted = 0
 ;

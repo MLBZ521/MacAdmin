@@ -1,7 +1,7 @@
 -- Queries on Computer Details
 
 -- Total number of Managed Computers
-SELECT count(*) AS "Total Managed Computers"
+SELECT COUNT(*) AS "Total Managed Computers"
 FROM computers_denormalized
 WHERE is_managed = 1;
 
@@ -62,26 +62,26 @@ SELECT
 				FROM patch_software_titles, computers_denormalized
 				WHERE
 					patch_software_titles.latest_version LIKE CONCAT('%(', computers_denormalized.operating_system_build, ')' )
-					and (
-						computers_denormalized.operating_system_version LIKE "10.10%" and patch_software_titles.id = 47
-						or
-						computers_denormalized.operating_system_version LIKE "10.11%" and patch_software_titles.id = 44
-						or
-						computers_denormalized.operating_system_version LIKE "10.12%" and patch_software_titles.id = 33
-						or
-						computers_denormalized.operating_system_version LIKE "10.13%" and patch_software_titles.id = 32
-						or
-						computers_denormalized.operating_system_version LIKE "10.14%" and patch_software_titles.id = 31
-						or
-						computers_denormalized.operating_system_version LIKE "10.15%" and patch_software_titles.id = 30
-						or
-						computers_denormalized.operating_system_version LIKE "11.%" and patch_software_titles.id = 28
-						or
-						computers_denormalized.operating_system_version LIKE "12.%" and patch_software_titles.id = 48
-						or
-						computers_denormalized.operating_system_version LIKE "13.%" and patch_software_titles.id = 54
-						or
-						computers_denormalized.operating_system_version LIKE "14.%" and patch_software_titles.id = 57
+					AND (
+						computers_denormalized.operating_system_version LIKE "10.10%" AND patch_software_titles.id = 47
+						OR
+						computers_denormalized.operating_system_version LIKE "10.11%" AND patch_software_titles.id = 44
+						OR
+						computers_denormalized.operating_system_version LIKE "10.12%" AND patch_software_titles.id = 33
+						OR
+						computers_denormalized.operating_system_version LIKE "10.13%" AND patch_software_titles.id = 32
+						OR
+						computers_denormalized.operating_system_version LIKE "10.14%" AND patch_software_titles.id = 31
+						OR
+						computers_denormalized.operating_system_version LIKE "10.15%" AND patch_software_titles.id = 30
+						OR
+						computers_denormalized.operating_system_version LIKE "11.%" AND patch_software_titles.id = 28
+						OR
+						computers_denormalized.operating_system_version LIKE "12.%" AND patch_software_titles.id = 48
+						OR
+						computers_denormalized.operating_system_version LIKE "13.%" AND patch_software_titles.id = 54
+						OR
+						computers_denormalized.operating_system_version LIKE "14.%" AND patch_software_titles.id = 57
 					)
 			)
 		), "True", "False") AS "Latest Patch Installed",
@@ -197,12 +197,12 @@ SELECT
 	computers.asset_tag AS "PCN",
 	IF(computers_denormalized.serial_number IS NULL, "True", "False") AS "Missing Serial Number",
 	IF(computers_denormalized.serial_number IN (
-				SELECT serial_number
-				FROM computers_denormalized
-				WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
-				GROUP BY serial_number
-				HAVING COUNT(serial_number) > 1
-			), "True", "False"
+			SELECT serial_number
+			FROM computers_denormalized
+			WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
+			GROUP BY serial_number
+			HAVING COUNT(serial_number) > 1
+		), "True", "False"
 	) AS "Duplicate Serial Numbers",
 	IF(
 		computers_denormalized.last_contact_time_epoch = 0, "Never",
