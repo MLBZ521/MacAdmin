@@ -319,6 +319,66 @@ LEFT JOIN sites
 ;
 
 
+-- Computers Checking-In after MDM Profile has expired
+SELECT
+	computers.computer_id AS "Computer ID",
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
+ 	IF(computers_denormalized.is_managed = 1, "True", "False") AS "Managed",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.last_contact_time_epoch/1000), INTERVAL 1 DAY)) AS "Last Check-in",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.last_report_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Inventory Update",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.device_certificate_expiration/1000), INTERVAL 1 DAY)) AS "Device Certificate Expires",
+	DATE(date_sub(FROM_unixtime(computers_denormalized.mdm_certificate_expiration/1000), INTERVAL 1 DAY)) AS "MDM Certificate Expires"
+FROM computers
+LEFT JOIN computers_denormalized
+	ON computers_denormalized.computer_id = computers.computer_id
+LEFT JOIN computer_security_info
+	ON computer_security_info.computer_id = computers.computer_id
+LEFT JOIN site_objects
+	ON computers.computer_id = site_objects.object_id
+		AND site_objects.object_type = "1"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
+WHERE
+	computers_denormalized.last_contact_time_epoch != 0
+	AND
+	computers_denormalized.last_contact_time_epoch > computers_denormalized.mdm_certificate_expiration
+;
+
+
+-- Computers that have failed to renew their MDM Profile
+-- And the MDM Profile has already expired
+--   Remove the last AND condition to see all failed Renew MDM Profile Commands
+SELECT
+	mac_denorm.computer_id AS "Computer ID",
+	IF (sites_macs.site_name IS NOT NULL, sites_macs.site_name, "None") AS `Site`,
+	IF(mac_denorm.is_managed = 1, "True", "False") AS "Managed",
+	error_code AS "Error Code",
+	error_domain AS "Error Domain",
+	error_localized_description AS "Localized Error Description"
+FROM mobile_device_management_commands AS mdm_cmds
+LEFT OUTER JOIN computers_denormalized AS mac_denorm
+	ON mdm_cmds.client_management_id = mac_denorm.management_id
+LEFT OUTER JOIN computer_user_pushtokens AS cupt
+	ON mdm_cmds.client_management_id = cupt.management_id
+LEFT OUTER JOIN mdm_client AS mdm_c
+	ON mdm_cmds.client_management_id = mdm_c.management_id
+LEFT JOIN site_objects AS site_objs_macs
+	ON mac_denorm.computer_id = site_objs_macs.object_id
+		AND site_objs_macs.object_type = "1"
+LEFT JOIN sites AS sites_macs
+	ON sites_macs.site_id = site_objs_macs.site_id
+WHERE
+	profile_id = -20
+	AND
+	apns_result_status = "Error"
+	AND
+	mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
+	AND
+	mac_denorm.mdm_certificate_expiration < UNIX_TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 180 DAY))*1000
+;
+
+
 -- ##################################################
 -- Security
 SELECT
