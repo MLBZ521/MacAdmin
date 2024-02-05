@@ -158,7 +158,7 @@ SELECT
 	IF(mobile_devices.serial_number IN (
 				SELECT serial_number
 				FROM mobile_devices
-				WHERE mobile_devices_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
+				WHERE mobile_devices_denormalized.is_managed = 1 -- When looking for duplicates, only check against managed records
 				GROUP BY serial_number
 				HAVING COUNT(serial_number) > 1
 			), "True", "False") AS "Duplicate Serial Numbers",
@@ -168,6 +168,27 @@ SELECT
 	) AS "Last Inventory Update",
 	DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
 	DATE(date_sub(FROM_unixtime(mobile_devices.initial_entry_date_epoch/1000), INTERVAL 1 DAY)) AS "Initial Enrollment",
+	DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.device_certificate_expiration/1000), INTERVAL 1 DAY)) AS "Device Certificate Expires",
+	IF(mobile_devices_denormalized.mobile_device_id IN (
+		SELECT mobile_denorm.mobile_device_id
+		FROM mobile_device_management_commands AS mdm_cmds
+		LEFT OUTER JOIN mobile_devices_denormalized AS mobile_denorm
+			ON mdm_cmds.client_management_id = mobile_denorm.management_id
+		LEFT OUTER JOIN mdm_client AS mdm_c
+			ON mdm_cmds.client_management_id = mdm_c.management_id
+		LEFT JOIN site_objects AS site_objs_mobiles
+			ON mobile_denorm.mobile_device_id = site_objs_mobiles.object_id
+				AND site_objs_mobiles.object_type = "21"
+		LEFT JOIN sites AS sites_mobiles
+			ON sites_mobiles.site_id = site_objs_mobiles.site_id
+		WHERE
+			profile_id = -20
+			AND
+			apns_result_status = "Error"
+			AND
+			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+		), "True", "False"
+	) AS "Failed to Renew MDM Profile",
 	IF(mobile_devices_denormalized.is_supervised = 1, "True", "False") AS "Supervised",
 	IF(
 		mobile_devices_denormalized.declarative_device_management_enabled = 1
@@ -184,7 +205,8 @@ LEFT JOIN site_objects
 		AND site_objects.object_type = "21"
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
-WHERE mobile_devices_denormalized.is_managed = 1
+WHERE
+mobile_devices_denormalized.is_managed = 1
 ;
 
 
