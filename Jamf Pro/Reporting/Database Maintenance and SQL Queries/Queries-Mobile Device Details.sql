@@ -210,6 +210,37 @@ mobile_devices_denormalized.is_managed = 1
 ;
 
 
+-- Mobile Devices that have failed to renew their MDM Profile
+-- And the MDM Profile has already expired
+--   Remove the last AND condition to see all failed Renew MDM Profile Commands
+SELECT
+	mobile_denorm.mobile_device_id AS "Device ID",
+	IF (sites_mobiles.site_name IS NOT NULL, sites_mobiles.site_name, "None") AS `Site`,
+	IF(mobile_denorm.is_managed = 1, "True", "False") AS "Managed",
+	error_code AS "Error Code",
+	error_domain AS "Error Domain",
+	error_localized_description AS "Localized Error Description"
+FROM mobile_device_management_commands AS mdm_cmds
+LEFT OUTER JOIN mobile_devices_denormalized AS mobile_denorm
+	ON mdm_cmds.client_management_id = mobile_denorm.management_id
+LEFT OUTER JOIN mdm_client AS mdm_c
+	ON mdm_cmds.client_management_id = mdm_c.management_id
+LEFT JOIN site_objects as site_objs_mobiles
+	ON mobile_denorm.mobile_device_id = site_objs_mobiles.object_id
+		AND site_objs_mobiles.object_type = "21"
+LEFT JOIN sites as sites_mobiles
+	ON sites_mobiles.site_id = site_objs_mobiles.site_id
+WHERE
+	profile_id = -20
+	AND
+	apns_result_status = "Error"
+	AND
+	mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+	AND
+	mac_denorm.mdm_certificate_expiration < UNIX_TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 180 DAY))*1000
+;
+
+
 -- ##################################################
 -- Security
 SELECT
