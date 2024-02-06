@@ -200,7 +200,7 @@ SELECT
 	IF(computers_denormalized.serial_number IN (
 			SELECT serial_number
 			FROM computers_denormalized
-			WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only checked against managed if the records
+			WHERE computers_denormalized.is_managed = 1 -- When looking for duplicates, only check against managed records
 			GROUP BY serial_number
 			HAVING COUNT(serial_number) > 1
 		), "True", "False"
@@ -530,3 +530,32 @@ WHERE
 	is_managed = 1 AND
 	sites.site_name IS NULL
 ;
+
+-- ##################################################
+-- Get all MDM Commands for a specific device
+
+SELECT *
+FROM mobile_device_management_commands
+WHERE
+	client_management_id = (
+		SELECT management_id FROM computers_denormalized
+		WHERE
+-- 			computer_id = ""
+-- 			serial_number = ""
+	);
+
+
+-- ##################################################
+-- Get pass code for an issued MDM Lock Command
+
+SELECT passcode, command_attributes
+FROM mobile_device_management_commands
+WHERE
+	command = "DeviceLock"
+	AND
+	client_management_id = (
+		SELECT management_id FROM computers_denormalized
+		WHERE
+-- 			computer_id = ""
+-- 			serial_number = ""
+	);

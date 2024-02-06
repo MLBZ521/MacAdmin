@@ -122,3 +122,63 @@ WHERE
 	mobile_device_apps.assign_vpp_device_based_licenses = 0
 	AND mobile_device_apps.deleted = 0
 ;
+
+
+-- ##################################################
+-- Authentication enabled on PreStages
+
+SELECT
+	COUNT(*) AS "Total PreStages",
+	(SELECT COUNT(*) FROM computer_dep_prestages WHERE require_authentication = 1) AS "Authentication Enabled"
+FROM computer_dep_prestages;
+
+
+SELECT
+	COUNT(*) AS "Total PreStages",
+	(SELECT COUNT(*) FROM mobile_device_prestages WHERE require_authentication = 1) AS "Authentication Enabled"
+FROM mobile_device_prestages;
+
+
+-- ##################################################
+-- Last selected Site for the given username
+
+SELECT username, key_pair_name, key_pair_value
+FROM user_preferences
+WHERE
+	key_pair_name = "lastSiteID"
+	AND username = "zthomps3"
+;
+
+
+
+-- ##################################################
+-- Get devices with attachments
+
+SELECT
+	computers.computer_id,
+	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
+	computers.computer_name AS "Computer Name",
+	computers_denormalized.serial_number AS "Serial Number",
+	IF(computers_denormalized.is_managed = 1, "True", "False") AS "Managed",
+	attachments.attachment_id,
+	filename,
+	file_size
+FROM computers
+LEFT JOIN computers_denormalized
+	ON computers_denormalized.computer_id = computers.computer_id
+LEFT JOIN site_objects
+	ON computers.computer_id = site_objects.object_id
+		AND site_objects.object_type = "1"
+LEFT JOIN sites
+	ON sites.site_id = site_objects.site_id
+LEFT JOIN attachment_assignments
+	ON computers.computer_id = attachment_assignments.object_id
+		AND attachment_assignments.object_type = "1"
+LEFT JOIN attachments
+	ON attachments.attachment_id = attachment_assignments.attachment_id
+WHERE
+	computers.computer_id IN (
+		SELECT object_id FROM attachment_assignments
+	)
+;
+

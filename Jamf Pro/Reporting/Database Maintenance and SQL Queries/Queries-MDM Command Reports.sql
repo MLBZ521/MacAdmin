@@ -469,3 +469,23 @@ GROUP BY
 HAVING COUNT(*) > 1
 ORDER BY COUNT(*)
 DESC;
+
+
+-- ##################################################
+-- Get unique MDM Commands
+
+SELECT distinct command
+FROM mobile_device_management_commands
+;
+
+
+
+-- ##################################################
+-- Get unique errors for failed "Renew MDM Profile" Commands
+SELECT distinct error_code, error_domain, error_localized_description
+FROM mobile_device_management_commands
+WHERE
+	profile_id = -20
+	AND
+	apns_result_status = "Error"
+;
