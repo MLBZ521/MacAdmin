@@ -7,7 +7,7 @@
 -- Get Policies that Execute @ Ongoing
 SELECT policy_id
 FROM policies
-WHERE execution_frequency LIKE "Ongoing";
+WHERE execution_frequency = "Ongoing";
 
 
 -- Policies with no Scope
@@ -37,10 +37,6 @@ SELECT DISTINCT policies.policy_id, policies.name
 FROM policies
 JOIN policy_deployment
 	ON policy_deployment.policy_id = policies.policy_id
-JOIN site_objects
-	ON site_objects.object_id = policies.policy_id
-JOIN sites
-	ON sites.site_id = site_objects.site_id
 WHERE
 	policy_deployment.target_type = "106";
 
