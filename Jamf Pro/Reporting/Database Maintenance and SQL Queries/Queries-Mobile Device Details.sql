@@ -39,7 +39,7 @@ SELECT
 				AND mobile_devices_denormalized.os_version LIKE "15.%"
 			OR
 				mobile_devices_denormalized.model_identifier REGEXP "^(iPad6,[0-9]|iPhone10,[0-9])$"
-				AND mobile_devices_denormalized.os_version LIKE "17.%"
+				AND mobile_devices_denormalized.os_version LIKE "16.%"
 			OR
 				mobile_devices_denormalized.os_version LIKE "17.%"
 		) THEN "True"
