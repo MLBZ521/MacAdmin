@@ -169,7 +169,7 @@ SELECT
 	DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.last_enrolled_date_epoch/1000), INTERVAL 1 DAY)) AS "Last Enrollment",
 	DATE(date_sub(FROM_unixtime(mobile_devices.initial_entry_date_epoch/1000), INTERVAL 1 DAY)) AS "Initial Enrollment",
 	DATE(date_sub(FROM_unixtime(mobile_devices_denormalized.device_certificate_expiration/1000), INTERVAL 1 DAY)) AS "Device Certificate Expires",
-	IF(mobile_devices_denormalized.mobile_device_id IN (
+	IF(mobile_devices.mobile_device_id IN (
 		SELECT mobile_denorm.mobile_device_id
 		FROM mobile_device_management_commands AS mdm_cmds
 		LEFT OUTER JOIN mobile_devices_denormalized AS mobile_denorm
@@ -187,6 +187,10 @@ SELECT
 			apns_result_status = "Error"
 			AND
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+			AND
+			mobile_denorm.device_certificate_expiration < UNIX_TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 180 DAY))*1000
+			AND
+			mobile_denorm.is_managed = 1
 		), "True", "False"
 	) AS "Failed to Renew MDM Profile",
 	IF(mobile_devices_denormalized.is_supervised = 1, "True", "False") AS "Supervised",
