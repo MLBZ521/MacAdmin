@@ -147,7 +147,7 @@ ORDER BY Total
 DESC;
 
 
--- Get Policies that have ran witin the last 24 hours, if they perform inventory, have errors, and their Site, and group/count the occurences
+-- Get Policies that have ran within the last 24 hours, if they perform inventory, have errors, and their Site, and group/count the occurrences
 SELECT
 	COUNT(*) AS "Total",
 	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
@@ -177,7 +177,7 @@ DESC;
 -- ##################################################
 -- Mash up of other queries
 
--- Get various Policies details of interest, including if they perform inventory, have errors, and their Site, and group/count the occurences.
+-- Get various Policies details of interest, including if they perform inventory, have errors, and their Site, and group/count the occurrences.
 -- This is an all time count of how often Policies are ran including the number of errors reported.
 SELECT
 	COUNT(*) AS "Total",
@@ -210,9 +210,9 @@ DESC;
 
 
 -- ##################################################
--- Policies that are configured for Ongoing with any "reoccuring" trigger and installs a Package
+-- Policies that are configured for Ongoing with any "reoccurring" trigger and installs a Package
 
--- Get Policies that are configured for Ongoing with any "reoccuring" trigger and installs a Package (Also get each Package ID and Name)
+-- Get Policies that are configured for Ongoing with any "reoccurring" trigger and installs a Package (Also get each Package ID and Name)
 SELECT DISTINCT
 	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
 	policies.policy_id AS "Policy ID",
@@ -242,7 +242,7 @@ WHERE
 	);
 
 
--- Get Policies that are configured for Ongoing with any "reoccuring" trigger and installs a Package which has a Scope that is not a Smart Group (Also get each Package ID and Name)
+-- Get Policies that are configured for Ongoing with any "reoccurring" trigger and installs a Package which has a Scope that is not a Smart Group (Also get each Package ID and Name)
 -- Need to add if scoped to Computer IDs directly
 -- This query needs verification
 SELECT DISTINCT
