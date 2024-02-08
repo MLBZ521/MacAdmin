@@ -21,7 +21,7 @@ SELECT
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$" THEN "iOS 10"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad4,[0-7]|iPhone[6-7],[0-9])$" THEN "iOS 12"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$" THEN "iOS 15"
-		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad([7-9]|1[0-9]),[0-9]|iPhone1[1-9],[0-9])$" THEN "iOS 16"
+		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad6,[0-9]|iPhone10,[0-9])$" THEN "iOS 16"
 		ELSE "iOS 17"
 	END AS "Latest Major OS Supported",
 	CASE
@@ -38,7 +38,7 @@ SELECT
 				mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$"
 				AND mobile_devices_denormalized.os_version LIKE "15.%"
 			OR
-				mobile_devices_denormalized.model_identifier REGEXP "^(iPad([7-9]|1[0-9]),[0-9]|iPhone1[1-9],[0-9])$"
+				mobile_devices_denormalized.model_identifier REGEXP "^(iPad6,[0-9]|iPhone10,[0-9])$"
 				AND mobile_devices_denormalized.os_version LIKE "17.%"
 			OR
 				mobile_devices_denormalized.os_version LIKE "17.%"
