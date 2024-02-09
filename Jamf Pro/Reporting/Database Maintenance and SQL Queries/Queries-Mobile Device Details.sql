@@ -17,7 +17,7 @@ SELECT
 	mobile_devices_denormalized.os_build AS "Operating System Build",
 	CASE
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod[1-4],[0-9]|iPad1,[0-9]|iPad2,[0-4]|iPhone[1-3],[0-9])$" THEN "Model Not Supported"
-		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod5,[0-9]|iPad2,[5-6]|iPad3,[0-9]|iPhone4,[0-9])$" THEN "iOS 9"
+		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod5,[0-9]|iPad2,[5-6]|iPad3,[1-3]|iPhone4,[0-9])$" THEN "iOS 9"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$" THEN "iOS 10"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPad4,[0-7]|iPhone[6-7],[0-9])$" THEN "iOS 12"
 		WHEN mobile_devices_denormalized.model_identifier REGEXP "^(iPod9,[0-9]|iPad4,[8-9]|iPad5,[0-9]|iPhone[8-9],[0-9])$" THEN "iOS 15"
@@ -26,7 +26,7 @@ SELECT
 	END AS "Latest Major OS Supported",
 	CASE
 		WHEN (
-			mobile_devices_denormalized.model_identifier REGEXP "^(iPod5,[0-9]|iPad2,[5-6]|iPad3,[0-9]|iPhone4,[0-9])$"
+			mobile_devices_denormalized.model_identifier REGEXP "^(iPod5,[0-9]|iPad2,[5-6]|iPad3,[1-3]|iPhone4,[0-9])$"
 			AND mobile_devices_denormalized.os_version LIKE "9.%"
 			OR
 				mobile_devices_denormalized.model_identifier REGEXP "^iPhone5,[0-9]$"
