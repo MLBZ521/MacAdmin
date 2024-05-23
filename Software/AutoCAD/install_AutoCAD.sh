@@ -3,7 +3,7 @@
 ###################################################################################################
 # Script Name:  install_AutoCAD.sh
 # By:  Zack Thompson / Created:  9/2/2020
-# Version:  1.1.0 / Updated:  11/24/2020 / By:  ZT
+# Version:  1.2.0 / Updated:  8/24/2021 / By:  ZT
 #
 # Description:  This script silently installs AutoCAD 2021 and newer.
 #
@@ -49,30 +49,33 @@ exitCheck() {
 ##################################################
 # Bits staged...
 
-# "New" silent install method...that does not work when run in cli installed .pkg (but does seem to work when installing that .pkg via GUI...)
+# "New" silent install method...that does not work when run in a cli installed .pkg (but does seem to work when installing that .pkg via GUI...)
 # installResult=$( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/Setup.app/Contents/MacOS/Setup" --silent --install_mode install --hide_eula  )
 
-# Create an array of .pkg's to install
 # Credit to Onkston for this install method.
 # https://www.jamf.com/jamf-nation/discussions/35944/autocad-2021-deployment-with-network-server
-declare -a pkgArray
-pkgArray+=( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/ObjToInstall/lib.pkg" )
-pkgArray+=( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/Packages/AdSSO/AdSSO-v2.pkg" )
-pkgArray+=( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/Packages/Licensing/$( /bin/ls "${pkgDir}/${AutoCADinstaller}/Contents/Helper/Packages/Licensing/" | /usr/bin/grep .pkg )" )
-pkgArray+=( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/ObjToInstall/licreg.pkg" )
-pkgArray+=( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/ObjToInstall/autocad2021.pkg" )
+pkgArray=$( /usr/bin/find -E "${pkgDir}/${AutoCADinstaller}/Contents/Helper" -iregex ".*[/].*[.]pkg" -prune )
 
-# Loop through each .pkg in the array.
-for pkg in "${pkgArray[@]}"; do
+# Verify at least one version of SPSS was found.
+if [[ -z "${pkgArray}" ]]; then
 
-	echo "Installing ${pkg}..."
-	installResult=$( /usr/sbin/installer -dumplog -verbose -pkg "${pkg}" -allowUntrusted -target / )
-	exitCode=$?
+	exitCheck 3 "ERROR:  Unable to locate .pkgs in the expected location!"
 
-	# Function exitCheck
-	exitCheck $exitCode "${pkg}" "${installResult}"
+else
 
-done
+	# Loop through each .pkg in the array.
+	while IFS=$'\n' read -r pkg; do
+
+		echo "Installing ${pkg}..."
+		installResult=$( /usr/sbin/installer -dumplog -verbose -pkg "${pkg}" -allowUntrusted -target / )
+		exitCode=$?
+
+		# Function exitCheck
+		exitCheck $exitCode "${pkg}" "${installResult}"
+
+	done < <( echo "${pkgArray}" )
+
+fi
 
 echo "All components have been installed."
 echo "AutoCAD has been installed!"
