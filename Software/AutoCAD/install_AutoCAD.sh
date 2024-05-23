@@ -1,83 +1,38 @@
 #!/bin/bash
 
-###################################################################################################
-# Script Name:  install_AutoCAD.sh
+####################################################################################################
+# Script Name:  Install-AutoCAD.sh
 # By:  Zack Thompson / Created:  9/2/2020
-# Version:  1.2.0 / Updated:  8/24/2021 / By:  ZT
+# Version:  1.3.0 / Updated:  5/20/2024 / By:  ZT
 #
-# Description:  This script silently installs AutoCAD 2021 and newer.
+# Description:  This script silently installs AutoCAD 2023 and newer.
+#	Probably works for AutoCAD 2021+ as well.
 #
-###################################################################################################
+# Note:  The "new" silent install method (using `[...]/Setup -silent`) does not work when it is
+#	executed from a .pkg's postinstall script for some odd reason.
+#
+####################################################################################################
 
 echo -e "*****  Install AutoCAD Process:  START  *****\n"
-
-# Check the installation target.
-if [[ $3 != "/" ]]; then
-	echo "ERROR:  Target disk is not the startup disk."
-	echo "*****  Install AutoCAD process:  FAILED  *****"
-	exit 1
-fi
-
-##################################################
-# Define Variables
-
-# Set working directory
-pkgDir=$( /usr/bin/dirname "${0}" )
-
-# Get the filename of the .app file
-AutoCADinstaller=$( /bin/ls "${pkgDir}" | /usr/bin/grep .app )
-
-##################################################
-# Define Functions
-
-exitCheck() {
-	if [[ $1 != 0 ]]; then
-
-		echo "Failed to install:  ${2}"
-		echo "Exit Code:  ${1}"
-		echo "Reason:  ${3}"
-		echo "*****  Install AutoCAD process:  FAILED  *****"
-		exit 2
-
-	else
-
-		echo "${2} has been installed!"
-
-	fi
-}
 
 ##################################################
 # Bits staged...
 
-# "New" silent install method...that does not work when run in a cli installed .pkg (but does seem to work when installing that .pkg via GUI...)
-# installResult=$( "${pkgDir}/${AutoCADinstaller}/Contents/Helper/Setup.app/Contents/MacOS/Setup" --silent --install_mode install --hide_eula  )
+echo "Searching for the Installer App..."
+installer_app=$( /usr/bin/find -E "/private/tmp" -iregex \
+	".*/Install Autodesk AutoCAD [[:digit:]]{4} for Mac[.]app" -type d -maxdepth 1 -prune )
 
-# Credit to Onkston for this install method.
-# https://www.jamf.com/jamf-nation/discussions/35944/autocad-2021-deployment-with-network-server
-pkgArray=$( /usr/bin/find -E "${pkgDir}/${AutoCADinstaller}/Contents/Helper" -iregex ".*[/].*[.]pkg" -prune )
+echo "Installing:  ${installer_app}"
+"${installer_app}/Contents/Helper/Setup.app/Contents/MacOS/Setup" --silent
+exit_code=$?
 
-# Verify at least one version of SPSS was found.
-if [[ -z "${pkgArray}" ]]; then
+/bin/rm -Rf "${installer_app}"
 
-	exitCheck 3 "ERROR:  Unable to locate .pkgs in the expected location!"
-
-else
-
-	# Loop through each .pkg in the array.
-	while IFS=$'\n' read -r pkg; do
-
-		echo "Installing ${pkg}..."
-		installResult=$( /usr/sbin/installer -dumplog -verbose -pkg "${pkg}" -allowUntrusted -target / )
-		exitCode=$?
-
-		# Function exitCheck
-		exitCheck $exitCode "${pkg}" "${installResult}"
-
-	done < <( echo "${pkgArray}" )
-
+if [[ $exit_code != 0 ]]; then
+	echo -e "[Error] Failed to install!\nExit Code:  ${exit_code}"
+	echo -e "\n*****  Install AutoCAD process:  FAILED  *****"
+	exit $exit_code
 fi
 
-echo "All components have been installed."
-echo "AutoCAD has been installed!"
-echo -e "\n*****  Install AutoCAD Process:  COMPLETE  *****"
+echo -e "AutoCAD has been installed!\n\n*****  Install AutoCAD Process:  COMPLETE  *****"
 exit 0
