@@ -142,7 +142,7 @@ SERVER licser2.company.com 000000000000 12345
 SERVER licser3.company.com 000000000000 12345
 USE_SERVER"
 			# For 2020 and newer
-			license_servers="27005@pubkeyserver14.asu.edu,27005@pubkeyserver15.asu.edu,27005@pubkeyserver16.asu.edu"
+			license_servers="12345@licser1.company.com,12345@licser2.company.com,12345@licser3.company.com"
 
 		elif [[ $license_type == "Administrative" ]]; then
 
@@ -152,7 +152,7 @@ SERVER licser5.company.com 000000000000 67890
 SERVER licser6.company.com 000000000000 67890
 USE_SERVER"
 			# For 2020 and newer
-			license_servers="27005@pubkeyserver14.asu.edu,27005@pubkeyserver15.asu.edu,27005@pubkeyserver16.asu.edu"
+			license_servers="67890@licser4.company.com,67890@licser5.company.com,27005@licser6.company.com"
 
 		fi
 	;;
