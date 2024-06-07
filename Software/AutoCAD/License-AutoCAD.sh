@@ -3,7 +3,7 @@
 ####################################################################################################
 # Script Name:  License-AutoCAD.sh
 # By:  Zack Thompson / Created:  3/29/2018
-# Version:  1.2.0 / Updated:  5/28/2024 / By:  ZT
+# Version:  1.2.1 / Updated:  6/07/2024 / By:  ZT
 #
 # Description:  This script applies the license for AutoCAD.
 #
@@ -17,6 +17,7 @@ license_directory="${autodesk_app_support}/CLM/LGS"
 autodesk_lic_helper="${autodesk_app_support}/AdskLicensing/Current/helper/AdskLicensingInstHelper"
 default_date_format="+%Y-%m-%d %H:%M:%S"
 script_exit_code=0
+local_log="/dev/null"
 
 ##################################################
 # Functions
@@ -30,7 +31,6 @@ write_to_log() {
 	# 	-n = (flag) Do not append newline after message
 	# 	-no_tee = (flag) Do not write message to log file
 	local message="${1}"
-	local no_tee="true"
 
 	while (( "$#" )); do
 		# Loop through the passed arguments
@@ -233,7 +233,7 @@ else
 
 			if [[ $registered_apps_exit != 0 ]]; then
 				write_to_log "[Error] Failed to query the Autodesk Licensing Service"
-				write_to_log "Exit Code:  ${registered_apps_exit}\nService reported:  ${registered_apps}" 
+				write_to_log "Exit Code:  ${registered_apps_exit}\nService reported:  ${registered_apps}" -e
 				exit_script 4
 			fi
 
