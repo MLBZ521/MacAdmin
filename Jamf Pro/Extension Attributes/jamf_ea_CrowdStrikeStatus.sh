@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.12.1 / Updated:  10/28/2022 / By:  ZT
+# Version:  2.13.0 / Updated:  6/7/2024 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -29,7 +29,19 @@ remediate_network_filter="true"
 csFirmwareAnalysisEnabled="false"
 
 # Set environments' Customer ID (CID)
-expectedCSCustomerID="12345678-90AB-CDEF-1234-567890ABCDEF"
+# Formatted for falconctl stats
+declare -a expected_tenant_cids=( \
+	"12345678-90AB-CDEF-1234-567890ABCDEF" \
+	"ABCDEF12-3456-7890-ABCD-EF1234567890" \
+	"23456789-0ABC-DEF-12345-67890ABCDEF1" \
+	"BCDEF123-4567-890A-BCDE-F1234567890A"
+)
+	# ASU Enterprise
+	# ASU Engineering
+	# ASU NFR Testing
+	# ASU Primary
+	# ASU-HIPAA
+	# KE-RTO
 
 # The number of days before reporting device has not connected to the CrowdStrike Cloud.
 lastConnectedVariance=7
@@ -101,7 +113,6 @@ PlistBuddy_Helper() {
 	local type="${4}"
 	local value="${5}"
 
-	# Delete existing values if required
 	if [[ "${action}" = "print_xml"  ]]; then
 
 		/usr/libexec/PlistBuddy -x -c "print" "${plist}" 2> /dev/null
@@ -552,10 +563,12 @@ else
 fi
 
 # Verify CS Customer ID (CID)
-if [[ -n "${csCustomerID}" && "${csCustomerID}" != "${expectedCSCustomerID}" ]]; then
-
+if [[ -z "${csCustomerID}" ]]; then
+	returnResult+=" Sensor not licensed;"
+elif [[ "${expected_tenant_cids[*]}" =~ $csCustomerID ]]; then
+	echo "Valid CID found."
+elif [[ -n "${cid}"  ]]; then
 	returnResult+=" Invalid Customer ID;"
-
 fi
 
 # Get the connection established dates.
