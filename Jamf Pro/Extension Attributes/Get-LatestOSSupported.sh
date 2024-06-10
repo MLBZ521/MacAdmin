@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.5.6 / Updated:  6/10/2024 / By:  ZT
+# Version:  2.6.0 / Updated:  6/10/2024 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -22,9 +22,9 @@
 #			updated.
 #
 #	System Requirements can be found here:
-#		Full List - https://support.apple.com/en-us/HT211683
-#		Sonoma (Preview) - https://www.apple.com/macos/sonoma-preview/
-#		Ventura - https://support.apple.com/en-us/HT213265 / https://support.apple.com/en-us/HT213264
+#		Sequoia (Preview) - https://www.apple.com/macos/macos-sequoia-preview/
+#		Sonoma - https://support.apple.com/en-us/105113
+#		Ventura - https://support.apple.com/en-us/102861
 #			* Apple has never publicly posted storage requirements for Ventura, which is why this
 #			  script identifies Ventura support with an asterisk, e.g. `Ventura*`
 #		Monterey - https://support.apple.com/en-us/HT212551
@@ -76,36 +76,30 @@ not_bigsur_regex="^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macm
 not_monterey_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
 not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
 not_sonoma_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
+not_sequoia_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-8],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
 
 ##################################################
 # Setup Functions
 
 write_to_ea_history() {
-
 	# Arguments
-	# $1 = (str) Plist key that the message value will be assigned too
-	# $2 = (str) Message that will be assigned to the key
-
+	#	$1 = (str) Plist key that the message value will be assigned too
+	#	$2 = (str) Message that will be assigned to the key
 	local key="${1}"
 	local value="${2}"
 
 	if [[ "${locally_log}" == "true" && -z "${TEST_OS}" && -z "${TEST_MODEL}" ]]; then
-
 		if [[ ! -e "${local_inventory}" ]]; then
-
 			/bin/mkdir -p "$( /usr/bin/dirname "${local_inventory}" )"
 			/usr/bin/touch "${local_inventory}"
-
 		fi
-
 		/usr/bin/defaults write "${local_inventory}" "${key}" "${value}"
-
 	fi
-
 }
 
 model_check() {
-	# $1 = Mac Model Identifier
+	# Arguments
+	#	$1 = Mac Model Identifier
 	local model="${1}"
 
 	if [[ $model =~ $not_elcapitan_or_older_regex || $model =~ ^Xserve.*$ ]]; then
@@ -125,45 +119,82 @@ model_check() {
 		echo "Monterey"
 	elif [[ $model =~ $not_sonoma_regex ]]; then
 		echo "Ventura*"
-	else
+	elif [[ $model =~ $not_sequoia_regex ]]; then
 		echo "Sonoma*"
+	else
+		echo "Sequoia*"
 	fi
 }
 
 os_check() {
-	# $1 = Max supported OS version based on hardware model
-	# $2 = Current OS major version
-	# $3 = Current OS minor version
-	# $4 = Current OS patch version
+	# Arguments
+	#	$1 = Max supported OS version based on hardware model
+	#	$2 = Current OS major version
+	#	$3 = Current OS minor version
+	#	$4 = Current OS patch version
 	local validate_os="${1}"
 	local os_major="${2}"
 	local os_minor="${3}"
 	local os_patch="${4}"
 
-	if [[ ! "${mac_model}" =~ ^MacPro.*$ ]]; then
-		# For ***non*** MacPro models:
+	if [[ ! "${mac_model}" =~ ^MacPro5,1$ ]]; then
+		# For all models except MacPro5,1...
 
-		if [[ "${validate_os}" == "Sonoma*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		if [[
+			"${validate_os}" == "Sequoia*" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
+		]]; then
+			echo "Sequoia*"
+		elif [[
+			"${validate_os}" == "Sonoma*" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
+		]]; then
 			echo "Sonoma*"
-		elif [[ "${validate_os}" == "Ventura*" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		elif [[
+			"${validate_os}" == "Ventura*" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
+		]]; then
 			echo "Ventura*"
-		elif [[ "${validate_os}" == "Monterey" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		elif [[
+			"${validate_os}" == "Monterey" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
+		]]; then
 			echo "Monterey"
-		elif [[ "${validate_os}" == "Big Sur" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 ) ]]; then
+		elif [[
+			"${validate_os}" == "Big Sur" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
+		]]; then
 			echo "Big Sur"
-		elif [[ "${validate_os}" == "Big Sur" && ( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -le 8 ) ]]; then
+		elif [[
+			"${validate_os}" == "Big Sur" && \
+			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -le 8 )
+		]]; then
 			echo "El Capitan / OS Limitation"
-		elif [[ "${validate_os}" == "Catalina" && "${os_major}" -eq 10 && "${os_minor}" -ge 9 ]]; then
+		elif [[
+			"${validate_os}" == "Catalina" && "${os_major}" -eq 10 && "${os_minor}" -ge 9
+		]]; then
 			echo "Catalina"
-		elif [[ "${validate_os}" == "Catalina" && "${os_major}" -eq 10 && "${os_minor}" -le 8 ]]; then
+		elif [[
+			"${validate_os}" == "Catalina" && "${os_major}" -eq 10 && "${os_minor}" -le 8
+		]]; then
 			echo "Mojave / OS Limitation"  # (Current OS Limitation, 10.15 Catalina)
-		elif [[ "${validate_os}" == "Mojave" && "${os_major}" -eq 10 && "${os_minor}" -ge 8 ]]; then
+		elif [[
+			"${validate_os}" == "Mojave" && "${os_major}" -eq 10 && "${os_minor}" -ge 8
+		]]; then
 			echo "Mojave"
-		elif [[ "${validate_os}" == "High Sierra" && "${os_major}" -eq 10 && "${os_minor}" -ge 8 ]]; then
+		elif [[
+			"${validate_os}" == "High Sierra" && "${os_major}" -eq 10 && "${os_minor}" -ge 8
+		]]; then
 			echo "High Sierra"
-		elif [[ "${validate_os}" == "High Sierra" && "${os_major}" -eq 10 && ( "${os_minor}" -ge 8 || "${os_minor}" -eq 7 && "${os_patch}" -ge 5 ) ]]; then
+		elif [[
+			"${validate_os}" == "High Sierra" && "${os_major}" -eq 10 && \
+			( "${os_minor}" -ge 8 || "${os_minor}" -eq 7 && "${os_patch}" -ge 5 )
+		]]; then
 			echo "Sierra / OS Limitation"  # (Current OS Limitation, 10.13 Compatible)
-		elif [[ "${validate_os}" == "El Capitan" && "${os_major}" -eq 10 && ( "${os_minor}" -ge 7 || "${os_minor}" -eq 6 && "${os_patch}" -ge 8 ) ]]; then
+		elif [[
+			"${validate_os}" == "El Capitan" && "${os_major}" -eq 10 && \
+			( "${os_minor}" -ge 7 || "${os_minor}" -eq 6 && "${os_patch}" -ge 8 )
+		]]; then
 			echo "El Capitan"
 		else
 			echo "<result>Current OS Not Supported</result>"
@@ -171,52 +202,44 @@ os_check() {
 		fi
 
 	else
-		# Because Apple had to make Mojave support for MacPro's difficult...  I have to add complexity to the original "simplistic" logic in this script.
+		# For MacPro5,1 Mac Pros because Apple had to make Mojave support for MacPro's
+		# difficult...I had to add complexity to the original "simplistic" logic in this script.
 
-		if [[ $validate_os =~ (Sonoma|Ventura)\* ]]; then
-			echo "${validate_os}"
-
-		elif [[ "${validate_os}" == "Monterey" ]]; then
-			# Any MacPro model that is compatible with Monterey based on model identifier alone, is 100% compatible with Monterey,
-			# since they wouldn't be compatible with any OS that is old, nor could they have incompatible hardware.
-			# e.g. MacPro6,1 (i.e. 2013/Trash Cans) and newer
-			echo "Monterey"
-
-		elif [[ "${validate_os}" == "Mojave" && "${os_major}" -eq 10 && ( "${os_minor}" -ge 14 || "${os_minor}" -eq 13 && "${os_patch}" -ge 6 ) ]]; then
+		if [[
+			"${validate_os}" == "Mojave" && "${os_major}" -eq 10 && \
+			( "${os_minor}" -ge 14 || "${os_minor}" -eq 13 && "${os_patch}" -ge 6 )
+		]]; then
 			# Supports Mojave, but required Metal Capable Graphics Cards and FileVault must be disabled.
 			mac_pro_result="Mojave"
 
 			# Check if the Graphics Card supports Metal
-			if [[ $( /usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs ) != *"Supported"* ]]; then
+			if [[
+				$( /usr/sbin/system_profiler SPDisplaysDataType | \
+					/usr/bin/awk -F 'Metal: ' '{print $2}' | /usr/bin/xargs ) != *"Supported"*
+			]]; then
 				mac_pro_result+=" / GFX unsupported"
 			fi
 
 			# Check if FileVault is enabled
-			if [[ $( /usr/bin/fdesetup status | /usr/bin/awk -F 'FileVault is ' '{print $2}' | /usr/bin/xargs ) != "Off." ]]; then
+			if [[ $( /usr/bin/fdesetup status | /usr/bin/awk '{print $NF}' ) != "Off." ]]; then
 				mac_pro_result+=" / FV Enabled"
 			fi
 
 			echo "${mac_pro_result}"
 
-		elif [[ "${validate_os}" == "Mojave" && "${os_major}" -eq 10 && ( "${os_minor}" -le 12 || "${os_minor}" -eq 13 && "${os_patch}" -le 5 ) ]]; then
-			echo "High Sierra / OS Limitation"  # Supports Mojave or newer, but requires a stepped upgrade path
-
-		elif [[ "${validate_os}" == "Mojave" && "${os_major}" -eq 10 && ( "${os_minor}" -ge 8 || "${os_minor}" -eq 7 && "${os_patch}" -ge 5 ) ]]; then
-			echo "Sierra / OS Limitation"  # (Current OS Limitation, 10.13 Compatible)
-
-		elif [[ "${validate_os}" == "El Capitan" && "${os_major}" -eq 10 && ( "${os_minor}" -ge 7 || "${os_minor}" -eq 6 && "${os_patch}" -ge 8 ) ]]; then
-			echo "El Capitan"
-
-		else
-			echo "<result>Current OS Not Supported</result>"
-			exit 0
+		elif [[
+			"${validate_os}" == "Mojave" && "${os_major}" -eq 10 && \
+			( "${os_minor}" -le 12 || "${os_minor}" -eq 13 && "${os_patch}" -le 5 )
+		]]; then
+			# Supports Mojave or newer, but requires a stepped upgrade path
+			echo "High Sierra / OS Limitation"
 		fi
-
 	fi
 }
 
 check_ram_upgradeable() {
-	ram_upgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | /usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs 2&> /dev/null )
+	ram_upgradeable=$( /usr/sbin/system_profiler SPMemoryDataType | \
+		/usr/bin/awk -F "Upgradeable Memory: " '{print $2}' | /usr/bin/xargs 2&> /dev/null )
 	# ARM Macs do not return the "Upgradeable Memory:" attribute as of early 2022
 	if [[ -z ${ram_upgradeable} ]]; then
 		ram_upgradeable="No"
@@ -224,9 +247,10 @@ check_ram_upgradeable() {
 	echo "${ram_upgradeable}"
 }
 
-# Check if the current RAM meets specs
 ram_check() {
-	# $1 = Max supported OS version based on hardware model
+	# Check if the current RAM meets specs
+	# Arguments
+	#	$1 = Max supported OS version based on hardware model
 	local validate_os="${1}"
 
 	# Setting the minimum RAM required for compatibility
@@ -236,10 +260,11 @@ ram_check() {
 	# Get RAM Info
 	system_ram=$(( $( /usr/sbin/sysctl -n hw.memsize ) / bytes_in_gigabytes ))
 
-	if [[ "${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|(Sonoma|Ventura)\*)$ ]]; then
-		# OS version requires 4GB RAM minimum
-		# For Ventura and Sonoma, value's are inherited from Monterey, Apple has
-		# not yet defined these requirements.
+	if [[
+		"${validate_os}" =~ ^(Catalina|Big[[:space:]]Sur|Monterey|(Ventura|Sonoma|Sequoia)\*)$
+	]]; then
+		# OS version requires 4GB RAM minimum.  For Ventura and newer, value's are inherited from
+		# Monterey as Apple has not publicly defined these requirements.
 
 		if [[ $system_ram -lt $minimum_ram_catalina_and_newer ]]; then
 			# Based on RAM, device does not have enough to support Catalina or newer
@@ -257,7 +282,8 @@ ram_check() {
 				fi
 
 			else
-				# Device does not have enough RAM to upgrade currently, but RAM capacity can be increased.
+				# Device does not have enough RAM to upgrade currently,
+				# but RAM capacity can be increased.
 				validate_os+=" / Insufficient RAM"
 			fi
 
@@ -273,71 +299,65 @@ ram_check() {
 				echo "<result>Not Upgradable</result>"
 				exit 0
 			else
-				# Device does not have enough RAM to upgrade currently, but RAM capacity can be increased.
+				# Device does not have enough RAM to upgrade currently,
+				# but RAM capacity can be increased.
 				validate_os+=" / Insufficient RAM"
 			fi
 
 		fi
-
 	fi
 
 	echo "${validate_os}"
 }
 
-# Check if the available free space is sufficient
 storage_check() {
-	# $1 = Max supported OS version based on hardware model
-	# $2 = Current OS major version
-	# $3 = Current OS minor version
-	# $4 = Current OS patch version
+	# Check if the available free space is sufficient
+	#	$1 = Max supported OS version based on hardware model
+	#	$2 = Current OS major version
+	#	$3 = Current OS minor version
+	#	$4 = Current OS patch version
 	local validate_os="${1}"
 	local os_major="${2}"
 	local os_minor="${3}"
 	local os_patch="${4}"
 
 	# Get free space on the boot disk
-	# storage_free_space=$( /usr/bin/osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]))" )
 	storage_free_space=$( /usr/bin/osascript -l "JavaScript" -e '
-
 		ObjC.import("Foundation");
-		var freeSpaceBytesRef=Ref();
-
+		let freeSpaceBytesRef = Ref();
 		$.NSURL.fileURLWithPath("/").getResourceValueForKeyError(
 			freeSpaceBytesRef,
 			"NSURLVolumeAvailableCapacityForImportantUsageKey",
 			null
 		);
+		Math.round( ObjC.unwrap( freeSpaceBytesRef[0] ) )'
+	)
 
-		Math.round(
-			ObjC.unwrap(
-				freeSpaceBytesRef[0]
-			)
-		)
-	')
-
-	# Workaround for NSURLVolumeAvailableCapacityForImportantUsageKey returning 0 if no user is logged in - use NSURLVolumeAvailableCapacityKey instead
+	# Workaround for NSURLVolumeAvailableCapacityForImportantUsageKey returning
+	# 0 if no user is logged in - use NSURLVolumeAvailableCapacityKey instead
 	if [[ ${storage_free_space} -eq 0 ]]; then
 		storage_free_space=$( /usr/bin/osascript -l "JavaScript" -e '
-
 			ObjC.import("Foundation");
 			var freeSpaceBytesRef=Ref();
-
 			$.NSURL.fileURLWithPath("/").getResourceValueForKeyError(
 				freeSpaceBytesRef,
 				"NSURLVolumeAvailableCapacityKey",
 				null
 			);
-
-			Math.round(
-				ObjC.unwrap(
-					freeSpaceBytesRef[0]
-				)
-			)
-		')
+			Math.round( ObjC.unwrap( freeSpaceBytesRef[0] ) )'
+		)
 	fi
 
-	# Set the required free space to compare.  Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
+	# Set the required free space to compare.
+	# Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
+		"Sequoia*"* )
+			# Value's inherited from Monterey, Apple has not defined these requirements
+			required_free_space_newer="27917287424" # 26GB if Sierra or later
+			os_newer="10.12.0"
+			required_free_space_older="47244640256" # 44GB if El Capitan or earlier
+			os_older="10.11.0"
+		;;
 		"Sonoma*"* )
 			# Value's inherited from Monterey, Apple has not defined these requirements
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
@@ -394,26 +414,22 @@ storage_check() {
 		if [[ "${os_major}" -gt "${newer_os_major}" ||
 			( "${os_major}" -eq "${newer_os_major}" &&
 			  "${os_minor}" -ge "${newer_os_minor}" &&
-			  "${os_patch}" -ge "${newer_os_patch}" ) ]]; then
-
+			  "${os_patch}" -ge "${newer_os_patch}" )
+		]]; then
 			required_free_space=$required_free_space_newer
-
 		# Check older
 		elif [[ "${os_major}" -gt "${older_os_major}" ||
 			  ( "${os_major}" -eq "${older_os_major}" &&
 				"${os_minor}" -ge "${older_os_minor}" &&
-				"${os_patch}" -ge "${older_os_patch}" ) ]]; then
-
+				"${os_patch}" -ge "${older_os_patch}" )
+		]]; then
 			required_free_space=$required_free_space_older
-
 		fi
-
 	fi
 
 	if [[  $storage_free_space -le $required_free_space ]]; then
 		echo " / Insufficient Storage"
 	fi
-
 }
 
 ##################################################
@@ -427,7 +443,7 @@ if [[ -z "${TEST_OS}" ]]; then
 	os_version=$( /usr/bin/sw_vers -productVersion )
 else
 	os_version="${TEST_OS}"
-	echo "Test OS value: ${TEST_OS}"
+	echo "Test OS value: ${os_version}"
 fi
 
 current_os_major=$( echo "${os_version}" | /usr/bin/awk -F '.' '{print $1}' )
@@ -446,6 +462,9 @@ fi
 model_result=$( model_check "${mac_model}" )
 
 case "${model_result}" in
+	"Sequoia*" )
+		version_string="15"
+	;;
 	"Sonoma*" )
 		version_string="14"
 	;;
@@ -475,7 +494,7 @@ case "${model_result}" in
 	;;
 esac
 
-if [[ 
+if [[
 	( "${version_string}" =~ ^10[.].+ && \
 	"${current_os_minor}" -gt $( echo "${version_string}" | /usr/bin/awk -F '.' '{print $2}' ) ) \
 	|| "${current_os_major}" -gt $( echo "${version_string}" | /usr/bin/awk -F '.' '{print $1}' )
@@ -483,25 +502,22 @@ if [[
 	# Check to see if device is running an OS version newer than what it supports.
 	# If so, no reason to check further specifications.
 	report_result="${model_result} (Model doesn't support current OS version)"
-
 elif [[
 		"${version_string}" == "${current_os_major}.${current_os_minor}" ||
 		"${version_string}" == "${current_os_major}"
 	]]; then
-	# Check to see if device is already running the latest supported OS.
-	# If so, no reason to check further specifications.
-
+	# Is device already running the latest supported OS?
 	report_result="${model_result}"
-
 else
-
-	os_result=$( os_check  "${model_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" "${mac_model}" )
+	# Run though compatibility check functions
+	os_result=$( os_check "${model_result}" "${current_os_major}" \
+		"${current_os_minor}" "${current_os_patch}" "${mac_model}" )
 	ram_check_results=$( ram_check "${os_result}" )
-	storage_check_results=$( storage_check "${os_result}" "${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
+	storage_check_results=$( storage_check "${os_result}" \
+		"${current_os_major}" "${current_os_minor}" "${current_os_patch}" )
 
 	report_result="${ram_check_results}${storage_check_results}"
 	model_result="${ram_check_results}${storage_check_results}"
-
 fi
 
 echo "<result>${report_result}</result>"
