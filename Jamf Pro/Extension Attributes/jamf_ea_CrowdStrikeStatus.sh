@@ -4,7 +4,7 @@
 ###################################################################################################
 # Script Name:  jamf_ea_CrowdStrikeStatus.sh
 # By:  Zack Thompson / Created:  1/8/2019
-# Version:  2.13.0 / Updated:  6/7/2024 / By:  ZT
+# Version:  2.13.1 / Updated:  6/11/2024 / By:  ZT
 #
 # Description:  This script gets the configuration of the CrowdStrike Falcon Sensor, if installed.
 #
@@ -144,7 +144,7 @@ get_falconctl_stats() {
 	# Arguments
 	# $1 = (str) path to falconctl
 
-	"${1}" stats agent_info Communications 2>&1
+	"${1}" stats agent_info Communications CloudInfo 2>&1
 	# Will eventually move to the --plist format, once it's fully supported
 	# "${1}" stats agent_info Communications --plist
 
@@ -573,8 +573,8 @@ fi
 
 # Get the connection established dates.
 connectionState=$( echo "${falconctlStats}" | /usr/bin/awk -F "State:" '{print $2}' | /usr/bin/xargs )
-established=$( echo "${falconctlStats}" | /usr/bin/awk -F "[^Last] Established At:" '{print $2}' | /usr/bin/xargs )
-lastEstablished=$( echo "${falconctlStats}" | /usr/bin/awk -F "Last Established At:" '{print $2}' | /usr/bin/xargs )
+established=$( echo "${falconctlStats}" | /usr/bin/awk -F "[[:space:]]+Established At:" '{print $2}' | /usr/bin/xargs )
+lastEstablished=$( echo "${falconctlStats}" | /usr/bin/awk -F "[[:space:]]+Last Established At:" '{print $2}' | /usr/bin/xargs )
 
 if [[ "${connectionState}" == "connected" ]]; then
 
