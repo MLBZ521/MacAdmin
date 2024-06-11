@@ -20,13 +20,13 @@ echo "Checking the CrowdStrike Falcon Sensor configuration..."
 # Supported actions:
 #   true - if network filter state is disabled, enable it
 #   false - do not change network filter state, only report on it
-remediate_network_filter="true"
+remediate_network_filter="false"
 
 # Set whether CrowdStrike Firmware Analysis is enabled in your Prevention Policy.
 # Supported actions:
 #   true - Firmware Analysis is enabled
 #   false - Firmware Analysis is disabled
-csFirmwareAnalysisEnabled="false"
+csFirmwareAnalysisEnabled="true"
 
 # Set environments' Customer ID (CID)
 # Formatted for falconctl stats
@@ -345,7 +345,7 @@ check_kernel_extension() {
 	# Check if the OS version is 10.13.2 or newer, if it is, check if the KEXT is enabled.
 	## Support for 10.13 is dropping at end of 2020!
 	### A KEXT will be used on macOS 11 until Apple releases an System Extension API for Firmware Analysis.
-	if [[ $( /usr/bin/bc <<< "${osMinorPatchVersion} >= 13.2" ) -eq 1 || ( $( /usr/bin/bc <<< "${osMajorVersion} >= 11" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ) ]]; then
+	if [[ $( /usr/bin/bc <<< "${osMajorVersion} < 12" ) -eq 1 && "${csFirmwareAnalysisEnabled}" == "true" ]]; then
 
 		# Get how many KEXTs are loaded.
 		kextsLoaded=$( /usr/sbin/kextstat | /usr/bin/grep "com.crowdstrike" | /usr/bin/wc -l | /usr/bin/xargs )
@@ -383,7 +383,10 @@ check_kernel_extension() {
 			fi
 
 		fi
-
+	else
+		echo "Skipping kernel extension check. Either the OS is Monterey/newer or Firmware Analysis is disabled."
+		echo "OS Major Version:" "${osMajorVersion}"
+		echo "Firmware Analysis Enabled:" "${csFirmwareAnalysisEnabled}"
 	fi
 
 }
