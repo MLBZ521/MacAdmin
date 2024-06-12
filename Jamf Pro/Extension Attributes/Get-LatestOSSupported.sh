@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.6.0 / Updated:  6/10/2024 / By:  ZT
+# Version:  2.6.1 / Updated:  6/11/2024 / By:  ZT
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -76,7 +76,7 @@ not_bigsur_regex="^(MacPro[1-5],[0-9]|iMac((([1-9]|1[0-3]),[0-9])|14,[0-3])|Macm
 not_monterey_regex="^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$"
 not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$"
 not_sonoma_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
-not_sequoia_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-8],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
+not_sequoia_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|Macmini[1-7],[0-9]|MacBookAir[1-8],[0-9]|MacBookPro([1-9]|1[0-4]),[0-9])$"
 
 ##################################################
 # Setup Functions
