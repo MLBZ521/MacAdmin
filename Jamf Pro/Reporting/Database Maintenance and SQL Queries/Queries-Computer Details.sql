@@ -26,7 +26,8 @@ SELECT
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-5],[0-9]|iMac([1-9]|1[0-5]),[0-9]|(Macmini|MacBookAir)[1-6],[0-9]|MacBook[1-8],[0-9]|MacBookPro(([1-9]|10),[0-9]|11,[0-3]))$" THEN "Big Sur"
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[1-9],[0-9]|MacBookPro([1-9]|1[0-3]),[0-9])$" THEN "Monterey"
 		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[\d,]+|MacBookPro([1-9]|1[0-4]),[0-9])$" THEN "Ventura"
-		ELSE "Sonoma"
+		WHEN computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|Macmini[1-7],[0-9]|MacBookAir[1-8],[0-9]|MacBookPro([1-9]|1[0-4]),[0-9])$" THEN "Sonoma"
+		ELSE "Sequoia"
 	END AS "Latest Major OS Supported",
 	CASE
 		WHEN (
@@ -51,7 +52,10 @@ SELECT
 				computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[\d,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
 				AND computers_denormalized.operating_system_version LIKE "13.%"
 			OR
-				computers_denormalized.operating_system_version LIKE "14.%"
+				computers_denormalized.model_identifier REGEXP "^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|Macmini[1-7],[0-9]|MacBookAir[1-8],[0-9]|MacBookPro([1-9]|1[0-4]),[0-9])$"
+				AND computers_denormalized.operating_system_version LIKE "14.%"
+			OR
+				computers_denormalized.operating_system_version LIKE "15.%"
 		) THEN "True"
 		ELSE "False"
 	END AS "Latest Major OS Installed",
@@ -351,7 +355,7 @@ WHERE
 --   Remove the last AND condition to see all failed Renew MDM Profile Commands
 SELECT
 	mac_denorm.computer_id AS "Computer ID",
-	IF (sites_macs.site_name IS NOT NULL, sites_macs.site_name, "None") AS `Site`,
+	IF(sites_macs.site_name IS NOT NULL, sites_macs.site_name, "None") AS "Site",
 	IF(mac_denorm.is_managed = 1, "True", "False") AS "Managed",
 	error_code AS "Error Code",
 	error_domain AS "Error Domain",
