@@ -200,7 +200,7 @@ SELECT
 	IF(mobile_devices_denormalized.is_supervised = 1, "True", "False") AS "Supervised",
 	CASE
 		WHEN mobile_devices_denormalized.declarative_device_management_enabled = 1 THEN "True"
-		WHEN mobile_devices_denormalized.os_version REGEXP "^([1-9]|1[0-5])\.[.\d]+$" THEN "Not Supported"
+		WHEN mobile_devices_denormalized.os_version REGEXP "^([1-9]|1[0-5])(\.[0-9])+?$" THEN "Not Supported"
 		ELSE "False"
 	END AS "Declarative Device Management",
 	IF(mobile_devices.user_removed_mdm_profile = 1, "True", "False") AS "Missing MDM Profile",
