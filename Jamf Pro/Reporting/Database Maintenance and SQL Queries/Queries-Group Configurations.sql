@@ -82,8 +82,8 @@ WHERE
 -- Full descriptive overview of Computer Groups
 SELECT DISTINCT
 	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
-	computer_groups.computer_group_name AS "Name",
 	computer_groups.computer_group_id AS "ID",
+	computer_groups.computer_group_name AS "Name",
 	IF(computer_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group",
 	IF(
 		computer_groups.computer_group_id NOT IN (
@@ -105,12 +105,12 @@ SELECT DISTINCT
 		computer_groups.computer_group_name NOT IN (
 			SELECT criteria FROM smart_computer_group_criteria WHERE search_field = "Computer Group"
 		),
-	"True", "False") AS "Not Used",
+	"False", "True") AS "Used",
 	IF(computer_groups.computer_group_id NOT IN (
 		SELECT computer_group_id
 		FROM computer_group_memberships
 		),
-	"True", "False") AS "No Members",
+	"True", "False") AS "Zero Members",
 	CASE
 		WHEN computer_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -121,7 +121,7 @@ SELECT DISTINCT
 			)
 		) THEN "True"
 		Else "False"
-	END AS "No Defined Criteria",
+	END AS "Criteria Not Defined",
 	CASE
 		WHEN computer_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -129,11 +129,11 @@ SELECT DISTINCT
 				SELECT computer_group_id
 				FROM smart_computer_group_criteria
 				GROUP BY computer_group_id
-				HAVING COUNT(computer_group_id) > 10
+				HAVING COUNT(computer_group_id) > 9
 			)
 		) THEN "True"
 		Else "False"
-	END AS "11+ Criteria",
+	END AS "10+ Criteria",
 	CASE
 		WHEN computer_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -142,11 +142,11 @@ SELECT DISTINCT
 				FROM smart_computer_group_criteria
 				WHERE search_field = "Computer Group"
 				GROUP BY computer_group_id
-				HAVING COUNT(computer_group_id) > 4
+				HAVING COUNT(computer_group_id) > 3
 			)
 		) THEN "True"
 		Else "False"
-	END AS "5+ Nested Groups"
+	END AS "4+ Nested Groups"
 FROM computer_groups
 LEFT JOIN site_objects
 	ON computer_groups.computer_group_id = site_objects.object_id
@@ -233,8 +233,8 @@ WHERE
 -- Full descriptive overview of Mobile Device Groups
 SELECT DISTINCT
 	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
-	mobile_device_groups.mobile_device_group_name AS "Name",
 	mobile_device_groups.mobile_device_group_id AS "ID",
+	mobile_device_groups.mobile_device_group_name AS "Name",
 	IF(mobile_device_groups.is_smart_group = "1", "Yes", "No") AS "Smart Group",
 	IF(
 		mobile_device_groups.mobile_device_group_id NOT IN (
@@ -250,13 +250,12 @@ SELECT DISTINCT
 		mobile_device_groups.mobile_device_group_name NOT IN (
 			SELECT criteria FROM smart_mobile_device_group_criteria WHERE search_field = "Mobile Device Group"
 		),
-	"True", "False") AS "Not Used",
+	"False", "True") AS "Used",
 	IF(mobile_device_groups.mobile_device_group_id NOT IN (
 		SELECT mobile_device_group_id
 		FROM mobile_device_group_memberships
 		),
-	"True", "False") AS "No Members",
-
+	"True", "False") AS "Zero Members",
 	CASE
 		WHEN mobile_device_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -267,8 +266,7 @@ SELECT DISTINCT
 			)
 		) THEN "True"
 		Else "False"
-	END AS "No Defined Criteria"
-
+	END AS "Criteria Not Defined",
 	CASE
 		WHEN mobile_device_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -276,11 +274,11 @@ SELECT DISTINCT
 				SELECT mobile_device_group_id
 				FROM smart_mobile_device_group_criteria
 				GROUP BY mobile_device_group_id
-				HAVING COUNT(mobile_device_group_id) > 10
+				HAVING COUNT(mobile_device_group_id) > 9
 			)
 		) THEN "True"
 		Else "False"
-	END AS "11+ Criteria"
+	END AS "10+ Criteria",
 	CASE
 		WHEN mobile_device_groups.is_smart_group = "0" THEN "Static"
 		WHEN (
@@ -289,11 +287,11 @@ SELECT DISTINCT
 				FROM smart_mobile_device_group_criteria
 				WHERE search_field = "Mobile Device Group"
 				GROUP BY mobile_device_group_id
-				HAVING COUNT(mobile_device_group_id) > 4
+				HAVING COUNT(mobile_device_group_id) > 3
 			)
 		) THEN "True"
 		Else "False"
-	END AS "5+ Nested Groups"
+	END AS "4+ Nested Groups"
 FROM mobile_device_groups
 LEFT JOIN site_objects
 	ON mobile_device_groups.mobile_device_group_id = site_objects.object_id
