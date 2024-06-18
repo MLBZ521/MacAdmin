@@ -156,25 +156,48 @@ DESC;
 
 -- ##################################################
 -- MDM Commands that result in an Error
--- Count and results for MDM Commands that resulted in an Error in last 24 hours
+-- Count and results for MDM Commands that resulted in an Error
+	-- Specifically Configuration Profiles and App Store Apps
+-- Optionally, limit to the last 24 hours (or other date range)
 SELECT
 	COUNT(mdm_cmds.apns_result_status) AS "Total",
 	mdm_cmds.command AS "Command",
+	mdm_c.client_type AS "Client Type",
 	mdm_cmds.error_localized_description AS "Description",
 	CASE
 		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Profile$" AND
+			mac_apps.deleted = 1
+		) THEN "Unknown/Deleted"
+		WHEN (
+			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Profile$" AND
+			mobile_apps.deleted = 1
+		) THEN "Unknown/Deleted"
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
+			AND mdm_cmds.command REGEXP "^(Install|Remove)Application$"
+			AND sites_mac_apps.site_name IS NOT NULL
+		) THEN sites_mac_apps.site_name
+		WHEN (
+			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+			AND mdm_cmds.command REGEXP "^(Install|Remove)Application$"
+			AND sites_mobile_apps.site_name IS NOT NULL
+		) THEN sites_mobile_apps.site_name
+		WHEN (
+			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
+			AND mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
 			AND sites_mac.site_name IS NOT NULL
 		) THEN sites_mac.site_name
 		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
+			AND mdm_cmds.command REGEXP "^(Install|Remove)Profile$"
 			AND sites_mobile.site_name IS NOT NULL
 		) THEN sites_mobile.site_name
 		ELSE "None"
-	END AS "Site",
-	mdm_c.client_type AS "Client Type",
-	mdm_cmds.profile_id AS "ID",
+	END AS "Object Site",
+	mdm_cmds.profile_id AS "Object ID",
 	CASE
 		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
@@ -192,7 +215,30 @@ SELECT
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
 			mdm_cmds.command REGEXP "^(Install|Remove)Application$"
 		) THEN mobile_apps.app_name
-	END AS "Name"
+	END AS "Name",
+	CASE
+		WHEN (
+			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Profile$" AND
+			mac_cp.deleted = 1
+		) THEN "True"
+		WHEN (
+			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Profile$" AND
+			mobile_cp.deleted = 1
+		) THEN "True"
+		WHEN (
+			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Application$" AND
+			mac_apps.deleted = 1
+		) THEN "True"
+		WHEN (
+			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") AND
+			mdm_cmds.command REGEXP "^(Install|Remove)Application$" AND
+			mobile_apps.deleted = 1
+		) THEN "True"
+		ELSE "False"
+	END AS "Deleted"
 FROM mobile_device_management_commands AS mdm_cmds
 LEFT OUTER JOIN computers_denormalized AS mac_denorm
 	ON mdm_cmds.client_management_id = mac_denorm.management_id
@@ -232,7 +278,8 @@ LEFT JOIN sites AS sites_mobile_apps
 	ON sites_mobile_apps.site_id = site_objs_mobile_apps.site_id
 WHERE
 	mdm_cmds.apns_result_status = "Error"
-	AND mdm_cmds.date_completed_epoch > unix_timestamp(date_sub(now(), INTERVAL 24 HOUR))*1000
+	AND mdm_cmds.command REGEXP "^(Install|Remove)(Profile|Application)$"
+	-- AND mdm_cmds.date_completed_epoch > unix_timestamp(date_sub(now(), INTERVAL 24 HOUR))*1000 -- Last 24 hours
 GROUP BY
 	mdm_cmds.profile_udid,
 	mdm_cmds.profile_id,
@@ -242,7 +289,11 @@ GROUP BY
 	mdm_cmds.error_localized_description,
 	mac_cp.display_name,
 	mobile_cp.display_name,
-	Site
+	mac_cp.deleted,
+	mac_apps.deleted,
+	mobile_cp.deleted,
+	mobile_apps.deleted,
+	`Object Site`
 ORDER BY COUNT(*)
 DESC;
 
