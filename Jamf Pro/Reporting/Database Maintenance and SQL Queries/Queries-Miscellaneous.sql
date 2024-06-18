@@ -52,30 +52,18 @@ DESC;
 -- ##################################################
 -- Queries for App Store Apps
 
--- Mac Apps with No Scope
+-- Mac Apps with
+	-- No Scope
+	-- (Not) using VPP Devices Based Licenses
 SELECT DISTINCT
 	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mac_apps.mac_app_id AS "ID",
-	mac_apps.app_name AS "Name"
-FROM mac_apps
-LEFT JOIN site_objects
-	ON mac_apps.mac_app_id = site_objects.object_id
-		AND site_objects.object_type = "350"
-LEFT JOIN sites
-	ON sites.site_id = site_objects.site_id
-WHERE
-	mac_apps.mac_app_id NOT IN (
+	mac_apps.app_name AS "Name",
+	IF(mac_apps.mac_app_id NOT IN (
 		SELECT mac_app_id FROM mac_app_deployment
-	)
-	AND mac_apps.deleted = 0
-;
-
-
--- Mac Apps not using VPP Devices Based Licenses
-SELECT DISTINCT
-	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
-	mac_apps.mac_app_id AS "ID",
-	mac_apps.app_name AS "Name"
+		), "True", "False"
+	) AS "No Scope",
+	IF(mac_apps.assign_vpp_device_based_licenses = 1, "True", "False") AS "VPP Licenses"
 FROM mac_apps
 LEFT JOIN site_objects
 	ON mac_apps.mac_app_id = site_objects.object_id
@@ -83,35 +71,22 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-	mac_apps.assign_vpp_device_based_licenses = 0
-	AND mac_apps.deleted = 0
+	mac_apps.deleted = 0
 ;
 
 
--- Mobile Device Apps with No Scope
+-- Mobile Device Apps with
+	-- No Scope
+	-- (Not) using VPP Devices Based Licenses
 SELECT DISTINCT
 	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
 	mobile_device_apps.mobile_device_app_id AS "ID",
-	mobile_device_apps.app_name AS "Name"
-FROM mobile_device_apps
-LEFT JOIN site_objects
-	ON mobile_device_apps.mobile_device_app_id = site_objects.object_id
-		AND site_objects.object_type = "23"
-LEFT JOIN sites
-	ON sites.site_id = site_objects.site_id
-WHERE
-	mobile_device_apps.mobile_device_app_id NOT IN (
+	mobile_device_apps.app_name AS "Name",
+	IF(mobile_device_apps.mobile_device_app_id NOT IN (
 		SELECT mobile_device_app_id FROM mobile_device_app_deployment
-	)
-	AND mobile_device_apps.deleted = 0
-;
-
-
--- Mobile Device Apps not using VPP Devices Based Licenses
-SELECT DISTINCT
-	IF(sites.site_name IS NULL, "None", sites.site_name) AS "Site",
-	mobile_device_apps.mobile_device_app_id AS "ID",
-	mobile_device_apps.app_name AS "Name"
+		), "True", "False"
+	) AS "No Scope",
+	IF(mobile_device_apps.assign_vpp_device_based_licenses = 1, "True", "False") AS "VPP Licenses"
 FROM mobile_device_apps
 LEFT JOIN site_objects
 	ON mobile_device_apps.mobile_device_app_id = site_objects.object_id
@@ -119,8 +94,7 @@ LEFT JOIN site_objects
 LEFT JOIN sites
 	ON sites.site_id = site_objects.site_id
 WHERE
-	mobile_device_apps.assign_vpp_device_based_licenses = 0
-	AND mobile_device_apps.deleted = 0
+	mobile_device_apps.deleted = 0
 ;
 
 
