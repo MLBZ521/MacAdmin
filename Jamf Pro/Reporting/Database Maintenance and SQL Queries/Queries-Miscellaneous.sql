@@ -16,8 +16,8 @@ WHERE
 GROUP BY
 	DATE(date_sub(from_unixtime(reports.date_entered_epoch/1000), INTERVAL 1 DAY)),
 	computer_id
-HAVING `Inventory Reports` > 1
-ORDER BY `Inventory Reports`
+HAVING "Inventory Reports" > 1
+ORDER BY "Inventory Reports"
 DESC;
 
 
@@ -146,9 +146,8 @@ SELECT username, key_pair_name, key_pair_value
 FROM user_preferences
 WHERE
 	key_pair_name = "lastSiteID"
-	AND username = "zthomps3"
+	AND username = "<username>"
 ;
-
 
 
 -- ##################################################

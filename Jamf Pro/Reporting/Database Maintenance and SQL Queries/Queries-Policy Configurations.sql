@@ -56,7 +56,7 @@ LEFT JOIN sites
 -- ##################################################
 -- Self Service Policies
 
--- Get Policies are report if they are set for Self Service and if have a Description and Icon and include it's Site
+-- Get Policies and report if they are set for Self Service and if they have a Description and Icon and include it's Site
 SELECT
 	policies.policy_id AS "Policy ID",
 	policies.name AS "Policy Name",

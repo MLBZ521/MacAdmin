@@ -24,7 +24,7 @@ WHERE command NOT IN (
 -- Jamf Pro Product Issue:  (Couldn't find the PI at the moment)
 -- When a machine is re-enrolled, it gets a new push token and all of the remote commands
 --      associated with the old push token are supposed to be cleared out.
--- However, the this doesn't happen which is what the PI is for and the below command will clear out.
+-- However, this doesn't happen which is what the PI is for and the below command will clear out.
 -- ***PLEASE NOTE*** Workarounds that remove objects from the mobile_device_management_commands
 --      table will leave orphan records in the mdm_command_source and mdm_command_group tables.
 --      If you are running this workaround, the workaround for PI-009639 must be run promptly after.
@@ -53,7 +53,7 @@ WHERE
 
 -- ##################################################
 -- Jamf Pro Product Issue:  PI-009639
--- Clean up records in the computer_user_pushtokens table
+-- Clean up records in the mdm_command_source and mdm_command_group tables
 
 -- Rename the original mdm_command_source table
 RENAME TABLE mdm_command_source TO mdm_command_source_original;

@@ -260,7 +260,7 @@ SELECT
 			AND sites_mobiles.site_name IS NOT NULL
 		) THEN sites_mobiles.site_name
 		ELSE "None"
-	END AS `Device Site`,
+	END AS "Device Site",
 	CASE
 		WHEN mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
 		WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
@@ -275,7 +275,7 @@ SELECT
 			AND sites_mobile_apps.site_name IS NOT NULL
 		) THEN sites_mobile_apps.site_name
 		ELSE "None"
-	END AS `App Site`,
+	END AS "App Site",
 	mdm_cmds.profile_id AS "App ID",
 	CASE
 		WHEN (
@@ -332,8 +332,8 @@ GROUP BY
 	mac_denorm.computer_id,
 	mdm_cmds.apns_result_status,
 	mdm_cmds.error_localized_description,
-	`App Site`,
-	`Device Site`
+	"App Site",
+	"Device Site"
 HAVING COUNT(*) > 1
 ORDER BY COUNT(*)
 DESC;
@@ -354,7 +354,7 @@ SELECT
 			AND sites_mobiles.site_name IS NOT NULL
 		) THEN sites_mobiles.site_name
 		ELSE "None"
-	END AS `Device Site`,
+	END AS "Device Site",
 	CASE
 		WHEN mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") THEN mac_denorm.computer_id
 		WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
@@ -369,7 +369,7 @@ SELECT
 			AND sites_mobile_apps.site_name IS NOT NULL
 		) THEN sites_mobile_apps.site_name
 		ELSE "None"
-	END AS `App Site`,
+	END AS "App Site",
 	mdm_cmds.profile_id AS "App ID",
 	CASE
 		WHEN (
@@ -430,8 +430,8 @@ GROUP BY
 	mac_denorm.computer_id,
 	mdm_cmds.apns_result_status,
 	mdm_cmds.error_localized_description,
-	`App Site`,
-	`Device Site`
+	"App Site",
+	"Device Site"
 HAVING COUNT(*) > 1
 ORDER BY COUNT(*)
 DESC;
@@ -477,7 +477,6 @@ DESC;
 SELECT distinct command
 FROM mobile_device_management_commands
 ;
-
 
 
 -- ##################################################
