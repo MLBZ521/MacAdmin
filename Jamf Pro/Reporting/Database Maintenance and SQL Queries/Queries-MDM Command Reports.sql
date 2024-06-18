@@ -7,6 +7,7 @@ SELECT
 	COUNT(*) AS "Total",
 	SUM(IF(apns_result_status = "", 1, 0)) AS "Pending",
 	SUM(IF(apns_result_status = "Error", 1, 0)) AS "Error",
+	SUM(IF(apns_result_status = "Error", 1, 0))*100/COUNT(*) AS "Error %",
 	SUM(IF(apns_result_status = "Acknowledged", 1, 0)) AS "Acknowledged",
 	SUM(IF(apns_result_status = "NotNow", 1, 0)) AS "Not Now"
 FROM mobile_device_management_commands
@@ -22,6 +23,7 @@ SELECT
 	mdm_c.client_type AS "Client Type",
 	SUM(IF(apns_result_status = "", 1, 0)) AS "Pending",
 	SUM(IF(apns_result_status = "Error", 1, 0)) AS "Error",
+	SUM(IF(apns_result_status = "Error", 1, 0))*100/COUNT(*) AS "Error %",
 	SUM(IF(apns_result_status = "Acknowledged", 1, 0)) AS "Acknowledged",
 	SUM(IF(apns_result_status = "NotNow", 1, 0)) AS "Not Now"
 FROM mobile_device_management_commands AS mdm_cmds
@@ -47,12 +49,13 @@ SELECT
 	COUNT(client_management_id) AS "Total",
 	mdm_cmds.command AS "Command",
 	mdm_cmds.apns_result_status AS "Result",
+	mdm_cmds.profile_id AS "Profile ID",
 	CASE
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_mac.site_name IS NOT NULL
 		) THEN sites_mac.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobile.site_name IS NOT NULL
 		) THEN sites_mobile.site_name
@@ -129,6 +132,7 @@ LEFT JOIN sites AS sites_mobile_apps
 	ON sites_mobile_apps.site_id = site_objs_mobile_apps.site_id
 WHERE
 	date_completed_epoch > unix_timestamp(date_sub(now(), INTERVAL 24 HOUR))*1000
+	-- and mdm_cmds.command = "RemoveProfile" -- Filter by install/remove Profile action
 GROUP BY
 	mdm_cmds.apns_result_status,
 	mdm_cmds.command,
@@ -158,11 +162,12 @@ SELECT
 	mdm_cmds.command AS "Command",
 	mdm_cmds.error_localized_description AS "Description",
 	CASE
-	   WHEN (
+		WHEN (
+			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER") AND
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_mac.site_name IS NOT NULL
 		) THEN sites_mac.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobile.site_name IS NOT NULL
 		) THEN sites_mobile.site_name
@@ -251,11 +256,11 @@ SELECT
 	COUNT(*),
 	mdm_c.client_type AS "Client Type",
 	CASE
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_macs.site_name IS NOT NULL
 		) THEN sites_macs.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobiles.site_name IS NOT NULL
 		) THEN sites_mobiles.site_name
@@ -266,11 +271,11 @@ SELECT
 		WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
 	END AS "Device ID",
 	CASE
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_mac_apps.site_name IS NOT NULL
 		) THEN sites_mac_apps.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobile_apps.site_name IS NOT NULL
 		) THEN sites_mobile_apps.site_name
@@ -345,11 +350,11 @@ SELECT
 	COUNT(*),
 	mdm_c.client_type AS "Client Type",
 	CASE
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_macs.site_name IS NOT NULL
 		) THEN sites_macs.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobiles.site_name IS NOT NULL
 		) THEN sites_mobiles.site_name
@@ -360,11 +365,11 @@ SELECT
 		WHEN mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV") THEN mobile_denorm.mobile_device_id
 	END AS "Device ID",
 	CASE
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("COMPUTER", "COMPUTER_USER")
 			AND sites_mac_apps.site_name IS NOT NULL
 		) THEN sites_mac_apps.site_name
-	   WHEN (
+		WHEN (
 			mdm_c.client_type IN ("MOBILE_DEVICE", "MOBILE_DEVICE_USER", "TV")
 			AND sites_mobile_apps.site_name IS NOT NULL
 		) THEN sites_mobile_apps.site_name
