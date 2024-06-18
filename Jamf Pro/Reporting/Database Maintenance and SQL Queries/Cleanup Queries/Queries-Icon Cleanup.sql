@@ -345,7 +345,7 @@ AND ( icons.filename REGEXP "^([0-9]+x[0-9]+bb|[0-9]+)[.](png|jpg)$");
 -- Find duplicate icons
 
 -- Get count of each duplicate icons and it's filename
-SELECT COUNT(contents_original), filename
+SELECT COUNT(contents_original), filename, contents_original
 FROM icons
 GROUP BY contents_original, filename
 HAVING COUNT(contents_original) > 1;
