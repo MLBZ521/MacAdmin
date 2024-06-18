@@ -81,8 +81,13 @@ WHERE packages.package_id NOT IN (
 
 -- Unused Printers
 SELECT DISTINCT
-	printers.printer_id,
-	printers.display_name
+	printer_id,
+	display_name,
+	device_uri,
+	location,
+	model,
+	info,
+	notes
 FROM printers
 WHERE printers.printer_id NOT IN (
 	SELECT printer_id FROM policy_printers
