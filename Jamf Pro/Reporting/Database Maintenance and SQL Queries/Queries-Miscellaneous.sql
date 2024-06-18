@@ -1,6 +1,30 @@
 -- Queries on Miscellaneous Configurations
 
 -- ##################################################
+-- Size of the jamfsoftware database
+SELECT
+    table_schema AS "Database",
+    ROUND(SUM(data_length + index_length) / 1024 / 1024 / 1024, 2) AS "Size in GB"
+FROM information_schema.TABLES
+WHERE table_schema = "jamfsoftware";
+
+
+-- Get all tables larger than <500MB> in the jamfsoftware database
+SELECT
+    table_name,
+    Round(( ( index_length ) / 1024 / 1024 ), 2) AS "Index Size (MB)",
+    Round(( ( data_length + index_length ) / 1024 / 1024 ), 2) AS "Table Size (MB)",
+    Round(( data_free / 1024 / 1024 ), 2) AS "Data Free (MB)",
+    table_rows
+FROM information_schema.tables
+WHERE 
+    table_schema = "jamfsoftware"
+    and Round(( ( data_length + index_length ) / 1024 / 1024 ), 2) > 500
+ORDER BY 3
+DESC;
+
+
+-- ##################################################
 -- Computer Inventory Submissions
 
 -- Count the number inventory submissions in the last 24 hours per computer.
