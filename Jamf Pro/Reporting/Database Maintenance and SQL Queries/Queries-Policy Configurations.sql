@@ -113,7 +113,7 @@ JOIN policy_history
 WHERE
 	policy_history.completed_epoch>unix_timestamp(date_sub(NOW(), interval 1 DAY))*1000
 GROUP BY
-	policy_history.policy_id,
+	policies.policy_id,
 	sites.site_name
 ORDER BY Total
 DESC;
@@ -137,7 +137,7 @@ WHERE
 	policy_history.completed_epoch>unix_timestamp(date_sub(NOW(), interval 1 DAY))*1000
 	AND policies.update_inventory = 1
 GROUP BY
-	policy_history.policy_id,
+	policies.policy_id,
 	sites.site_name
 ORDER BY Total
 DESC;
@@ -149,7 +149,7 @@ SELECT
 	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
 	policies.policy_id AS "Policy ID",
 	policies.name AS "Policy Name",
-	IF(policies.update_inventory = "1", "Yes", "No") AS "Update Inventory?",
+	IF(policies.update_inventory = "1", "Yes", "No") AS "Update Inventory",
 	SUM(IF(error = "1", 1, 0)) AS "Errors"
 FROM policies
 LEFT JOIN site_objects
@@ -164,7 +164,7 @@ JOIN logs
 WHERE
 	policy_history.completed_epoch > unix_timestamp(date_sub(NOW(), INTERVAL 1 DAY))*1000
 GROUP BY
-	policy_history.policy_id,
+	policies.policy_id,
 	sites.site_name
 ORDER BY Total
 DESC;
@@ -199,8 +199,8 @@ JOIN policy_history
 JOIN logs
 	ON logs.log_id = policy_history.log_id
 GROUP BY
-	policy_history.policy_id,
-	sites.site_name
+    policies.policy_id,
+    sites.site_name
 ORDER BY Total
 DESC;
 
@@ -232,7 +232,6 @@ WHERE
 	AND (
 		policies.trigger_event_startup = "1"
 		OR policies.trigger_event_login = "1"
-		OR policies.trigger_event_logout = "1"
 		OR policies.trigger_event_network_state_change = "1"
 		OR policies.trigger_event_checkin = "1"
 	);
@@ -270,7 +269,6 @@ WHERE
 	AND (
 		policies.trigger_event_startup = "1"
 		OR policies.trigger_event_login = "1"
-		OR policies.trigger_event_logout = "1"
 		OR policies.trigger_event_network_state_change = "1"
 		OR policies.trigger_event_checkin = "1"
 	)
