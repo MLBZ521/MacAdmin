@@ -179,3 +179,13 @@ WHERE
 	)
 ;
 
+
+-- ##################################################
+-- Get where a script is used
+select policy_id
+from policy_scripts
+where script_id = (
+	select scripts.script_id
+	from scripts
+	where scripts.file_name = "<name of script>" 
+);
