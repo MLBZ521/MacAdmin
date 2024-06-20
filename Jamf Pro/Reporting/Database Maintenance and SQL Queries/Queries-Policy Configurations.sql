@@ -24,6 +24,44 @@ FROM policies
 WHERE policies.enabled != "1";
 
 
+-- Policies with no configuration and not created by Jamf Remote
+SELECT *
+FROM policies
+WHERE 
+    created_by = "jss"
+    AND run_swu != 1
+    AND file_vault_2_reboot != 1 
+    AND update_inventory != 1
+    AND fix_permissions != 1
+    AND fix_by_host_files != 1
+    AND reset_computer_name != 1
+    AND search_for_file = "" 
+    AND locate_file = ""
+    AND search_for_process = ""
+    AND spotlight_search = ""
+    AND run_command = ""
+    AND install_all_cached != 1
+    AND flush_system_caches != 1
+    AND flush_user_caches != 1
+    AND verify_startup_disk != 1
+    AND heal != 1
+    AND set_of_password != 1
+    AND perform_workplace_join != 1
+    AND compliance != 1
+    AND disk_encryption_action != 1
+    AND disk_encryption_id != 4
+    AND managed_password_action != "rotate"
+    AND policy_id NOT IN ( 
+        ( SELECT policy_id FROM policy_packages
+        UNION ALL SELECT policy_id FROM policy_accounts
+        UNION ALL SELECT policy_id FROM policy_directory_bindings
+        UNION ALL SELECT policy_id FROM policy_dock_items
+        UNION ALL SELECT policy_id FROM policy_printers
+        UNION ALL SELECT policy_id FROM policy_scripts )
+    )
+;
+
+
 -- Policies with no Category and not created by Jamf Remote
 SELECT DISTINCT policies.policy_id, policies.name, policies.use_for_self_service
 FROM policies
