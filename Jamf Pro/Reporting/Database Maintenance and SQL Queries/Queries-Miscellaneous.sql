@@ -25,6 +25,50 @@ DESC;
 
 
 -- ##################################################
+-- Custom DB Settings
+
+-- Get currently configured custom Jamf Pro settings
+SELECT * FROM jss_custom_settings;
+
+
+-- Disable icon migration when enabling the Cloud Services in Jamf Pro
+INSERT INTO jss_custom_settings
+	(settings_key, value) 
+	VALUES("com.jamfsoftware.jss.core.ics.migrate.enabled", "false")
+;
+
+
+-- Enable Basic Auth for the Jamf Pro API
+INSERT INTO jss_custom_settings
+	(settings_key, value) 
+	VALUES("com.jamfsoftware.api.security.basicAuthEnabled", "true")
+;
+
+
+-- Fix:  Browser fails to load images in Jamf Pro WebUI due to violating Content Security Policy (CSP)
+-- Clear current settings
+DELETE FROM jss_custom_settings
+WHERE settings_key IN (
+	"com.jamfsoftware.http.servlet.response.csp.enforcement.mode",
+	"com.jamfsoftware.http.servlet.response.csp.allow.list"
+);
+
+-- Enable enforcement mode:
+INSERT INTO jss_custom_settings
+	(settings_key, value) 
+	VALUES("com.jamfsoftware.http.servlet.response.csp.enforcement.mode", "true")
+;
+
+INSERT INTO jss_custom_settings
+	(settings_key, value) 
+	VALUES(
+		"com.jamfsoftware.http.servlet.response.csp.allow.list",
+		"default-src 'self' 'unsafe-inline' 'unsafe-eval' data: *.jamf.net *.jamf.build *.jamfcloud.com *.jamf.com *.amazonaws.com *.mzstatic.com *.googleapis.com *.gstatic.com *.googletmanager.com *.zoominsoftware.io *.nr-data.net https://js-agent.newrelic.com *.pendo.io *<insert.company.domain>:*; frame-ancestors 'self' *.jamf.net *.jamf.build *.jamfcloud.com app.pendo.io"
+	)
+;
+
+
+-- ##################################################
 -- Computer Inventory Submissions
 
 -- Count the number inventory submissions in the last 24 hours per computer.
