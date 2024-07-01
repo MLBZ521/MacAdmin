@@ -214,28 +214,74 @@ DESC;
 -- Get various Policies details of interest, including if they perform inventory, have errors, and their Site, and group/count the occurrences.
 -- This is an all time count of how often Policies are ran including the number of errors reported.
 SELECT
-	COUNT(*) AS "Total",
+    policies.policy_id AS "Policy ID",
+    policies.name AS "Policy Name",
+    IF(sites.site_name IS NULL, "none", sites.site_name) AS Site,
+	COUNT(policy_history.policy_id) AS "Total",
 	SUM(IF(error = "1", 1, 0)) AS "Errors",
-	policies.policy_id AS "Policy ID",
-	policies.name AS "Policy Name",
-	IF(sites.site_name IS NULL, "none", sites.site_name) AS "Site",
-	IF(policies.enabled = "1", "Yes", "No") AS "Enabled",
-	IF(policies.update_inventory = "1", "Yes", "No") AS "Update Inventory?",
-	IF(policies.use_for_self_service = "1", "Yes", "No") AS "Self Service",
-	IF(policies.self_service_description = "", "No", "Yes") AS "Has Description",
-	IF(policies.self_service_icon_id = "-1", "No", "Yes") AS "Has Icon",
-	IF(policies.category_id = "-1" AND policies.created_by = "jss", "No", "Yes") AS "Has Category",
-	IF(policies.policy_id NOT IN ( SELECT policy_id FROM policy_deployment ), "False", "True") AS "Has Scope"
+    IF(policies.enabled = "1", "Yes", "No") AS "Enabled",
+	IF(policies.policy_id IN ( SELECT policies.policy_id FROM policies WHERE 
+		created_by = "jss"
+		AND run_swu != 1
+		AND file_vault_2_reboot != 1 
+		AND update_inventory != 1
+		AND fix_permissions != 1
+		AND fix_by_host_files != 1
+		AND reset_computer_name != 1
+		AND search_for_file = "" 
+		AND locate_file = ""
+		AND search_for_process = ""
+		AND spotlight_search = ""
+		AND run_command = ""
+		AND install_all_cached != 1
+		AND flush_system_caches != 1
+		AND flush_user_caches != 1
+		AND verify_startup_disk != 1
+		AND heal != 1
+		AND set_of_password != 1
+		AND perform_workplace_join != 1
+		AND compliance != 1
+		AND disk_encryption_action != 1
+		AND disk_encryption_id != 4
+		AND managed_password_action != "rotate"
+		AND policy_id NOT IN ( 
+			( SELECT policy_id FROM policy_packages
+			UNION ALL SELECT policy_id FROM policy_accounts
+			UNION ALL SELECT policy_id FROM policy_directory_bindings
+			UNION ALL SELECT policy_id FROM policy_dock_items
+			UNION ALL SELECT policy_id FROM policy_printers
+			UNION ALL SELECT policy_id FROM policy_scripts )
+		)
+	), "True", "False") AS "No configuration",
+	IF(MAX(policy_history.completed_epoch) IS NULL, "Never", DATE_FORMAT(from_unixtime(MAX(policy_history.completed_epoch)/1000), '%Y-%m-%d %H:%i:%s')) AS "Last Ran",
+    IF(policies.update_inventory = "1", "Yes", "No") AS "Update Inventory",
+    IF(policies.category_id = "-1", "No", "Yes") AS "Has Category",
+    IF(policies.execution_frequency IN ( "Ongoing", "Once every day", "Once every week", "Once every month" ), "True", "False") AS "Recurring Frequency",
+    IF(policies.trigger_event_checkin = "1", "True", "False") AS "Check-in Event",
+    IF(policies.trigger_event_login = "1", "True", "False") AS "Login Event",
+    IF(policies.trigger_event_startup = "1", "True", "False") AS "Startup Event",
+    IF(policies.trigger_event_enrollment_complete = "1", "True", "False") AS "Enrollment Event",
+    IF(policies.trigger_event_network_state_change = "1", "True", "False") AS "Network Event",
+    IF(policies.use_for_self_service = "1", "Yes", "No") AS "Self Service",
+    policies.self_service_display_name AS "Self Service Policy Name",
+    IF(policies.self_service_description = "", "No", "Yes") AS "Has Description",
+    IF(policies.self_service_icon_id = "-1", "No", "Yes") AS "Has Icon",
+    IF(policies.policy_id IN ( SELECT policy_deployment.policy_id FROM policy_deployment ), "True", "False") AS "Has Scope",
+    IF(policies.policy_id IN ( SELECT policy_deployment.policy_id FROM policy_deployment WHERE policy_deployment.target_type = "101" ), "True", "False") AS "Scoped to  All Computers",
+    IF(policies.policy_id IN ( SELECT policy_deployment.policy_id FROM policy_deployment WHERE policy_deployment.target_type = "106" ), "True", "False") AS "Scoped to  All Users",
+    IF(policies.policy_id IN ( SELECT policy_id FROM policy_packages), "True", "False") AS "Installs Package(s)",
+    IF(policies.run_swu = "1", "True", "False") AS "Perform Software Update"
 FROM policies
 LEFT JOIN site_objects
-	ON policies.policy_id = site_objects.object_id
-		AND site_objects.object_type = "3"
+    ON policies.policy_id = site_objects.object_id AND site_objects.object_type = "3"
 LEFT JOIN sites
-	ON sites.site_id = site_objects.site_id
-JOIN policy_history
-	ON policy_history.policy_id = policies.policy_id
-JOIN logs
-	ON logs.log_id = policy_history.log_id
+    ON sites.site_id = site_objects.site_id
+LEFT JOIN policy_history
+    ON policy_history.policy_id = policies.policy_id
+LEFT JOIN logs
+    ON logs.log_id = policy_history.log_id
+WHERE
+    policies.created_by = "jss"
 GROUP BY
     policies.policy_id,
     sites.site_name
