@@ -19,7 +19,7 @@ SELECT
 FROM information_schema.tables
 WHERE 
     table_schema = "jamfsoftware"
-    and Round(( ( data_length + index_length ) / 1024 / 1024 ), 2) > 500
+    AND Round(( ( data_length + index_length ) / 1024 / 1024 ), 2) > 500
 ORDER BY 3
 DESC;
 
@@ -225,11 +225,41 @@ WHERE
 
 
 -- ##################################################
+-- Get devices with multiple attachments
+SELECT 
+	object_id AS "JSS ID",
+	object_type AS "Device Type",
+	attachments.attachment_id AS "Attachment ID",
+	filename AS "Filename",
+	file_type AS "File Type",
+	file_size AS "File Size"
+FROM attachments
+LEFT OUTER JOIN attachment_assignments
+	ON attachment_assignments.attachment_id = attachments.attachment_id
+WHERE 
+	-- Optionally limit by file type
+	-- file_type IN ( "application/zip", "application/octet-stream" )
+	-- AND 
+	attachments.attachment_id IN (
+	SELECT attachment_id
+	FROM attachment_assignments 
+	WHERE object_id IN (
+		SELECT object_id
+		FROM attachment_assignments 
+		GROUP BY object_id, object_type
+		HAVING COUNT(object_id) > 1
+	)
+)
+ORDER BY object_id
+;
+
+
+-- ##################################################
 -- Get where a script is used
-select policy_id
-from policy_scripts
-where script_id = (
-	select scripts.script_id
-	from scripts
-	where scripts.file_name = "<name of script>" 
+SELECT policy_id
+FROM policy_scripts
+WHERE script_id = (
+	SELECT scripts.script_id
+	FROM scripts
+	WHERE scripts.file_name = "<name of script>" 
 );
