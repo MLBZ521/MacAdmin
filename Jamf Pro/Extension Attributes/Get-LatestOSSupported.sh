@@ -539,6 +539,6 @@ else
 	model_result="${ram_check_results}${storage_check_results}"
 fi
 
-echo "<result>${report_result}</result>"
+echo "<result>${version_string} ${report_result}</result>"
 write_to_ea_history "latest_os_supported" "${model_result}"
 exit 0
