@@ -515,11 +515,26 @@ check_privacy_preferences() {
 }
 
 check_network_filter() {
-	##### Network Filter State Verification #####
-	# Using an official, unsupported, but "more reliable" 
-	# method for validating the Network Filter Status.
-	/usr/bin/defaults read \
-		"/Library/Application Support/CrowdStrike/Falcon/simplestore.plist" "networkFilterEnabled"
+        ##### Network Filter State Verification #####
+        ##### Network Filter State Verification (Updated for 7.21+) #####
+        # Using an official, unsupported, but "more reliable"
+        # Directly tracks the state of the active NetworkExtension Content Filter configuration
+        # method for validating the Network Filter Status.
+        # instead of referencing deprecated local agent storage structures.
+        /usr/bin/defaults read \
+        local plistPath="/Library/Preferences/com.apple.networkextension.plist"
+                "/Library/Application Support/CrowdStrike/Falcon/simplestore.plist" "networkFilterEnabled"
+        if [[ -f "$plistPath" ]]; then
+                local filterBlock
+                filterBlock=$(/usr/bin/plutil -convert xml1 -o - "$plistPath" 2>/dev/null | /usr/bin/grep -A 15 "<string>com.crowdstrike.falcon.App</string>")
+                if echo "$filterBlock" | /usr/bin/grep -A 1 "<key>Enabled</key>" | /usr/bin/grep -q "<true/>"; then
+                        echo "1"
+                else
+                        echo "0"
+                fi
+        else
+                echo "0"
+        fi
 }
 
 ##################################################
