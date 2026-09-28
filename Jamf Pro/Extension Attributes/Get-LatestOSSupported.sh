@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.7.1 / Updated:  9/28/2026 / By:  @AmyNaultMolina
+# Version:  2.8.1 / Updated:  9/28/2026 / By:  @AmyNaultMolina
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
