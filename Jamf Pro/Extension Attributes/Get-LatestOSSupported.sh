@@ -152,7 +152,7 @@ os_check() {
 			"${validate_os}" == "Golden Gate*" && \
 			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
 		]]; then
-			echo "Tahoe*"
+			echo "Golden Gate*"
 		elif [[
 			"${validate_os}" == "Tahoe*" && \
 			( "${os_major}" -ge 11 || "${os_major}" -eq 10 && "${os_minor}" -ge 9 )
