@@ -4,7 +4,7 @@
 ####################################################################################################
 # Script Name:  Get-LatestOSSupported.sh
 # By:  Zack Thompson / Created:  9/26/2017
-# Version:  2.8.0 / Updated:  7/21/2026 / By:  @HowardGMac
+# Version:  2.8.1 / Updated:  9/28/2026 / By:  @AmyNaultMolina
 #
 # Description:  A Jamf Pro Extension Attribute to check the latest compatible version of macOS.
 #
@@ -22,6 +22,7 @@
 #			updated.
 #
 #	System Requirements can be found here:
+#		Golden Gate - https://support.apple.com/en-us/127255
 #		Tahoe - https://support.apple.com/en-us/122867
 #		Sequoia - https://support.apple.com/en-us/120282
 #		Sonoma - https://support.apple.com/en-us/105113
@@ -79,7 +80,7 @@ not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBook
 not_sonoma_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
 not_sequoia_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|Macmini[1-7],[0-9]|MacBookAir[1-8],[0-9]|MacBookPro([1-9]|1[0-4]),[0-9])$"
 not_tahoe_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-9]),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro((16,3)|([1-9]|1[0-5]),[0-9]))$"
-not_goldengate_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-9]|20),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro([1-9]|1[0-6]),[0-9]|MacBook([1-9]|10),[0-9])$"
+not_goldengate_regex="^(MacPro([1-9]|1[0-3]),[0-9]|iMac([1-9]|1[0-9]|20),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro(([1-9]|1[0-6]),[0-9])|MacBook([1-9]|10),[0-9])$"
 
 ##################################################
 # Setup Functions
@@ -368,7 +369,7 @@ storage_check() {
 	# Set the required free space to compare.
 	# Set space requirement in bytes:  /usr/bin/bc <<< "<space in GB> * 1073741824"
 	case "${validate_os}" in
- 		"Golden Gate*"* )
+		"Golden Gate*"* )
 			# Value's inherited from Monterey, Apple has not defined these requirements
 			required_free_space_newer="27917287424" # 26GB if Sierra or later
 			os_newer="10.12.0"
