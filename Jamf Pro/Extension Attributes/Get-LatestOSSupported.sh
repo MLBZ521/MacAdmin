@@ -80,7 +80,7 @@ not_ventura_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-7]),[0-9]|(Macmini|MacBook
 not_sonoma_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|(Macmini|MacBookAir)[1-7],[0-9]|MacBook[0-9,]+|MacBookPro([1-9]|1[0-4]),[0-9])$"
 not_sequoia_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-8]),[0-9]|Macmini[1-7],[0-9]|MacBookAir[1-8],[0-9]|MacBookPro([1-9]|1[0-4]),[0-9])$"
 not_tahoe_regex="^(MacPro[1-6],[0-9]|iMac([1-9]|1[0-9]),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro((16,3)|([1-9]|1[0-5]),[0-9]))$"
-not_goldengate_regex="^(MacPro([1-9]|1[0-3]),[0-9]|iMac([1-9]|1[0-9]|20),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro(([1-9]|1[0-6]),[0-9]))$"
+not_goldengate_regex="^(MacPro([1-9]|1[0-3]),[0-9]|iMac([1-9]|1[0-9]|20),[0-9]|iMacPro1,1|Macmini[1-8],[0-9]|MacBookAir[1-9],[0-9]|MacBookPro(([1-9]|1[0-6]),[0-9])|MacBook([1-9]|10),[0-9])$"
 
 ##################################################
 # Setup Functions
